@@ -236,23 +236,23 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
               onClick={() => onSelectDate(day.dateStr)}
               className={`flex flex-col items-center justify-center flex-shrink-0 w-[58px] sm:w-[68px] py-2.5 px-2 rounded-xl transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-black text-white shadow-md font-bold scale-102'
-                  : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100 border border-gray-100'
+                  ? 'bg-gray-200 border-2 border-gray-300 text-gray-950 shadow-xs font-black scale-102'
+                  : 'bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 border border-gray-200/70'
               }`}
             >
               <span
                 className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${
-                  isSelected ? 'text-gray-300' : 'text-gray-500'
+                  isSelected ? 'text-gray-700 font-bold' : 'text-gray-500'
                 }`}
               >
                 {day.dayName}
               </span>
-              <span className="text-base sm:text-lg font-black mt-0.5 leading-tight">
+              <span className="text-base sm:text-lg font-black mt-0.5 leading-tight text-gray-950">
                 {day.dayNum}
               </span>
               <span
                 className={`text-[9px] uppercase font-bold tracking-tight mt-0.5 ${
-                  isSelected ? 'text-orange-400' : 'text-gray-400'
+                  isSelected ? 'text-orange-600' : 'text-gray-400'
                 }`}
               >
                 {day.monthShort}
