@@ -79,17 +79,17 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
   });
 
   return (
-    <div className="w-full bg-white border border-gray-200 rounded-xl p-3 sm:p-4 mb-6 shadow-xs select-none">
+    <div className="w-full bg-white border border-gray-200/90 rounded-2xl p-3 sm:p-4 mb-4 shadow-xs select-none">
       {/* Top Header: Month/Year on left, Prev/Next Week Arrows on right */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2.5">
         {/* Month / Year button with popup */}
         <div className="relative" ref={datePickerRef}>
           <button
             onClick={() => setShowDatePicker(!showDatePicker)}
-            className="flex items-center space-x-1.5 text-sm sm:text-base font-black text-gray-900 hover:text-orange-600 transition-colors px-2 py-1 rounded-md hover:bg-gray-100 cursor-pointer"
+            className="flex items-center space-x-1.5 text-sm sm:text-base font-bold text-gray-900 hover:text-orange-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 cursor-pointer"
           >
             <span>{currentMonthYear}</span>
-            <CalendarIcon className="w-4 h-4 text-gray-500 ml-1" />
+            <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 ml-1" />
           </button>
 
           {/* Date Picker Dropdown */}
@@ -131,21 +131,21 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
           )}
         </div>
 
-        {/* Previous & Next Week Controls */}
-        <div className="flex items-center space-x-1.5">
+        {/* Previous & Next Week Controls (Bigger Icons) */}
+        <div className="flex items-center space-x-1 sm:space-x-1.5">
           <button
             onClick={handlePrevWeek}
             title="Previous Week"
-            className="p-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200/80 transition-colors cursor-pointer"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button
             onClick={handleNextWeek}
             title="Next Week"
-            className="p-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200/80 transition-colors cursor-pointer"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>

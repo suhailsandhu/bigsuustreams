@@ -173,13 +173,6 @@ export const App: React.FC = () => {
             {/* ========================================================= */}
             {activeTab === 'games' && (
               <>
-                {/* Main Heading: NBA GAMES & SCORES - Centered per user instruction */}
-                <div className="mb-6 text-center">
-                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight uppercase">
-                    NBA GAMES & SCORES
-                  </h1>
-                </div>
-
                 {/* NBA-Style Interactive 7-Day Date Navigation */}
                 <DateNavigation
                   selectedDate={selectedDate}
