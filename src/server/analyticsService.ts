@@ -31,7 +31,7 @@ class AnalyticsTracker {
   };
   private streamStats = new Map<string, { name: string; views: number }>();
   private recentActivity: ActivityEvent[] = [];
-  private adminPin = process.env.ADMIN_PIN || 'suu2026';
+  private adminPin = process.env.ADMIN_PIN || 'suhail7865';
 
   constructor() {
     // Cleanup inactive sessions every 30 seconds

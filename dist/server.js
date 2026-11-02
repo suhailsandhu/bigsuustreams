@@ -711,7 +711,7 @@ var AnalyticsTracker = class {
   };
   streamStats = /* @__PURE__ */ new Map();
   recentActivity = [];
-  adminPin = process.env.ADMIN_PIN || "suu2026";
+  adminPin = process.env.ADMIN_PIN || "suhail7865";
   constructor() {
     setInterval(() => {
       this.cleanup();

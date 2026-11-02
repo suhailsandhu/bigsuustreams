@@ -181,7 +181,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   type="password"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  placeholder="Enter passcode (default: suu2026)"
+                  placeholder="Enter Passcode"
                   className="w-full text-center tracking-widest text-base font-bold bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 outline-none focus:border-black focus:bg-white transition-all"
                   autoFocus
                 />
@@ -357,7 +357,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between text-[11px] text-gray-400 px-1 pt-2 border-t border-gray-100 font-medium">
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Protected with Passcode (suu2026)
+                  Protected Admin Area
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
