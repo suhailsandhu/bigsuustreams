@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
-  Settings, RefreshCw, AlertCircle, ShieldCheck, Tv, ExternalLink,
+  Settings, RefreshCw, AlertCircle, ShieldCheck,
   Layers, Radio
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
@@ -32,7 +32,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isVerified, setIsVerified] = useState(false);
-  const [playerMode, setPlayerMode] = useState<'direct' | 'embed'>('direct');
   const [showControls, setShowControls] = useState(true);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const controlsTimeoutRef = useRef<any>(null);
@@ -65,15 +64,23 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     // Clear watchdog timer
     if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
 
-    // Watchdog: If playback does not start within 6 seconds, auto-fallback to embed feed
+    // Watchdog: If playback does not start within 10 seconds, try quality fallback or retry
     watchdogTimerRef.current = setTimeout(() => {
       if (video.paused && video.readyState < 2) {
         console.warn('Playback watchdog timeout fired for', stream.stream_key, selectedQuality);
-        console.log('Seamlessly switching to official embed feed...');
-        setPlayerMode('embed');
-        setIsLoading(false);
+        if (selectedQuality === '1080p') {
+          console.log('Watchdog attempting quality fallback to 720p...');
+          onQualityChange('720p');
+        } else if (selectedQuality === '720p') {
+          console.log('Watchdog attempting quality fallback to 540p...');
+          onQualityChange('540p');
+        } else {
+          setIsLoading(false);
+          setHasError(true);
+          setErrorMessage('Direct HLS feed is buffering. Click Retry Feed to reconnect.');
+        }
       }
-    }, 6000);
+    }, 10000);
 
     // Destroy existing Hls instance
     if (hlsRef.current) {
@@ -89,9 +96,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         backBufferLength: 30,
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 6,
-        fragLoadingMaxRetry: 3,
-        manifestLoadingMaxRetry: 3,
-        levelLoadingMaxRetry: 3,
+        fragLoadingMaxRetry: 5,
+        manifestLoadingMaxRetry: 5,
+        levelLoadingMaxRetry: 5,
       });
 
       hlsRef.current = hls;
@@ -123,21 +130,20 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.warn('HLS.js event error:', data.type, data.details);
         if (data.fatal) {
-          if (retryCountRef.current < 2) {
+          if (retryCountRef.current < 4) {
             retryCountRef.current += 1;
-            console.log(`Recovering from fatal error (attempt ${retryCountRef.current}/2)...`);
+            console.log(`Recovering from error (attempt ${retryCountRef.current}/4)...`);
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
               hls.startLoad();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError();
             }
           } else {
-            // Maximum retries reached -> Seamlessly switch to embed mode
             if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
             hls.destroy();
-            console.log('Direct HLS feed unavailable on host, seamlessly falling back to official live embed...');
-            setPlayerMode('embed');
             setIsLoading(false);
+            setHasError(true);
+            setErrorMessage('Direct HLS feed encountered a network obstacle. Click Retry Feed to reconnect.');
           }
         }
       });
@@ -158,8 +164,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       video.addEventListener('error', () => {
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
-        console.warn('Native HLS error, switching to official embed feed...');
-        setPlayerMode('embed');
+        setHasError(true);
+        setErrorMessage('Native video playback encountered an error. Click Retry to reconnect.');
         setIsLoading(false);
       });
     } else {
@@ -171,9 +177,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   }, [manifestUrl, onQualityChange, selectedQuality, stream.stream_key]);
 
   useEffect(() => {
-    if (playerMode === 'direct') {
-      loadHlsStream();
-    }
+    loadHlsStream();
     return () => {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
       if (hlsRef.current) {
@@ -181,7 +185,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         hlsRef.current = null;
       }
     };
-  }, [loadHlsStream, playerMode]);
+  }, [loadHlsStream]);
 
   // Video event listeners
   useEffect(() => {
@@ -314,38 +318,10 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     }
   };
 
-  // Upstream embed URL for fallback tab (supports streamfree.top and strmfree.st)
-  const embedSource = stream.sources.find(s => s.quality.toLowerCase() === selectedQuality.toLowerCase()) || stream.sources[0];
-  const embedUrl = embedSource ? embedSource.url.replace('strmfree.st', 'streamfree.top') : `https://streamfree.top/embed/basketball/${stream.stream_key}1080p`;
-
   return (
     <div className="w-full flex flex-col space-y-3">
       {/* Top Header Bar above Video (Clean & Minimal) */}
-      <div className="flex items-center justify-between px-1">
-        {/* Stream Source Mode Switcher */}
-        <div className="flex items-center space-x-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-          <button
-            onClick={() => setPlayerMode('direct')}
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-              playerMode === 'direct'
-                ? 'bg-black text-white shadow-2xs'
-                : 'text-gray-600 hover:text-black'
-            }`}
-          >
-            Direct HLS
-          </button>
-          <button
-            onClick={() => setPlayerMode('embed')}
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-              playerMode === 'embed'
-                ? 'bg-black text-white shadow-2xs'
-                : 'text-gray-600 hover:text-black'
-            }`}
-          >
-            Live Embed
-          </button>
-        </div>
-
+      <div className="flex items-center justify-end px-1">
         {/* Live Status Pill */}
         {stream.is_live ? (
           <div className="flex items-center space-x-1.5 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
@@ -367,75 +343,66 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         onTouchStart={() => setShowControls(true)}
         className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl group select-none"
       >
-        {playerMode === 'direct' ? (
-          <>
-            {/* The Direct HTML5 Video Element */}
-            <video
-              ref={videoRef}
-              playsInline
-              // @ts-ignore
-              webkit-playsinline="true"
-              x-webkit-airplay="allow"
-              className="w-full h-full object-contain"
-              onClick={togglePlay}
-            />
+        {/* The Direct HTML5 Video Element */}
+        <video
+          ref={videoRef}
+          playsInline
+          // @ts-ignore
+          webkit-playsinline="true"
+          x-webkit-airplay="allow"
+          className="w-full h-full object-contain"
+          onClick={togglePlay}
+        />
 
-            {/* Loading Buffering Indicator */}
-            {isLoading && !hasError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 backdrop-blur-xs z-10 pointer-events-none">
-                <div className="relative">
-                  <div className="w-14 h-14 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
-                  <Radio className="w-6 h-6 text-orange-400 absolute inset-0 m-auto animate-pulse" />
-                </div>
-                <p className="mt-3 text-xs font-semibold tracking-wide text-orange-300/90 uppercase">
-                  Resolving Direct Ad-Free HLS Stream...
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Connecting to live {selectedQuality} sports stream
-                </p>
-              </div>
-            )}
+        {/* Loading Buffering Indicator */}
+        {isLoading && !hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 backdrop-blur-xs z-10 pointer-events-none">
+            <div className="relative">
+              <div className="w-14 h-14 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
+              <Radio className="w-6 h-6 text-orange-400 absolute inset-0 m-auto animate-pulse" />
+            </div>
+            <p className="mt-3 text-xs font-semibold tracking-wide text-orange-300/90 uppercase">
+              Resolving Direct Ad-Free HLS Stream...
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Connecting to live {selectedQuality} sports stream
+            </p>
+          </div>
+        )}
 
-            {/* Error or Unavailable Overlay */}
-            {hasError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center z-20">
-                <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
-                  <AlertCircle className="w-6 h-6 text-amber-400" />
-                </div>
-                <h3 className="text-base font-bold text-white mb-1">Playback Status Notice</h3>
-                <p className="text-xs text-slate-400 max-w-md mb-4 leading-relaxed">
-                  {errorMessage || 'Direct stream temporarily unavailable or initializing broadcast.'}
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    onClick={() => {
-                      retryCountRef.current = 0;
-                      loadHlsStream();
-                    }}
-                    className="flex items-center space-x-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Retry Feed</span>
-                  </button>
-                  <button
-                    onClick={() => onQualityChange(selectedQuality === '1080p' ? '540p' : '1080p')}
-                    className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-lg border border-slate-700 transition-colors cursor-pointer"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Switch to {selectedQuality === '1080p' ? '540p' : '1080p'}</span>
-                  </button>
-                  <button
-                    onClick={() => setPlayerMode('embed')}
-                    className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-lg border border-slate-700 transition-colors cursor-pointer"
-                  >
-                    <Tv className="w-3.5 h-3.5" />
-                    <span>Switch to Embed Feed</span>
-                  </button>
-                </div>
-              </div>
-            )}
+        {/* Error or Unavailable Overlay */}
+        {hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center z-20">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
+              <AlertCircle className="w-6 h-6 text-amber-400" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-1">Playback Status Notice</h3>
+            <p className="text-xs text-slate-400 max-w-md mb-4 leading-relaxed">
+              {errorMessage || 'Direct stream temporarily unavailable or initializing broadcast.'}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                onClick={() => {
+                  retryCountRef.current = 0;
+                  loadHlsStream();
+                }}
+                className="flex items-center space-x-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Retry Feed</span>
+              </button>
+              <button
+                onClick={() => onQualityChange(selectedQuality === '1080p' ? '720p' : (selectedQuality === '720p' ? '540p' : '1080p'))}
+                className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-lg border border-slate-700 transition-colors cursor-pointer"
+              >
+                <Settings className="w-3.5 h-3.5 text-orange-400" />
+                <span>Try Other Quality</span>
+              </button>
+            </div>
+          </div>
+        )}
 
-            {/* Custom Modern Video Controls Overlay */}
+        {/* Custom Modern Video Controls Overlay */}
             <div
               className={`absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/80 via-transparent to-black/30 transition-opacity duration-300 pointer-events-none z-10 ${
                 showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
@@ -581,40 +548,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                 </div>
               </div>
             </div>
-          </>
-        ) : (
-          /* Official Embed Feed with Transparency & Ad Disclosure */
-          <div className="relative w-full h-full bg-slate-950 flex flex-col">
-            <div className="bg-amber-950/40 border-b border-amber-500/20 px-3 py-1.5 flex items-center justify-between text-[11px] text-amber-300">
-              <span className="flex items-center space-x-1">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="truncate">
-                  Official third-party iframe embed from {embedUrl.includes('strmfree') ? 'StreamFree' : 'source'}.
-                </span>
-              </span>
-              <a
-                href={embedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center space-x-1 text-amber-400 hover:underline shrink-0 ml-2 font-medium"
-              >
-                <span>Direct Link</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            <div className="relative flex-1 w-full h-full">
-              <iframe
-                src={embedUrl}
-                title={stream.name}
-                allow="fullscreen; picture-in-picture; autoplay; encrypted-media"
-                allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
-                className="w-full h-full border-0"
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Under-player Quality Buttons */}

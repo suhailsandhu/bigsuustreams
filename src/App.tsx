@@ -83,9 +83,11 @@ export const App: React.FC = () => {
     }
   }, [selectedStream, allGames]);
 
-  // Load scoreboard data for selectedDate
-  const loadScoreboardData = useCallback(async (dateStr: string) => {
-    setIsLoading(true);
+  // Load scoreboard data for selectedDate with silent background auto-refresh
+  const loadScoreboardData = useCallback(async (dateStr: string, silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -93,19 +95,23 @@ export const App: React.FC = () => {
       setScoreboard(data);
     } catch (err: any) {
       console.error('Failed to load scoreboard:', err);
-      setError('Unable to load live scoreboard data. Please check your network connection.');
+      if (!silent) {
+        setError('Unable to load live scoreboard data. Please check your network connection.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadScoreboardData(selectedDate);
+    loadScoreboardData(selectedDate, false);
 
-    // Refresh every 30 seconds for live game scores
+    // Auto-refresh every 15 seconds silently for live scores and stream updates
     const interval = setInterval(() => {
-      loadScoreboardData(selectedDate);
-    }, 30000);
+      loadScoreboardData(selectedDate, true);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [selectedDate, loadScoreboardData]);

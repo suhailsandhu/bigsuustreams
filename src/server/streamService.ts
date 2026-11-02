@@ -146,7 +146,6 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   // Candidate mirrors (streamfree.top does not block datacenter cloud IPs, strmfree.st is fallback)
   const mirrors = ['https://streamfree.top', 'https://strmfree.st'];
   let successfulMirror = 'https://streamfree.top';
-  let embedUrl = '';
   let embedRes: Response | null = null;
   let tokens: Record<string, any> = {};
 
@@ -155,17 +154,11 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
       const candidateQualities = [quality, '1080p', '540p', '720p'];
       for (const q of candidateQualities) {
         const u = `${mirror}/embed/basketball/${streamKey}${q}`;
-        const res = await fetch(u, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Referer': mirror
-          }
-        });
+        const res = await fetch(u);
         if (res.ok) {
           const text = await res.text();
           const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
           if (match) {
-            embedUrl = u;
             embedRes = res;
             tokens = JSON.parse(match[1]);
             successfulMirror = mirror;
@@ -193,12 +186,7 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   let keyData: any = {};
   for (const mirror of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
     try {
-      const res = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Referer': embedUrl
-        }
-      });
+      const res = await fetch(`${mirror}/get-stream-key/${streamKey}`);
       if (res.ok) {
         keyData = await res.json();
         break;
@@ -236,13 +224,7 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     for (const host of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
       try {
         const u = `${host}${pathPrefix}${v}/index.m3u8${qStr}`;
-        const res = await fetch(u, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Referer': embedUrl,
-            'Origin': host
-          }
-        });
+        const res = await fetch(u);
         if (res.ok) {
           return { res, url: u, host };
         }
@@ -252,13 +234,7 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     }
 
     const fallbackUrl = `${successfulMirror}${pathPrefix}${v}/index.m3u8${qStr}`;
-    const res = await fetch(fallbackUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Referer': embedUrl,
-        'Origin': successfulMirror
-      }
-    });
+    const res = await fetch(fallbackUrl);
     return { res, url: fallbackUrl, host: successfulMirror };
   }
 

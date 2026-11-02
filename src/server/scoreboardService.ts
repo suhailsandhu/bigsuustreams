@@ -259,14 +259,6 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
       linescores: (awayComp.linescores || []).map((l: any) => parseInt(l?.displayValue ?? l?.value ?? '0', 10))
     };
 
-    const statusType = event.status?.type || {};
-    const state = statusType.state as 'pre' | 'in' | 'post';
-    const isLive = state === 'in';
-
-    // Game leaders from competition
-    const homeLeaders = parseTeamLeaders(comp, homeTeam.id, homeTeam.displayName, homeTeam.logo);
-    const awayLeaders = parseTeamLeaders(comp, awayTeam.id, awayTeam.displayName, awayTeam.logo);
-
     // 3. Match with Streams
     const homeNorm = normalizeName(homeTeam.displayName);
     const homeShort = normalizeName(homeTeam.shortDisplayName || homeTeam.name);
@@ -280,9 +272,16 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
       return matchHome && matchAway;
     });
 
+    const isStreamLive = !!(matchedStream?.is_live || (Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0));
+
+    const statusType = event.status?.type || {};
+    const rawState = (statusType.state || 'pre') as 'pre' | 'in' | 'post';
+    const isLive = rawState === 'in' || (isStreamLive && (rawState as string) !== 'post');
+    const state: 'pre' | 'in' | 'post' = (isLive && (rawState as string) !== 'post') ? 'in' : rawState;
+
     const streamInfo = matchedStream ? {
       available: true,
-      isLive: matchedStream.is_live,
+      isLive: isStreamLive,
       streamKey: matchedStream.stream_key,
       qualities: ['1080p', '720p', '540p', '2160p'],
       viewers: matchedStream.viewers || 0,
@@ -294,16 +293,29 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
       viewers: 0
     };
 
-    // Format tipoff time for center display (e.g. "5:30 PM PT" or "8:30 PM ET")
+    // Format tipoff time for center display (US Eastern fallback if server is UTC)
     let displayDetail = statusType.detail || statusType.description || '';
-    if (state === 'pre') {
+    if (isLive) {
+      displayDetail = statusType.shortDetail && !statusType.shortDetail.includes('PM') && !statusType.shortDetail.includes('AM') 
+        ? statusType.shortDetail 
+        : (statusType.detail && !statusType.detail.includes('PM') && !statusType.detail.includes('AM') ? statusType.detail : 'LIVE');
+    } else if (state === 'pre') {
       try {
         const gameDate = new Date(event.date);
-        displayDetail = gameDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+        displayDetail = gameDate.toLocaleTimeString('en-US', {
+          timeZone: 'America/New_York',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }) + ' ET';
       } catch {
-        // Keep default
+        displayDetail = statusType.shortDetail || 'Upcoming';
       }
     }
+
+    // Game leaders from competition
+    const homeLeaders = parseTeamLeaders(comp, homeTeam.id, homeTeam.displayName, homeTeam.logo);
+    const awayLeaders = parseTeamLeaders(comp, awayTeam.id, awayTeam.displayName, awayTeam.logo);
 
     // 4. Fetch rich game leaders (PTS, REB, AST) for NBA games
     let displayLeaders: GameLeadersDisplay | undefined;
@@ -321,9 +333,9 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
       status: {
         state,
         detail: displayDetail,
-        shortDetail: statusType.shortDetail || displayDetail,
+        shortDetail: isLive ? (displayDetail === 'LIVE' ? 'LIVE' : (statusType.shortDetail || displayDetail)) : (statusType.shortDetail || displayDetail),
         isLive,
-        period: event.status?.period || 0,
+        period: event.status?.period || (isLive ? 1 : 0),
         clock: event.status?.displayClock || ''
       },
       homeTeam,

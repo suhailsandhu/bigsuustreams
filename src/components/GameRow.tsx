@@ -9,6 +9,20 @@ interface GameRowProps {
   onOpenBoxScore: (game: ScoreboardGame) => void;
 }
 
+function formatTipoff(dateStr?: string, fallback = 'Scheduled'): string {
+  if (dateStr) {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return fallback;
+}
+
 export const GameRow: React.FC<GameRowProps> = ({
   game,
   hideScores = false,
@@ -126,7 +140,7 @@ export const GameRow: React.FC<GameRowProps> = ({
                   </span>
                 ) : (
                   <div className="flex items-center space-x-1 text-[11px] sm:text-xs font-bold text-gray-900 whitespace-nowrap">
-                    <span>{game.status.detail || 'Scheduled'}</span>
+                    <span>{formatTipoff(game.date, game.status.detail)}</span>
                   </div>
                 )}
               </div>

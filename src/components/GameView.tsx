@@ -41,46 +41,68 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
   const isLive = game?.status?.isLive ?? stream.is_live;
   const statusDetail = game?.status?.shortDetail || game?.status?.detail || (isLive ? 'LIVE' : formatTipoffTime(stream.match_timestamp));
 
-  // Fetch box score stats
+  // Fetch box score stats with auto-refresh every 15 seconds
   useEffect(() => {
     let activeEspnId = game?.espnId;
-    
-    if (!activeEspnId) {
-      fetch('/api/basketball/scoreboard')
-        .then(r => r.json())
-        .then(data => {
-          const matched = (data.games || []).find((g: any) => 
-            g.stream?.streamKey === stream.stream_key ||
-            stream.stream_key.includes(g.awayTeam?.name?.toLowerCase()) ||
-            stream.name.toLowerCase().includes(g.awayTeam?.name?.toLowerCase())
-          );
-          if (matched?.espnId) {
-            setLoadingSummary(true);
-            fetchGameSummary(matched.espnId)
-              .then(d => {
-                setSummary(d);
-                setLoadingSummary(false);
-              })
-              .catch(() => setLoadingSummary(false));
-          }
-        })
-        .catch(console.warn);
-      return;
-    }
+    let isCancelled = false;
 
-    setLoadingSummary(true);
-    setSummaryError(null);
+    const loadSummary = (silent = false) => {
+      if (!silent) {
+        setLoadingSummary(true);
+        setSummaryError(null);
+      }
 
-    fetchGameSummary(activeEspnId)
-      .then((data) => {
-        setSummary(data);
-        setLoadingSummary(false);
-      })
-      .catch((err) => {
-        console.warn('GameView boxscore fetch error:', err);
-        setSummaryError('Live box score stats will update as the game progresses.');
-        setLoadingSummary(false);
-      });
+      const runFetch = (id: string) => {
+        fetchGameSummary(id)
+          .then((data) => {
+            if (!isCancelled) {
+              setSummary(data);
+              setLoadingSummary(false);
+            }
+          })
+          .catch((err) => {
+            if (!isCancelled) {
+              console.warn('GameView boxscore fetch error:', err);
+              if (!silent) {
+                setSummaryError('Live box score stats will update as the game progresses.');
+              }
+              setLoadingSummary(false);
+            }
+          });
+      };
+
+      if (activeEspnId) {
+        runFetch(activeEspnId);
+      } else {
+        fetch('/api/basketball/scoreboard')
+          .then(r => r.json())
+          .then(data => {
+            if (isCancelled) return;
+            const matched = (data.games || []).find((g: any) => 
+              g.stream?.streamKey === stream.stream_key ||
+              stream.stream_key.includes(g.awayTeam?.name?.toLowerCase()) ||
+              stream.name.toLowerCase().includes(g.awayTeam?.name?.toLowerCase())
+            );
+            if (matched?.espnId) {
+              activeEspnId = matched.espnId;
+              runFetch(matched.espnId);
+            } else if (!silent) {
+              setLoadingSummary(false);
+            }
+          })
+          .catch(() => {
+            if (!isCancelled && !silent) setLoadingSummary(false);
+          });
+      }
+    };
+
+    loadSummary(false);
+    const interval = setInterval(() => loadSummary(true), 15000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, [game?.espnId, stream.stream_key]);
 
   const handleShare = () => {
