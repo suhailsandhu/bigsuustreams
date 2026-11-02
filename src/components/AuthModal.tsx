@@ -28,12 +28,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAppleSignInClick = () => {
-    setError(null);
-    // Direct navigation to Apple's official Apple ID login portal
-    window.location.href = 'https://appleid.apple.com/sign-in';
-  };
-
   if (!isOpen) return null;
 
   const handleQuickPasscodeSubmit = async (e: React.FormEvent) => {
@@ -263,28 +257,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           ) : (
             <>
-              {/* Social Log In: Continue with Apple ID Button */}
-              <button
-                type="button"
-                onClick={handleAppleSignInClick}
-                disabled={loading}
-                className="w-full flex items-center justify-center space-x-2.5 py-3 px-4 rounded-2xl bg-black hover:bg-neutral-800 text-white text-sm font-bold shadow-xs transition active:scale-[0.98] cursor-pointer"
-              >
-                {/* Official Apple Icon */}
-                <svg className="w-4 h-4 fill-current shrink-0 -mt-0.5" viewBox="0 0 170 170">
-                  <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.04-7.58-7.74-11.64-14.1-6.19-9.76-11.03-21.2-14.52-34.33-3.49-13.12-5.24-25.29-5.24-36.49 0-15.65 4.12-28.53 12.36-38.64 8.24-10.11 18.57-15.28 31-15.5 4.8 0 10.15 1.25 16.05 3.75 5.9 2.5 9.8 3.8 11.7 3.9 1.54 0 5.46-1.3 11.77-3.9 6.31-2.6 11.53-3.8 15.66-3.6 11.65.65 21.08 4.78 28.3 12.4-10.3 6.22-15.34 14.88-15.13 25.98.22 8.7 3.52 16.03 9.9 21.98 6.38 5.95 13.88 9.3 22.5 10.05-2.29 6.95-4.99 13.75-8.1 20.4zM119.22 31.85c0-7.28 2.66-14.28 7.98-21 5.32-6.72 11.83-10.6 19.53-11.65.11 1.08.16 2.05.16 2.92 0 7.39-2.82 14.44-8.46 21.15-5.64 6.71-12.04 10.57-19.21 11.58z"/>
-                </svg>
-                <span>Continue with Apple ID</span>
-              </button>
-
-              {/* Clean Divider */}
-              <div className="relative my-5 flex items-center justify-center">
-                <div className="w-full border-t border-gray-200" />
-                <span className="absolute bg-white px-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                  or continue with credentials
-                </span>
-              </div>
-
               {/* Segmented iOS Tab Switcher */}
               <div className="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-2xl mb-4 border border-gray-200/60">
                 <button
@@ -434,7 +406,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="mt-6 pt-4 border-t border-gray-100 flex flex-col items-center justify-center space-y-2">
             <div className="flex items-center space-x-1.5 text-[11px] text-gray-400 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Encrypted Session • Verified Sports Portal</span>
+              <span>Encrypted Session</span>
             </div>
 
             {onOpenLegal && (
