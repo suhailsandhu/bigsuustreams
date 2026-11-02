@@ -1302,7 +1302,7 @@ function applySecurityHeaders(_req, res, next) {
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
 var app = express();
-var PORT = process.env.PORT || 3e3;
+var PORT = process.env.PORT && process.env.PORT !== "80" ? process.env.PORT : 3e3;
 var SITE_PASSCODE = process.env.SITE_PASSCODE || "lebronisthegoat";
 app.disable("x-powered-by");
 app.use(applySecurityHeaders);
@@ -1363,6 +1363,44 @@ app.get("/api/basketball/highlights", async (req, res) => {
     res.status(500).json({ error: err && err.message || "Failed to fetch highlights" });
   }
 });
+async function handleResolve(req, res) {
+  try {
+    const key = req.params.key;
+    const quality = req.params.quality || req.query.quality || "1080p";
+    const hls = await resolveHlsStream(key, quality);
+    res.json({
+      success: true,
+      streamUrl: hls.upstreamUrl,
+      proxyUrl: `/api/basketball/hls/${key}/${hls.selectedQuality}.m3u8`,
+      selectedQuality: hls.selectedQuality,
+      availableQualities: hls.availableQualities,
+      isExternal: hls.isExternal
+    });
+  } catch (err) {
+    res.status(500).json({ error: err && err.message || "Failed to resolve stream" });
+  }
+}
+async function handleHls(req, res) {
+  const key = req.params.key;
+  const quality = req.params.quality || req.query.quality || "1080p";
+  try {
+    const hls = await resolveHlsStream(key, quality);
+    if (hls.isExternal && hls.externalUrl) {
+      return res.redirect(hls.externalUrl);
+    }
+    if (!hls.m3u8Text && hls.upstreamUrl) {
+      return res.redirect(302, hls.upstreamUrl);
+    }
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("X-Stream-Quality", hls.selectedQuality);
+    res.setHeader("X-Available-Qualities", hls.availableQualities.join(","));
+    res.send(hls.m3u8Text);
+  } catch (err) {
+    res.status(502).json({ error: "Stream resolution failed: " + (err && err.message || "") });
+  }
+}
 app.get("/api/football/scoreboard", async (req, res) => {
   try {
     const dateStr = req.query.date ? String(req.query.date) : void 0;
@@ -1434,46 +1472,8 @@ app.get("/api/basketball/sources/:key", async (req, res) => {
     res.status(404).json({ error: "Sources not found" });
   }
 });
-var handleResolve = async (req, res) => {
-  try {
-    const key = req.params.key;
-    const quality = req.params.quality || req.query.quality || "1080p";
-    const hls = await resolveHlsStream(key, quality);
-    res.json({
-      success: true,
-      streamUrl: hls.upstreamUrl,
-      proxyUrl: `/api/basketball/hls/${key}/${hls.selectedQuality}.m3u8`,
-      selectedQuality: hls.selectedQuality,
-      availableQualities: hls.availableQualities,
-      isExternal: hls.isExternal
-    });
-  } catch (err) {
-    res.status(500).json({ error: err && err.message || "Failed to resolve stream" });
-  }
-};
 app.get("/api/basketball/resolve/:key", handleResolve);
 app.get("/api/basketball/resolve/:key/:quality", handleResolve);
-var handleHls = async (req, res) => {
-  const key = req.params.key;
-  const quality = req.params.quality || req.query.quality || "1080p";
-  try {
-    const hls = await resolveHlsStream(key, quality);
-    if (hls.isExternal && hls.externalUrl) {
-      return res.redirect(hls.externalUrl);
-    }
-    if (!hls.m3u8Text && hls.upstreamUrl) {
-      return res.redirect(302, hls.upstreamUrl);
-    }
-    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("X-Stream-Quality", hls.selectedQuality);
-    res.setHeader("X-Available-Qualities", hls.availableQualities.join(","));
-    res.send(hls.m3u8Text);
-  } catch (err) {
-    res.status(502).json({ error: "Stream resolution failed: " + (err && err.message || "") });
-  }
-};
 app.get("/api/basketball/hls/:key.m3u8", handleHls);
 app.get("/api/basketball/hls/:key/:quality.m3u8", handleHls);
 app.post("/api/analytics/ping", (req, res) => {
@@ -1523,6 +1523,6 @@ app.use((req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   res.sendFile(path.join(distPath, "index.html"));
 });
-app.listen(PORT, () => {
-  console.log(`Courtside Stream production server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);
 });
