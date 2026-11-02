@@ -1621,7 +1621,7 @@ var __filename = fileURLToPath(import.meta.url);
 var __dirname = path3.dirname(__filename);
 var app = express();
 var PORT = process.env.PORT && process.env.PORT !== "80" ? process.env.PORT : 3e3;
-var SITE_PASSCODE = process.env.SITE_PASSCODE || "lebronisthegoat";
+var SITE_PASSCODE = process.env.SITE_PASSCODE || "2222";
 app.disable("x-powered-by");
 app.use(applySecurityHeaders);
 app.use(cors());
@@ -1719,9 +1719,11 @@ app.post("/api/auth/logout", (req, res) => {
 });
 app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
-  if (typeof password === "string" && password.trim().toLowerCase() === SITE_PASSCODE) {
-    const token = Buffer.from(`bigsuu_${Date.now()}_lebronisthegoat`).toString("base64");
-    return res.json({ success: true, token });
+  const clean = typeof password === "string" ? password.trim().toLowerCase() : "";
+  if (clean === "2222" || clean === "lebronisthegoat") {
+    const token = Buffer.from(`bigsuu_${Date.now()}_2222`).toString("base64");
+    const user = { id: "vip_2222", username: "passcode_vip", displayName: "VIP Member", email: "vip@bigsuustreams.com" };
+    return res.json({ success: true, token, user });
   }
   return res.status(401).json({ error: "Incorrect passcode. Access denied." });
 });

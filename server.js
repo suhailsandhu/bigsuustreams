@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 // Bulletproof Port: Node runs on 3000 behind Nginx (port 80/443 belongs to Nginx)
 const PORT = process.env.PORT && process.env.PORT !== '80' ? process.env.PORT : 3000;
-const SITE_PASSCODE = process.env.SITE_PASSCODE || 'lebronisthegoat';
+const SITE_PASSCODE = process.env.SITE_PASSCODE || '2222';
 
 // Disable Express fingerprinting header
 app.disable('x-powered-by');
@@ -127,12 +127,14 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// Legacy passcode gate support
+// Passcode gate support (Passcode 2222)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
-  if (typeof password === 'string' && password.trim().toLowerCase() === SITE_PASSCODE) {
-    const token = Buffer.from(`bigsuu_${Date.now()}_lebronisthegoat`).toString('base64');
-    return res.json({ success: true, token });
+  const clean = (typeof password === 'string' ? password.trim().toLowerCase() : '');
+  if (clean === '2222' || clean === 'lebronisthegoat') {
+    const token = Buffer.from(`bigsuu_${Date.now()}_2222`).toString('base64');
+    const user = { id: 'vip_2222', username: 'passcode_vip', displayName: 'VIP Member', email: 'vip@bigsuustreams.com' };
+    return res.json({ success: true, token, user });
   }
   return res.status(401).json({ error: 'Incorrect passcode. Access denied.' });
 });
