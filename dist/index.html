@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" style="background-color: #f8fafc; color: #0f172a;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <title>NBA Streams — Live Games, Scores & Streams</title>
+    <meta name="description" content="Official live NBA scores, game leaders, standings, and ad-free live streams." />
+    
+    <!-- PWA & Mobile Web App Meta -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="NBA Streams" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    
+    <!-- Inline light background style matching nba.com UI -->
+    <style>html,body{min-height:100vh;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#0f172a!important;background-color:#f8fafc!important}#root{min-height:100vh}</style>
+
+    <!-- Font Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="/assets/index-CNGchYwm.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Bmpodm1N.css">
+  </head>
+  <body style="background-color: #f8fafc; color: #0f172a;">
+    <div id="root">
+      <!-- Fast initial placeholder while React hydrates -->
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #f8fafc; color: #ea580c;">
+        <div style="width: 44px; height: 44px; border: 4px solid #fed7aa; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <div style="margin-top: 14px; font-weight: 900; font-size: 13px; letter-spacing: 0.1em; color: #0f172a;">NBA GAMES & SCORES</div>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>
+
+
+    <script>
+      // Service worker management with automatic stale-cache recovery
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          reg.update();
+        }).catch((err) => {
+          console.log('SW registration note:', err);
+        });
+
+        // Listen for controller changes and reload to pick up fresh bundle
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      }
+
+      // Automatic fallback if old cached script fails to load
+      window.addEventListener('error', (event) => {
+        if (event && event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK')) {
+          console.warn('Stale asset failed to load, clearing caches and reloading...');
+          if ('caches' in window) {
+            caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => {
+              if (!sessionStorage.getItem('courtside_reloaded')) {
+                sessionStorage.setItem('courtside_reloaded', '1');
+                window.location.reload();
+              }
+            });
+          }
+        }
+      }, true);
+    </script>
+  </body>
+</html>
