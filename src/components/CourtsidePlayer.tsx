@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
-  Settings, RefreshCw, AlertCircle, ShieldCheck,
+  RefreshCw, AlertCircle, ShieldCheck,
   Layers, Radio
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
@@ -33,7 +33,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showQualityMenu, setShowQualityMenu] = useState(false);
   const controlsTimeoutRef = useRef<any>(null);
 
   // Available qualities in requested order: 540p, 720p, 1080p, 2160p
@@ -47,7 +46,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     controlsTimeoutRef.current = setTimeout(() => {
       if (isPlaying) {
         setShowControls(false);
-        setShowQualityMenu(false);
       }
     }, 3500);
   };
@@ -336,12 +334,12 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         )}
       </div>
 
-      {/* Main Video Viewport Container */}
+      {/* Main Video Viewport Container (Light Themed) */}
       <div
         ref={containerRef}
         onMouseMove={handleMouseMove}
         onTouchStart={() => setShowControls(true)}
-        className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl group select-none"
+        className="relative w-full aspect-video bg-gray-950 rounded-2xl overflow-hidden border border-gray-200 shadow-md group select-none"
       >
         {/* The Direct HTML5 Video Element */}
         <video
@@ -354,30 +352,30 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           onClick={togglePlay}
         />
 
-        {/* Loading Buffering Indicator */}
+        {/* Loading Buffering Indicator (Light Themed) */}
         {isLoading && !hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 backdrop-blur-xs z-10 pointer-events-none">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/95 backdrop-blur-xs z-10 pointer-events-none">
             <div className="relative">
-              <div className="w-14 h-14 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin"></div>
-              <Radio className="w-6 h-6 text-orange-400 absolute inset-0 m-auto animate-pulse" />
+              <div className="w-14 h-14 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+              <Radio className="w-6 h-6 text-gray-900 absolute inset-0 m-auto animate-pulse" />
             </div>
-            <p className="mt-3 text-xs font-semibold tracking-wide text-orange-300/90 uppercase">
-              Resolving Direct Ad-Free HLS Stream...
+            <p className="mt-3 text-xs font-black tracking-wider text-gray-900 uppercase">
+              Connecting to Live Feed...
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Connecting to live {selectedQuality} sports stream
+            <p className="text-[11px] font-medium text-gray-500 mt-1">
+              Loading {selectedQuality} sports stream
             </p>
           </div>
         )}
 
-        {/* Error or Unavailable Overlay */}
+        {/* Error or Unavailable Overlay (Light Themed) */}
         {hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center z-20">
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
-              <AlertCircle className="w-6 h-6 text-amber-400" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/95 p-6 text-center z-20">
+            <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-3">
+              <AlertCircle className="w-6 h-6 text-amber-600" />
             </div>
-            <h3 className="text-base font-bold text-white mb-1">Playback Status Notice</h3>
-            <p className="text-xs text-slate-400 max-w-md mb-4 leading-relaxed">
+            <h3 className="text-base font-bold text-gray-900 mb-1">Playback Status Notice</h3>
+            <p className="text-xs text-gray-500 max-w-md mb-4 leading-relaxed">
               {errorMessage || 'Direct stream temporarily unavailable or initializing broadcast.'}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -386,168 +384,125 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                   retryCountRef.current = 0;
                   loadHlsStream();
                 }}
-                className="flex items-center space-x-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
+                className="flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Retry Feed</span>
-              </button>
-              <button
-                onClick={() => onQualityChange(selectedQuality === '1080p' ? '720p' : (selectedQuality === '720p' ? '540p' : '1080p'))}
-                className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-lg border border-slate-700 transition-colors cursor-pointer"
-              >
-                <Settings className="w-3.5 h-3.5 text-orange-400" />
-                <span>Try Other Quality</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* Custom Modern Video Controls Overlay */}
-            <div
-              className={`absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/80 via-transparent to-black/30 transition-opacity duration-300 pointer-events-none z-10 ${
-                showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              {/* Top Bar: Title & Ad-Free Badge */}
-              <div className="flex items-center justify-between pointer-events-auto">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold text-white/90 drop-shadow-md truncate max-w-[240px] sm:max-w-md">
-                    {stream.name}
-                  </span>
-                  <span className="hidden sm:inline-block bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
-                    {stream.league}
-                  </span>
-                </div>
-
-                {isVerified && (
-                  <div className="flex items-center space-x-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full backdrop-blur-md">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[10px] font-semibold text-emerald-300">Verified Ad-Free Feed</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Center Play/Pause Big Touch Button */}
-              <div className="flex items-center justify-center pointer-events-auto">
-                {!isLoading && (
-                  <button
-                    onClick={togglePlay}
-                    className="w-14 h-14 rounded-full bg-orange-500/90 hover:bg-orange-500 text-white flex items-center justify-center shadow-xl shadow-orange-500/30 transition-transform active:scale-95 cursor-pointer"
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-6 h-6 fill-current" />
-                    ) : (
-                      <Play className="w-6 h-6 fill-current ml-0.5" />
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Bottom Controls Bar */}
-              <div className="flex items-center justify-between gap-3 pointer-events-auto bg-slate-950/60 backdrop-blur-md px-3 py-2 rounded-xl border border-white/5">
-                {/* Left: Play/Pause, Mute & Volume */}
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={togglePlay}
-                    className="text-white/90 hover:text-orange-400 transition-colors cursor-pointer"
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
-                  </button>
-
-                  <div className="flex items-center space-x-1.5 group/vol">
-                    <button
-                      onClick={toggleMute}
-                      className="text-white/90 hover:text-orange-400 transition-colors cursor-pointer"
-                    >
-                      {isMuted || volume === 0 ? (
-                        <VolumeX className="w-4 h-4 text-red-400" />
-                      ) : (
-                        <Volume2 className="w-4 h-4" />
-                      )}
-                    </button>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={isMuted ? 0 : volume}
-                      onChange={handleVolumeChange}
-                      className="w-16 h-1 accent-orange-500 bg-slate-700 rounded-lg cursor-pointer hidden sm:block"
-                    />
-                  </div>
-
-                  {/* Live Sync Pill */}
-                  <button
-                    onClick={() => {
-                      retryCountRef.current = 0;
-                      loadHlsStream();
-                    }}
-                    className="flex items-center space-x-1 text-[11px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded hover:bg-red-500/20 transition-colors cursor-pointer"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                    <span>LIVE</span>
-                  </button>
-                </div>
-
-                {/* Right: Quality Dropdown, PiP, Fullscreen */}
-                <div className="flex items-center space-x-2 relative">
-                  {/* Quality Button */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowQualityMenu(!showQualityMenu)}
-                      className="flex items-center space-x-1 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-700 transition-colors cursor-pointer"
-                    >
-                      <Settings className="w-3.5 h-3.5 text-orange-400" />
-                      <span>{selectedQuality}</span>
-                    </button>
-
-                    {showQualityMenu && (
-                      <div className="absolute bottom-full right-0 mb-2 w-32 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1 z-30 flex flex-col space-y-0.5">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2 py-1">
-                          Video Quality
-                        </div>
-                        {availableQualities.map((q) => (
-                          <button
-                            key={q}
-                            onClick={() => {
-                              onQualityChange(q);
-                              setShowQualityMenu(false);
-                            }}
-                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-                              selectedQuality === q
-                                ? 'bg-orange-500/20 text-orange-400 font-bold'
-                                : 'text-slate-300 hover:bg-slate-800'
-                            }`}
-                          >
-                            <span>{q}</span>
-                            {selectedQuality === q && <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Picture in Picture */}
-                  <button
-                    onClick={togglePiP}
-                    className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Picture in Picture"
-                  >
-                    <Layers className="w-4 h-4" />
-                  </button>
-
-                  {/* Fullscreen */}
-                  <button
-                    onClick={toggleFullscreen}
-                    className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-                    title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                  >
-                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+        {/* Custom Modern Video Controls Overlay (Light/Clean Themed) */}
+        <div
+          className={`absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/40 via-transparent to-black/20 transition-opacity duration-300 pointer-events-none z-10 ${
+            showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {/* Top Bar: Title & Ad-Free Badge */}
+          <div className="flex items-center justify-between pointer-events-auto">
+            <div className="flex items-center space-x-2 bg-white/95 border border-gray-200/80 px-2.5 py-1 rounded-lg backdrop-blur-md shadow-xs">
+              <span className="text-xs font-bold text-gray-900 truncate max-w-[240px] sm:max-w-md">
+                {stream.name}
+              </span>
+              <span className="hidden sm:inline-block bg-orange-100 text-orange-700 text-[10px] font-extrabold px-1.5 py-0.5 rounded uppercase">
+                {stream.league}
+              </span>
             </div>
+
+            {isVerified && (
+              <div className="flex items-center space-x-1.5 bg-white/95 border border-emerald-200 px-2.5 py-1 rounded-full backdrop-blur-md shadow-xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[10px] font-bold text-emerald-700">Verified Feed</span>
+              </div>
+            )}
+          </div>
+
+          {/* Center Play/Pause Touch Button */}
+          <div className="flex items-center justify-center pointer-events-auto">
+            {!isLoading && (
+              <button
+                onClick={togglePlay}
+                className="w-14 h-14 rounded-full bg-white/95 hover:bg-white text-gray-900 flex items-center justify-center shadow-xl border border-gray-200 transition-transform active:scale-95 cursor-pointer"
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? (
+                  <Pause className="w-6 h-6 fill-current" />
+                ) : (
+                  <Play className="w-6 h-6 fill-current ml-0.5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Bottom Controls Bar (Light Themed) */}
+          <div className="flex items-center justify-between gap-3 pointer-events-auto bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl border border-gray-200 shadow-lg text-gray-800">
+            {/* Left: Play/Pause, Mute & Volume */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={togglePlay}
+                className="text-gray-700 hover:text-black transition-colors cursor-pointer"
+              >
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+              </button>
+
+              <div className="flex items-center space-x-1.5 group/vol">
+                <button
+                  onClick={toggleMute}
+                  className="text-gray-700 hover:text-black transition-colors cursor-pointer"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <Volume2 className="w-4 h-4" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="w-16 h-1 accent-black bg-gray-200 rounded-lg cursor-pointer hidden sm:block"
+                />
+              </div>
+
+              {/* Live Sync Pill */}
+              <button
+                onClick={() => {
+                  retryCountRef.current = 0;
+                  loadHlsStream();
+                }}
+                className="flex items-center space-x-1 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded hover:bg-red-100 transition-colors cursor-pointer"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                <span>LIVE</span>
+              </button>
+            </div>
+
+            {/* Right: Picture-in-Picture & Fullscreen (Settings gear removed per request) */}
+            <div className="flex items-center space-x-1">
+              {/* Picture in Picture */}
+              <button
+                onClick={togglePiP}
+                className="text-gray-600 hover:text-black p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Picture in Picture"
+              >
+                <Layers className="w-4 h-4" />
+              </button>
+
+              {/* Fullscreen */}
+              <button
+                onClick={toggleFullscreen}
+                className="text-gray-600 hover:text-black p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Under-player Quality Buttons */}
