@@ -255,7 +255,15 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   }
 
   if (!m3u8Res.ok) {
-    throw new Error(`Upstream M3U8 returned HTTP ${m3u8Res.status}`);
+    // If the server IP is restricted by upstream CDN (e.g. datacenter 403 on cloud hosts),
+    // provide the direct upstream URL so the client browser on residential/cellular IP streams directly
+    return {
+      isExternal: false,
+      selectedQuality,
+      availableQualities,
+      m3u8Text: '',
+      upstreamUrl: finalM3u8Url
+    };
   }
 
   const rawM3u8Text = await m3u8Res.text();

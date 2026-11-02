@@ -75,14 +75,40 @@ app.get('/api/basketball/sources/:key', async (req, res) => {
   }
 });
 
-// 4. HLS Manifest resolution and proxy (with normalized M3U8 segments)
+// 4. HLS Stream Resolution and Proxy
+const handleResolve = async (req, res) => {
+  try {
+    const key = req.params.key;
+    const quality = req.params.quality || req.query.quality || '1080p';
+    const hls = await resolveHlsStream(key, quality);
+    res.json({
+      success: true,
+      streamUrl: hls.upstreamUrl,
+      proxyUrl: `/api/basketball/hls/${key}/${hls.selectedQuality}.m3u8`,
+      selectedQuality: hls.selectedQuality,
+      availableQualities: hls.availableQualities,
+      isExternal: hls.isExternal
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Failed to resolve stream' });
+  }
+};
+
+app.get('/api/basketball/resolve/:key', handleResolve);
+app.get('/api/basketball/resolve/:key/:quality', handleResolve);
+
 const handleHls = async (req, res) => {
   const key = req.params.key;
   const quality = req.params.quality || req.query.quality || '1080p';
   try {
     const hls = await resolveHlsStream(key, quality);
-    if (hls.isExternal) {
-      return res.redirect(hls.externalUrl || '/');
+    if (hls.isExternal && hls.externalUrl) {
+      return res.redirect(hls.externalUrl);
+    }
+
+    // If server couldn't fetch proxy playlist (e.g. cloud datacenter 403), redirect directly to working CDN
+    if (!hls.m3u8Text && hls.upstreamUrl) {
+      return res.redirect(302, hls.upstreamUrl);
     }
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
