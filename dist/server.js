@@ -1072,6 +1072,10 @@ var distPath = path.join(__dirname, "dist");
 if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, "index.html"))) {
   distPath = __dirname;
 }
+app.get(["/admin", "/admin/*", "/stats"], (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path.join(distPath, "index.html"));
+});
 app.get("/sw.js", (req, res) => {
   res.setHeader("Content-Type", "text/javascript");
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");

@@ -30,6 +30,19 @@ Welcome to your update log! This is a simple, plain-English record of every chan
 - **Embedded Official Player**: The video player opens directly on the website and streams the full game recap uploaded by the official **@NBA** YouTube channel.
 - **Box Score Below Player**: Below the video, the full player box scores, leaders, and quarter linescores are displayed together.
 
+### 🎨 Pro Sports App Redesign & iPhone Polish
+- **Removed Homepage "Box Score" Buttons**: Cleaned up the game cards so only the red **"Watch Highlights"** button appears on completed games (tapping anywhere on a card opens the details).
+- **Matchup "at" Standard**: Replaced all instances of "vs" with "at" (e.g. "Thunder at Cavaliers") so visitors instantly know who is playing on the road vs. at home.
+- **Clear Away & Home Badges**: Added explicit `AWAY` and `HOME` tags alongside team records and scheduled game times on upcoming matchups.
+- **Clean Upcoming Game Popups**: Removed the redundant "Live box score player stats will update..." text from upcoming game popups, leaving the space clean and uncluttered.
+- **iPhone Player Stats Table Overhaul**:
+  - Expanded sticky player column width (`min-w-[175px] sm:min-w-[210px]`) so long NBA names (e.g. "Payton Pritchard", "Hugo Gonzalez") never get truncated with awkward dots.
+  - Added smooth horizontal touch scrolling for player statistics (`MIN`, `PTS`, `FG`, `3PT`, `FT`, `REB`, `AST`, `TO`, `STL`, `BLK`, `PF`, `+/-`).
+  - Bolded point totals (`PTS`) for instant readability.
+- **50/50 Mobile Team Switcher**: Replaced the small left-aligned team selector with a thumb-friendly full-width segmented control featuring larger team logos.
+- **Private Admin URL**: Removed the visible "Site Activity" button from the public footer. The live visitor telemetry dashboard is now strictly hidden and only accessible by navigating directly to **`bigsuustreams.com/admin`**.
+- **Desktop Focus & Layout Balance**: Constrained schedule feed width (`max-w-4xl`) on desktop to eliminate awkward empty gaps and match the refined presentation of major sports platforms like Apple Sports and NBA.com.
+
 ---
 
 ## 🔒 Safe 3-Step Workflow for Future Updates

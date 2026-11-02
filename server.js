@@ -182,6 +182,12 @@ if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html')
   distPath = __dirname;
 }
 
+// Explicit Admin route direct access
+app.get(['/admin', '/admin/*', '/stats'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
 // Service worker must never be cached aggressively
 app.get('/sw.js', (req, res) => {
   res.setHeader('Content-Type', 'text/javascript');

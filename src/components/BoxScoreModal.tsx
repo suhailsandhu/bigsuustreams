@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Play, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, Play, RefreshCw } from 'lucide-react';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard.ts';
 import { fetchGameSummary } from '../services/api.ts';
 
@@ -31,7 +31,7 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
       })
       .catch((err) => {
         console.warn('Boxscore fetch error:', err);
-        setError('Detailed boxscore statistics not yet posted for this matchup.');
+        setError('Detailed box score statistics not yet posted for this matchup.');
         setLoading(false);
       });
   }, [game]);
@@ -48,54 +48,57 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
   if (!game) return null;
 
   const awayTeam = summary?.boxscore?.away || {
-    team: { id: game.awayTeam.id, displayName: game.awayTeam.displayName, logo: game.awayTeam.logo, record: game.awayTeam.record },
+    team: { id: game.awayTeam.id, displayName: game.awayTeam.displayName, name: game.awayTeam.name, logo: game.awayTeam.logo, record: game.awayTeam.record },
     score: game.awayTeam.score,
     linescores: (game.awayTeam.linescores || []).map((l: any) => parseInt(l?.displayValue ?? l?.value ?? l ?? '0', 10)),
-    statLabels: ['MIN', 'PTS', 'REB', 'AST', 'FG', '3PT', 'FT'],
+    statLabels: ['MIN', 'PTS', 'REB', 'AST', 'FG', '3PT', 'FT', 'TO', 'STL', 'BLK', 'PF', '+/-'],
     athletes: []
   };
 
   const homeTeam = summary?.boxscore?.home || {
-    team: { id: game.homeTeam.id, displayName: game.homeTeam.displayName, logo: game.homeTeam.logo, record: game.homeTeam.record },
+    team: { id: game.homeTeam.id, displayName: game.homeTeam.displayName, name: game.homeTeam.name, logo: game.homeTeam.logo, record: game.homeTeam.record },
     score: game.homeTeam.score,
     linescores: (game.homeTeam.linescores || []).map((l: any) => parseInt(l?.displayValue ?? l?.value ?? l ?? '0', 10)),
-    statLabels: ['MIN', 'PTS', 'REB', 'AST', 'FG', '3PT', 'FT'],
+    statLabels: ['MIN', 'PTS', 'REB', 'AST', 'FG', '3PT', 'FT', 'TO', 'STL', 'BLK', 'PF', '+/-'],
     athletes: []
   };
 
   const currentTeamBox = activeTab === 'away' ? awayTeam : homeTeam;
+  const isFinal = game.status.state === 'post';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs select-none">
       <div className="relative w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden border border-gray-200">
         
         {/* ========================================================= */}
-        {/* 1. REDESIGNED MODAL HEADER (Spacious, Uncrowded)          */}
+        {/* 1. MODAL HEADER: Matchup using 'at' & Clear Status        */}
         {/* ========================================================= */}
         <div className="p-4 sm:p-5 border-b border-gray-100 bg-white">
           <div className="flex items-start justify-between gap-3">
-            {/* Matchup & Status on the left */}
+            {/* Matchup & Status: Away at Home */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center flex-wrap gap-2 mb-1">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 truncate">
-                  {game.awayTeam.name || game.awayTeam.displayName} vs {game.homeTeam.name || game.homeTeam.displayName}
+                <h3 className="text-sm sm:text-lg font-black text-gray-900 tracking-tight">
+                  {game.awayTeam.name || game.awayTeam.displayName} <span className="text-gray-400 font-semibold text-xs sm:text-sm">at</span> {game.homeTeam.name || game.homeTeam.displayName}
                 </h3>
                 {game.status?.detail && (
-                  <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
+                  <span className={`text-[10px] sm:text-xs font-bold uppercase px-2.5 py-0.5 rounded-full ${
                     game.status.isLive
-                      ? 'bg-red-50 text-red-600 border border-red-100'
-                      : 'bg-gray-100 text-gray-600 border border-gray-200/60'
+                      ? 'bg-red-50 text-red-600 border border-red-200'
+                      : isFinal
+                      ? 'bg-gray-100 text-gray-700 font-extrabold border border-gray-200/80'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200/80'
                   }`}>
                     {game.status.shortDetail || game.status.detail}
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-gray-400 font-normal">
+              <p className="text-[11px] sm:text-xs text-gray-400 font-medium">
                 Official NBA Box Score & Player Stats
               </p>
             </div>
 
-            {/* Actions on the right: Stream & Close (X) */}
+            {/* Actions: Stream & Close Button */}
             <div className="flex items-center space-x-2 shrink-0">
               {game.stream?.available && onWatchGame && (
                 <button
@@ -103,7 +106,7 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
                     onClose();
                     onWatchGame(game);
                   }}
-                  className="flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
+                  className="flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white font-bold text-xs px-3.5 py-1.5 rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
                 >
                   <Play className="w-3 h-3 fill-current" />
                   <span>Stream</span>
@@ -126,50 +129,67 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
         {/* ========================================================= */}
         <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4">
           
-          {/* Quarter-by-Quarter Scoreboard (Compact Linescore) */}
-          <div className="bg-gray-50/80 border border-gray-200/80 rounded-xl p-2.5 sm:p-3 overflow-x-auto">
+          {/* Quarter-by-Quarter Linescore Table */}
+          <div className="bg-gray-50/90 border border-gray-200/80 rounded-2xl p-3 sm:p-4 overflow-x-auto">
             <table className="w-full text-xs text-center border-collapse min-w-[280px]">
               <thead>
-                <tr className="text-gray-400 border-b border-gray-200/60 font-medium uppercase text-[10px]">
-                  <th className="text-left py-1 px-2 font-semibold text-gray-500 min-w-[90px]">Team</th>
-                  <th className="py-1 px-1.5 min-w-[26px]">Q1</th>
-                  <th className="py-1 px-1.5 min-w-[26px]">Q2</th>
-                  <th className="py-1 px-1.5 min-w-[26px]">Q3</th>
-                  <th className="py-1 px-1.5 min-w-[26px]">Q4</th>
-                  {awayTeam.linescores.length > 4 && <th className="py-1 px-1.5 min-w-[26px]">OT</th>}
-                  <th className="py-1 px-2 text-right font-bold text-gray-900 min-w-[34px]">Total</th>
+                <tr className="text-gray-400 border-b border-gray-200/80 font-bold uppercase text-[10px] sm:text-[11px]">
+                  <th className="text-left py-1.5 px-2 font-semibold text-gray-500 min-w-[120px]">Team</th>
+                  <th className="py-1.5 px-1.5 min-w-[28px]">Q1</th>
+                  <th className="py-1.5 px-1.5 min-w-[28px]">Q2</th>
+                  <th className="py-1.5 px-1.5 min-w-[28px]">Q3</th>
+                  <th className="py-1.5 px-1.5 min-w-[28px]">Q4</th>
+                  {awayTeam.linescores.length > 4 && <th className="py-1.5 px-1.5 min-w-[28px]">OT</th>}
+                  <th className="py-1.5 px-2 text-right font-black text-gray-900 min-w-[36px]">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+                {/* Away Team Row */}
                 <tr>
-                  <td className="text-left py-1.5 px-2 font-semibold text-gray-900 flex items-center space-x-1.5">
-                    {awayTeam.team.logo && <img src={awayTeam.team.logo} className="w-3.5 h-3.5 object-contain shrink-0" alt="" />}
-                    <span className="truncate">{awayTeam.team.displayName}</span>
+                  <td className="text-left py-2 px-2 font-bold text-gray-900 flex items-center space-x-2">
+                    {awayTeam.team.logo && (
+                      <img src={awayTeam.team.logo} className="w-5 h-5 object-contain shrink-0" alt="" />
+                    )}
+                    <span className="truncate">{(awayTeam.team as any).name || awayTeam.team.displayName}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase bg-gray-200/60 px-1 py-0.5 rounded shrink-0">
+                      AWAY
+                    </span>
                   </td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[0] ?? '-'}</td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[1] ?? '-'}</td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[2] ?? '-'}</td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[3] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[0] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[1] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[2] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[3] ?? '-'}</td>
                   {awayTeam.linescores.length > 4 && (
-                    <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[4]}</td>
+                    <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeam.linescores[4]}</td>
                   )}
-                  <td className="py-1.5 px-2 text-right font-bold tabular-nums text-gray-900">
+                  <td className={`py-2 px-2 text-right font-black tabular-nums text-sm ${
+                    isFinal && game.awayTeam.winner ? 'text-gray-900' : isFinal ? 'text-gray-400' : 'text-gray-900'
+                  }`}>
                     {awayTeam.score}
                   </td>
                 </tr>
+
+                {/* Home Team Row */}
                 <tr>
-                  <td className="text-left py-1.5 px-2 font-semibold text-gray-900 flex items-center space-x-1.5">
-                    {homeTeam.team.logo && <img src={homeTeam.team.logo} className="w-3.5 h-3.5 object-contain shrink-0" alt="" />}
-                    <span className="truncate">{homeTeam.team.displayName}</span>
+                  <td className="text-left py-2 px-2 font-bold text-gray-900 flex items-center space-x-2">
+                    {homeTeam.team.logo && (
+                      <img src={homeTeam.team.logo} className="w-5 h-5 object-contain shrink-0" alt="" />
+                    )}
+                    <span className="truncate">{(homeTeam.team as any).name || homeTeam.team.displayName}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase bg-gray-200/60 px-1 py-0.5 rounded shrink-0">
+                      HOME
+                    </span>
                   </td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[0] ?? '-'}</td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[1] ?? '-'}</td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[2] ?? '-'}</td>
-                  <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[3] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[0] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[1] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[2] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[3] ?? '-'}</td>
                   {homeTeam.linescores.length > 4 && (
-                    <td className="py-1.5 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[4]}</td>
+                    <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeam.linescores[4]}</td>
                   )}
-                  <td className="py-1.5 px-2 text-right font-bold tabular-nums text-gray-900">
+                  <td className={`py-2 px-2 text-right font-black tabular-nums text-sm ${
+                    isFinal && game.homeTeam.winner ? 'text-gray-900' : isFinal ? 'text-gray-400' : 'text-gray-900'
+                  }`}>
                     {homeTeam.score}
                   </td>
                 </tr>
@@ -177,30 +197,34 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
             </table>
           </div>
 
-          {/* Team Switcher Tabs: Balanced 50/50 iOS Segmented Control */}
-          <div className="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200/60">
+          {/* Balanced 50/50 Team Segmented Control Tabs */}
+          <div className="grid grid-cols-2 gap-1.5 bg-gray-100 p-1 rounded-2xl border border-gray-200/70">
             <button
               onClick={() => setActiveTab('away')}
-              className={`flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
+              className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer truncate ${
                 activeTab === 'away'
-                  ? 'bg-white text-gray-900 shadow-2xs'
+                  ? 'bg-white text-gray-900 shadow-xs'
                   : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {awayTeam.team.logo && <img src={awayTeam.team.logo} className="w-4 h-4 object-contain shrink-0" alt="" />}
-              <span className="truncate">{awayTeam.team.displayName}</span>
+              {awayTeam.team.logo && (
+                <img src={awayTeam.team.logo} className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" alt="" />
+              )}
+              <span className="truncate">{(awayTeam.team as any).name || awayTeam.team.displayName}</span>
             </button>
 
             <button
               onClick={() => setActiveTab('home')}
-              className={`flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
+              className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer truncate ${
                 activeTab === 'home'
-                  ? 'bg-white text-gray-900 shadow-2xs'
+                  ? 'bg-white text-gray-900 shadow-xs'
                   : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {homeTeam.team.logo && <img src={homeTeam.team.logo} className="w-4 h-4 object-contain shrink-0" alt="" />}
-              <span className="truncate">{homeTeam.team.displayName}</span>
+              {homeTeam.team.logo && (
+                <img src={homeTeam.team.logo} className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" alt="" />
+              )}
+              <span className="truncate">{(homeTeam.team as any).name || homeTeam.team.displayName}</span>
             </button>
           </div>
 
@@ -210,27 +234,25 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
               <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
               <span>Loading player box score...</span>
             </div>
-          ) : error ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
-              <AlertCircle className="w-5 h-5 text-amber-600 mx-auto mb-1.5" />
-              <p className="text-xs text-amber-800 font-medium">{error}</p>
-            </div>
+          ) : error && currentTeamBox.athletes.length === 0 ? (
+            /* For upcoming games without box score, leave area completely empty per user instruction */
+            null
           ) : currentTeamBox.athletes.length > 0 ? (
             <div
-              className="border border-gray-200/80 rounded-xl overflow-x-auto touch-pan-x shadow-2xs"
+              className="border border-gray-200/90 rounded-2xl overflow-x-auto touch-pan-x shadow-2xs bg-white"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <table className="w-full text-left text-xs border-collapse min-w-[560px]">
                 <thead>
-                  <tr className="bg-gray-50/95 border-b border-gray-200/80 text-gray-400 font-semibold uppercase text-[10px]">
-                    <th className="py-2.5 px-3 font-semibold sticky left-0 bg-gray-50 z-20 min-w-[175px] sm:min-w-[200px] shadow-[2px_0_5px_rgba(0,0,0,0.04)]">
+                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px]">
+                    <th className="py-2.5 px-3 sm:px-4 font-bold sticky left-0 bg-gray-50 z-20 min-w-[175px] sm:min-w-[210px] shadow-[2px_0_5px_rgba(0,0,0,0.04)]">
                       Player
                     </th>
-                    {currentTeamBox.statLabels.map((lbl, idx) => (
+                    {currentTeamBox.statLabels.map((lbl) => (
                       <th
                         key={lbl}
-                        className={`py-2.5 px-2.5 text-right font-semibold ${
-                          idx === 1 ? 'text-gray-900' : 'text-gray-500'
+                        className={`py-2.5 px-2.5 text-right font-bold ${
+                          lbl === 'PTS' ? 'text-gray-900 font-black' : 'text-gray-500'
                         }`}
                       >
                         {lbl}
@@ -240,22 +262,22 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                   {currentTeamBox.athletes.map((ath) => (
-                    <tr key={ath.athlete.id} className="hover:bg-gray-50/60 transition-colors">
-                      {/* Sticky Player Name Column: Widen so full names never truncate */}
-                      <td className="py-2 px-3 font-semibold text-gray-900 flex items-center space-x-2.5 sticky left-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.04)] min-w-[175px] sm:min-w-[200px]">
+                    <tr key={ath.athlete.id} className="hover:bg-gray-50/80 transition-colors">
+                      {/* Sticky Player Column: Wide enough so player names never truncate */}
+                      <td className="py-2.5 px-3 sm:px-4 font-bold text-gray-900 flex items-center space-x-2.5 sticky left-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.04)] min-w-[175px] sm:min-w-[210px]">
                         {ath.athlete.headshot ? (
                           <img
                             src={ath.athlete.headshot}
-                            className="w-7 h-7 rounded-full object-cover border border-gray-100 shrink-0"
+                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-gray-100 shrink-0"
                             alt=""
                           />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-500 shrink-0">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">
                             {ath.athlete.jersey || '#'}
                           </div>
                         )}
                         <div className="min-w-0 pr-1">
-                          <div className="text-xs font-semibold text-gray-900 whitespace-nowrap">
+                          <div className="text-xs sm:text-sm font-bold text-gray-900 whitespace-nowrap">
                             {ath.athlete.displayName}
                           </div>
                           <div className="text-[10px] text-gray-400 font-normal">
@@ -265,25 +287,27 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
                       </td>
 
                       {/* Stat Values with Tabular Numerals */}
-                      {ath.stats.map((val, idx) => (
-                        <td
-                          key={idx}
-                          className={`py-2 px-2.5 text-right tabular-nums text-xs whitespace-nowrap ${
-                            idx === 1 ? 'font-bold text-gray-900' : 'text-gray-600'
-                          }`}
-                        >
-                          {val}
-                        </td>
-                      ))}
+                      {ath.stats.map((val, idx) => {
+                        const isPts = currentTeamBox.statLabels[idx] === 'PTS';
+                        return (
+                          <td
+                            key={idx}
+                            className={`py-2.5 px-2.5 text-right tabular-nums text-xs whitespace-nowrap ${
+                              isPts ? 'font-black text-gray-900' : 'text-gray-600 font-semibold'
+                            }`}
+                          >
+                            {val}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="py-8 text-center text-xs text-gray-400">
-              Live box score player stats will update dynamically as the game progresses.
-            </div>
+            /* Upcoming game empty state per user request: leave that area empty */
+            null
           )}
         </div>
       </div>
