@@ -182,8 +182,8 @@ if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html')
   distPath = __dirname;
 }
 
-// Explicit Admin route direct access
-app.get(['/admin', '/admin/*', '/stats'], (req, res) => {
+// Explicit Admin route direct access (compatible with Express 5 path-to-regexp)
+app.get(/^\/(admin|stats)/, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(distPath, 'index.html'));
 });
