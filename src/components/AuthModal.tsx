@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound } from 'lucide-react';
-import { NflLogo } from './NflLogo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,7 +11,6 @@ interface AuthModalProps {
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onSuccess,
-  currentSport = 'nba',
   onOpenLegal
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -96,7 +94,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       try {
         (window as any).google.accounts.id.prompt((notification: any) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            window.location.href = '/api/auth/google/login';
+            window.location.href = 'https://accounts.google.com/signin/v2/identifier?service=accountsettings';
           }
         });
         return;
@@ -105,8 +103,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     }
 
-    // Direct official Google login redirect
-    window.location.href = '/api/auth/google/login';
+    // Direct navigation to Google's official account login portal
+    window.location.href = 'https://accounts.google.com/signin/v2/identifier?service=accountsettings';
   };
 
   if (!isOpen) return null;
@@ -264,23 +262,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <div className="p-6 sm:p-8 pt-3 overflow-y-auto">
           
-          {/* Top Logo Presentation (Pure official logos) */}
+          {/* Top Logo Presentation (NBA + NFL Dual Brand from Home Screen Icon) */}
           <div className="flex flex-col items-center justify-center mb-5">
-            {currentSport === 'nba' ? (
-              <img
-                src="/nba-logo.png"
-                alt="NBA"
-                className="h-16 sm:h-20 w-auto object-contain filter drop-shadow-2xs mb-2"
-              />
-            ) : (
-              <NflLogo className="h-16 sm:h-20 w-auto mb-2" />
-            )}
+            <img
+              src="/app-brand-logo.png"
+              alt="NBA & NFL"
+              className="h-16 sm:h-20 w-auto object-contain rounded-2xl filter drop-shadow-md mb-2 transition transform hover:scale-105"
+            />
             <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight text-center">
               {showPasscodeMode ? 'Quick Access' : mode === 'login' ? 'Welcome Back' : 'Create an Account'}
             </h2>
             <p className="text-xs text-gray-400 font-medium text-center mt-1 max-w-xs">
               {showPasscodeMode
-                ? 'Enter the 4-digit site passcode (2222) for instant access.'
+                ? 'Enter authorized access passcode.'
                 : mode === 'login'
                 ? 'Sign in to access live 4K feeds, box scores, and multi-angle streams.'
                 : 'Join BSS for unlimited free sports streaming.'}
@@ -304,7 +298,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setQuickPasscode(e.target.value);
                       setPasscodeError(null);
                     }}
-                    placeholder="2222"
+                    placeholder="••••"
                     autoFocus
                     className="w-full px-4 py-3 rounded-2xl bg-gray-50 border border-gray-200 text-center text-xl font-black tracking-widest text-gray-900 focus:outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition"
                   />
