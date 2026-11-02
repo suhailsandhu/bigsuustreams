@@ -1,7 +1,7 @@
 import React from 'react';
-import { Play, Trophy, Film } from 'lucide-react';
+import { Play, Trophy, Film, Clock } from 'lucide-react';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
-import type { NbaTeam } from '../data/nbaTeams.ts';
+import type { SportsTeam } from '../data/nbaTeams.ts';
 
 interface GameRowProps {
   game: ScoreboardGame;
@@ -9,7 +9,8 @@ interface GameRowProps {
   onWatchGame: (game: ScoreboardGame) => void;
   onWatchHighlights?: (game: ScoreboardGame) => void;
   onOpenBoxScore: (game: ScoreboardGame) => void;
-  favoriteTeam?: NbaTeam | null;
+  favoriteTeam?: SportsTeam | null;
+  isCountdownActive?: boolean;
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -28,7 +29,8 @@ function formatTipoff(dateStr?: string, fallback = 'Scheduled'): string {
     try {
       const d = new Date(dateStr);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+        const is24h = typeof window !== 'undefined' && localStorage.getItem('bss_time_format') === '24h';
+        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !is24h });
       }
     } catch {
       // ignore
@@ -37,24 +39,18 @@ function formatTipoff(dateStr?: string, fallback = 'Scheduled'): string {
   return fallback;
 }
 
-// Calculates remaining minutes if the game starts within 1 hour (60 minutes)
-function getMinutesUntilStart(dateStr?: string): number | null {
-  if (!dateStr) return null;
+// Calculates remaining minutes until this game starts
+function getMinutesUntilStart(dateStr?: string): number {
+  if (!dateStr) return 0;
   try {
     const gameTime = new Date(dateStr).getTime();
-    if (isNaN(gameTime)) return null;
+    if (isNaN(gameTime)) return 0;
     const diffMs = gameTime - Date.now();
     const diffMinutes = Math.ceil(diffMs / 60000);
-    if (diffMinutes > 0 && diffMinutes <= 60) {
-      return diffMinutes;
-    }
-    if (diffMinutes === 0 && diffMs > 0) {
-      return 1;
-    }
+    return Math.max(1, diffMinutes);
   } catch {
-    // ignore
+    return 0;
   }
-  return null;
 }
 
 export const GameRow: React.FC<GameRowProps> = ({
@@ -63,7 +59,8 @@ export const GameRow: React.FC<GameRowProps> = ({
   onWatchGame,
   onWatchHighlights,
   onOpenBoxScore,
-  favoriteTeam
+  favoriteTeam,
+  isCountdownActive = false
 }) => {
   const isLive = game.status.isLive;
   const isFinal = game.status.state === 'post';
@@ -72,21 +69,22 @@ export const GameRow: React.FC<GameRowProps> = ({
   const home = game.homeTeam;
   const away = game.awayTeam;
 
-  const awayScore = hideScores ? '-' : away.score ?? '-';
-  const homeScore = hideScores ? '-' : home.score ?? '-';
+  const effectiveHideScores = hideScores || (typeof window !== 'undefined' && localStorage.getItem('bss_hide_scores') === 'true');
+  const awayScore = effectiveHideScores && isFinal ? '-' : (away.score ?? '-');
+  const homeScore = effectiveHideScores && isFinal ? '-' : (home.score ?? '-');
 
-  // Live countdown for upcoming games starting within 1 hour
-  const [minutesUntilStart, setMinutesUntilStart] = React.useState<number | null>(() =>
-    isUpcoming ? getMinutesUntilStart(game.date) : null
+  // Live countdown for upcoming games
+  const [minutesUntilStart, setMinutesUntilStart] = React.useState<number>(() =>
+    getMinutesUntilStart(game.date)
   );
 
   React.useEffect(() => {
-    if (!isUpcoming) return;
+    if (!isUpcoming || !isCountdownActive) return;
     const update = () => setMinutesUntilStart(getMinutesUntilStart(game.date));
     update();
     const timer = setInterval(update, 30000);
     return () => clearInterval(timer);
-  }, [game.date, isUpcoming]);
+  }, [game.date, isUpcoming, isCountdownActive]);
 
   // Check if this matchup features the user's favorite team
   const isFavoriteGame = Boolean(
@@ -179,11 +177,6 @@ export const GameRow: React.FC<GameRowProps> = ({
               <div className="text-xs sm:text-sm font-extrabold text-gray-800 whitespace-nowrap">
                 {formatTipoff(game.date, game.status.detail)}
               </div>
-              {minutesUntilStart !== null && (
-                <div className="text-[10px] sm:text-[11px] text-gray-400 font-medium whitespace-nowrap mt-0.5">
-                  Stream starting in {minutesUntilStart} {minutesUntilStart === 1 ? 'minute' : 'minutes'}
-                </div>
-              )}
             </div>
           ) : (
             /* Live or Completed Game: Scores & Status */
@@ -260,6 +253,25 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
 
       </div>
+
+      {/* For Upcoming Games: Gray Button indicating when stream starts (active 1 hour before earliest game of the day) */}
+      {isUpcoming && isCountdownActive && (
+        <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenBoxScore(game);
+            }}
+            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-gray-100/90 hover:bg-gray-200/80 text-gray-600 text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 border border-gray-200/70 shadow-2xs transition active:scale-98 cursor-pointer"
+          >
+            <Clock className="w-3.5 h-3.5 text-gray-400" />
+            <span>
+              Stream starting in {minutesUntilStart} {minutesUntilStart === 1 ? 'minute' : 'minutes'}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* For Live Games: Single 'Watch Live' Action Button */}
       {isLive && (

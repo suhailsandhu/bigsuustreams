@@ -136,6 +136,32 @@ export const App: React.FC = () => {
     return (scoreboard?.games || []).filter((g) => g.league === targetLeague);
   }, [scoreboard, currentSport]);
 
+  // Periodic tick every 30s to keep countdown active checks fresh
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((t) => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Countdown active: triggers 1 hour before the earliest game of the day, or anytime games are underway
+  const isCountdownActive = useMemo(() => {
+    if (!allGames.length) return false;
+    const hasStartedAny = allGames.some((g) => g.status?.isLive || g.status?.state === 'post');
+    if (hasStartedAny) return true;
+
+    let earliest = Infinity;
+    for (const g of allGames) {
+      if (g.date) {
+        const t = new Date(g.date).getTime();
+        if (!isNaN(t) && t < earliest) {
+          earliest = t;
+        }
+      }
+    }
+    if (earliest === Infinity) return false;
+    return Date.now() >= (earliest - 60 * 60 * 1000);
+  }, [allGames, clockTick]);
+
   // Active favorite team for subtle card highlighting
   const favoriteTeam = useMemo(() => {
     if (typeof window === 'undefined') return null;
@@ -432,6 +458,7 @@ export const App: React.FC = () => {
                       key={game.id}
                       game={game}
                       favoriteTeam={favoriteTeam}
+                      isCountdownActive={isCountdownActive}
                       onWatchGame={handleWatchGame}
                       onWatchHighlights={handleWatchHighlights}
                       onOpenBoxScore={(g) => setBoxScoreGame(g)}
