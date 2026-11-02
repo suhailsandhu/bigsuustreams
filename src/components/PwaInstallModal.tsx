@@ -45,8 +45,8 @@ export const PwaInstallModal: React.FC<PwaInstallModalProps> = ({
             <Smartphone className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-white">Install Courtside Stream</h3>
-            <p className="text-xs text-slate-400">Add to your Home Screen for full-screen basketball streaming</p>
+            <h3 className="text-lg font-black text-white">Install BSS Streams</h3>
+            <p className="text-xs text-slate-400">Add to your Home Screen for full-screen sports streaming</p>
           </div>
         </div>
 

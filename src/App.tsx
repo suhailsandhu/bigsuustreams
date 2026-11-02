@@ -15,6 +15,7 @@ import { AuthModal } from './components/AuthModal.tsx';
 import { LegalModal } from './components/LegalModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
+import { findTeamByQuery } from './data/nbaTeams.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -129,31 +130,18 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
+  // Games list preserved strictly in normal chronological schedule order
   const allGames = useMemo(() => {
     const targetLeague = currentSport === 'nfl' ? 'NFL' : 'NBA';
-    const games = (scoreboard?.games || []).filter((g) => g.league === targetLeague);
-    const fav = (typeof window !== 'undefined' ? (localStorage.getItem('bss_favorite_team') || '') : '').trim().toLowerCase();
+    return (scoreboard?.games || []).filter((g) => g.league === targetLeague);
+  }, [scoreboard, currentSport]);
 
-    if (!fav) return games;
-
-    return [...games].sort((a, b) => {
-      const aMatches =
-        (a.awayTeam?.name && a.awayTeam.name.toLowerCase().includes(fav)) ||
-        (a.awayTeam?.displayName && a.awayTeam.displayName.toLowerCase().includes(fav)) ||
-        (a.homeTeam?.name && a.homeTeam.name.toLowerCase().includes(fav)) ||
-        (a.homeTeam?.displayName && a.homeTeam.displayName.toLowerCase().includes(fav));
-
-      const bMatches =
-        (b.awayTeam?.name && b.awayTeam.name.toLowerCase().includes(fav)) ||
-        (b.awayTeam?.displayName && b.awayTeam.displayName.toLowerCase().includes(fav)) ||
-        (b.homeTeam?.name && b.homeTeam.name.toLowerCase().includes(fav)) ||
-        (b.homeTeam?.displayName && b.homeTeam.displayName.toLowerCase().includes(fav));
-
-      if (aMatches && !bMatches) return -1;
-      if (!aMatches && bMatches) return 1;
-      return 0;
-    });
-  }, [scoreboard, currentSport, settingsTick]);
+  // Active favorite team for subtle card highlighting
+  const favoriteTeam = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const favKey = localStorage.getItem('bss_favorite_team') || '';
+    return findTeamByQuery(favKey) || null;
+  }, [settingsTick]);
 
   const handleWatchHighlights = useCallback(async (game: ScoreboardGame) => {
     setSelectedGame(game);
@@ -443,6 +431,7 @@ export const App: React.FC = () => {
                     <GameRow
                       key={game.id}
                       game={game}
+                      favoriteTeam={favoriteTeam}
                       onWatchGame={handleWatchGame}
                       onWatchHighlights={handleWatchHighlights}
                       onOpenBoxScore={(g) => setBoxScoreGame(g)}

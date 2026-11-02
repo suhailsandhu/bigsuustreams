@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Trophy, Film } from 'lucide-react';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
+import type { NbaTeam } from '../data/nbaTeams.ts';
 
 interface GameRowProps {
   game: ScoreboardGame;
@@ -8,6 +9,18 @@ interface GameRowProps {
   onWatchGame: (game: ScoreboardGame) => void;
   onWatchHighlights?: (game: ScoreboardGame) => void;
   onOpenBoxScore: (game: ScoreboardGame) => void;
+  favoriteTeam?: NbaTeam | null;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  if (clean.length === 6) {
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return `rgba(0, 0, 0, ${alpha})`;
 }
 
 function formatTipoff(dateStr?: string, fallback = 'Scheduled'): string {
@@ -29,7 +42,8 @@ export const GameRow: React.FC<GameRowProps> = ({
   hideScores = false,
   onWatchGame,
   onWatchHighlights,
-  onOpenBoxScore
+  onOpenBoxScore,
+  favoriteTeam
 }) => {
   const isLive = game.status.isLive;
   const isFinal = game.status.state === 'post';
@@ -40,6 +54,24 @@ export const GameRow: React.FC<GameRowProps> = ({
 
   const awayScore = hideScores ? '-' : away.score ?? '-';
   const homeScore = hideScores ? '-' : home.score ?? '-';
+
+  // Check if this matchup features the user's favorite team
+  const isFavoriteGame = Boolean(
+    favoriteTeam && (
+      (away.name && (away.name.toLowerCase().includes(favoriteTeam.name.toLowerCase()) || away.displayName?.toLowerCase().includes(favoriteTeam.displayName.toLowerCase()))) ||
+      (home.name && (home.name.toLowerCase().includes(favoriteTeam.name.toLowerCase()) || home.displayName?.toLowerCase().includes(favoriteTeam.displayName.toLowerCase()))) ||
+      (away.abbreviation && away.abbreviation.toUpperCase() === favoriteTeam.abbreviation.toUpperCase()) ||
+      (home.abbreviation && home.abbreviation.toUpperCase() === favoriteTeam.abbreviation.toUpperCase())
+    )
+  );
+
+  const cardStyle: React.CSSProperties = isFavoriteGame && favoriteTeam?.primaryColor
+    ? {
+        borderLeftWidth: '4px',
+        borderLeftColor: favoriteTeam.primaryColor,
+        backgroundColor: hexToRgba(favoriteTeam.primaryColor, 0.038)
+      }
+    : {};
 
   const handleRowClick = () => {
     if (isLive) {
@@ -58,7 +90,12 @@ export const GameRow: React.FC<GameRowProps> = ({
   return (
     <div
       onClick={handleRowClick}
-      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white border border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300 transition-all p-2 sm:p-2.5 select-none cursor-pointer ${
+      style={cardStyle}
+      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border transition-all p-2 sm:p-2.5 select-none cursor-pointer ${
+        isFavoriteGame
+          ? 'border-gray-200/90 shadow-2xs hover:shadow-md'
+          : 'bg-white border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300'
+      } ${
         isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
       }`}
     >
