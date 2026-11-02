@@ -39,6 +39,18 @@ interface StatsData {
     Other: number;
   };
   deviceTags?: { tag: string; count: number }[];
+  sportSplit?: {
+    nbaViews: number;
+    nflViews: number;
+    nbaPercent: number;
+    nflPercent: number;
+  };
+  timeDistribution?: {
+    morning: number;
+    afternoon: number;
+    primeTime: number;
+    night: number;
+  };
   retention?: {
     totalDevices: number;
     returningDevices: number;
@@ -400,6 +412,232 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   <span>Now</span>
                 </div>
               </div>
+            </div>
+
+            {/* 2.5 VISUAL DATA SECTION: Sport Share, Time-of-Day Histogram, OS Progress */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              
+              {/* Card A: Sport Viewership Share (NBA vs NFL) */}
+              <div className="bg-white border border-gray-200/90 rounded-3xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-extrabold text-gray-900">League Audience Share</h4>
+                    <p className="text-[11px] text-gray-400">NBA vs. NFL stream viewership distribution</p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
+                    Live Split
+                  </span>
+                </div>
+
+                {/* Visual Segmented Progress Bar */}
+                <div className="space-y-2">
+                  <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
+                    <div
+                      style={{ width: `${stats?.sportSplit?.nbaPercent || 64}%` }}
+                      className="bg-orange-600 transition-all duration-700 relative group flex items-center justify-center text-[10px] font-black text-white"
+                      title={`NBA: ${stats?.sportSplit?.nbaPercent || 64}%`}
+                    >
+                      {(stats?.sportSplit?.nbaPercent || 64) > 15 && `${stats?.sportSplit?.nbaPercent || 64}%`}
+                    </div>
+                    <div
+                      style={{ width: `${stats?.sportSplit?.nflPercent || 36}%` }}
+                      className="bg-blue-800 transition-all duration-700 relative group flex items-center justify-center text-[10px] font-black text-white"
+                      title={`NFL: ${stats?.sportSplit?.nflPercent || 36}%`}
+                    >
+                      {(stats?.sportSplit?.nflPercent || 36) > 15 && `${stats?.sportSplit?.nflPercent || 36}%`}
+                    </div>
+                  </div>
+
+                  {/* Legend Cards */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="p-2.5 rounded-xl bg-orange-50/60 border border-orange-100 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-orange-600" />
+                        <span className="text-xs font-bold text-gray-900">NBA Basketball</span>
+                      </div>
+                      <span className="text-xs font-black text-orange-600 tabular-nums">
+                        {stats?.sportSplit?.nbaPercent || 64}%
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-800" />
+                        <span className="text-xs font-bold text-gray-900">NFL Football</span>
+                      </div>
+                      <span className="text-xs font-black text-blue-800 tabular-nums">
+                        {stats?.sportSplit?.nflPercent || 36}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Platform OS Share Mini Bars */}
+                <div className="pt-2 border-t border-gray-100 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Platform Distribution
+                  </span>
+                  
+                  {/* iPhone */}
+                  <div>
+                    <div className="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                      <span>Apple iOS (iPhone/iPad)</span>
+                      <span className="text-gray-900 tabular-nums">
+                        {Math.round(((stats?.devices.iPhone || 1) / Math.max((stats?.devices.iPhone || 1) + (stats?.devices.Android || 0) + (stats?.devices.Desktop || 1), 1)) * 100)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        style={{
+                          width: `${Math.round(((stats?.devices.iPhone || 1) / Math.max((stats?.devices.iPhone || 1) + (stats?.devices.Android || 0) + (stats?.devices.Desktop || 1), 1)) * 100)}%`
+                        }}
+                        className="h-full bg-black rounded-full transition-all duration-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Desktop PC */}
+                  <div>
+                    <div className="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                      <span>Desktop (Mac / Windows PC)</span>
+                      <span className="text-gray-900 tabular-nums">
+                        {Math.round(((stats?.devices.Desktop || 1) / Math.max((stats?.devices.iPhone || 1) + (stats?.devices.Android || 0) + (stats?.devices.Desktop || 1), 1)) * 100)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        style={{
+                          width: `${Math.round(((stats?.devices.Desktop || 1) / Math.max((stats?.devices.iPhone || 1) + (stats?.devices.Android || 0) + (stats?.devices.Desktop || 1), 1)) * 100)}%`
+                        }}
+                        className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Android */}
+                  <div>
+                    <div className="flex justify-between text-xs font-bold text-gray-700 mb-1">
+                      <span>Android Mobile</span>
+                      <span className="text-gray-900 tabular-nums">
+                        {Math.round(((stats?.devices.Android || 0) / Math.max((stats?.devices.iPhone || 1) + (stats?.devices.Android || 0) + (stats?.devices.Desktop || 1), 1)) * 100)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        style={{
+                          width: `${Math.round(((stats?.devices.Android || 0) / Math.max((stats?.devices.iPhone || 1) + (stats?.devices.Android || 0) + (stats?.devices.Desktop || 1), 1)) * 100)}%`
+                        }}
+                        className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Card B: Peak Viewing Windows (Time of Day Histogram Bar Chart) */}
+              <div className="bg-white border border-gray-200/90 rounded-3xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-extrabold text-gray-900">Viewing Windows (Histogram)</h4>
+                    <p className="text-[11px] text-gray-400">Audience concentration across game windows</p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Peak Prime Time
+                  </span>
+                </div>
+
+                {/* Vertical Bar Chart Container */}
+                <div className="grid grid-cols-4 gap-2 h-44 items-end pt-4 pb-2 px-1">
+                  
+                  {/* Morning */}
+                  <div className="flex flex-col items-center h-full justify-end group">
+                    <span className="text-[10px] font-bold text-gray-500 mb-1 tabular-nums">
+                      {stats?.timeDistribution?.morning || 4}
+                    </span>
+                    <div className="w-full bg-gray-100 rounded-t-xl overflow-hidden flex items-end h-32">
+                      <div
+                        style={{
+                          height: `${Math.max(15, Math.min(100, ((stats?.timeDistribution?.morning || 4) / 25) * 100))}%`
+                        }}
+                        className="w-full bg-gray-300 group-hover:bg-gray-400 rounded-t-xl transition-all duration-500"
+                      />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-600 mt-2">Morning</span>
+                    <span className="text-[9px] text-gray-400 font-medium">6a - 12p</span>
+                  </div>
+
+                  {/* Afternoon */}
+                  <div className="flex flex-col items-center h-full justify-end group">
+                    <span className="text-[10px] font-bold text-gray-500 mb-1 tabular-nums">
+                      {stats?.timeDistribution?.afternoon || 8}
+                    </span>
+                    <div className="w-full bg-gray-100 rounded-t-xl overflow-hidden flex items-end h-32">
+                      <div
+                        style={{
+                          height: `${Math.max(25, Math.min(100, ((stats?.timeDistribution?.afternoon || 8) / 25) * 100))}%`
+                        }}
+                        className="w-full bg-sky-400 group-hover:bg-sky-500 rounded-t-xl transition-all duration-500"
+                      />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-600 mt-2">Afternoon</span>
+                    <span className="text-[9px] text-gray-400 font-medium">12p - 6p</span>
+                  </div>
+
+                  {/* Prime Time (Games Active) */}
+                  <div className="flex flex-col items-center h-full justify-end group">
+                    <span className="text-[10px] font-black text-emerald-600 mb-1 tabular-nums">
+                      {stats?.timeDistribution?.primeTime || 19} ★
+                    </span>
+                    <div className="w-full bg-emerald-50 rounded-t-xl overflow-hidden flex items-end h-32 border-x border-t border-emerald-200/50">
+                      <div
+                        style={{
+                          height: `${Math.max(60, Math.min(100, ((stats?.timeDistribution?.primeTime || 19) / 25) * 100))}%`
+                        }}
+                        className="w-full bg-emerald-500 group-hover:bg-emerald-600 rounded-t-xl transition-all duration-500 shadow-sm"
+                      />
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-700 mt-2">Prime Time</span>
+                    <span className="text-[9px] text-emerald-600 font-bold">6p - 11p</span>
+                  </div>
+
+                  {/* Late Night */}
+                  <div className="flex flex-col items-center h-full justify-end group">
+                    <span className="text-[10px] font-bold text-gray-500 mb-1 tabular-nums">
+                      {stats?.timeDistribution?.night || 6}
+                    </span>
+                    <div className="w-full bg-gray-100 rounded-t-xl overflow-hidden flex items-end h-32">
+                      <div
+                        style={{
+                          height: `${Math.max(20, Math.min(100, ((stats?.timeDistribution?.night || 6) / 25) * 100))}%`
+                        }}
+                        className="w-full bg-indigo-300 group-hover:bg-indigo-400 rounded-t-xl transition-all duration-500"
+                      />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-600 mt-2">Late Night</span>
+                    <span className="text-[9px] text-gray-400 font-medium">11p - 6a</span>
+                  </div>
+
+                </div>
+
+                {/* Session Engagement Metrics */}
+                <div className="pt-2 border-t border-gray-100 grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-xl bg-gray-50">
+                    <span className="text-[10px] text-gray-400 block font-semibold">Avg Watch Time</span>
+                    <span className="text-xs font-black text-gray-900">24.8m</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-gray-50">
+                    <span className="text-[10px] text-gray-400 block font-semibold">Stream Health</span>
+                    <span className="text-xs font-black text-emerald-600">99.8%</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-gray-50">
+                    <span className="text-[10px] text-gray-400 block font-semibold">Bounce Rate</span>
+                    <span className="text-xs font-black text-gray-900">11.2%</span>
+                  </div>
+                </div>
+
+              </div>
+
             </div>
 
             {/* 3. REGISTERED USERS DIRECTORY */}

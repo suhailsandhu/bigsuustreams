@@ -26,18 +26,23 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       const thumbUrl = `https://img.youtube.com/vi/${stream.youtubeVideoId}/maxresdefault.jpg`;
 
       return (
-        <div className="relative w-full aspect-video bg-neutral-950 rounded-2xl overflow-hidden shadow-xl border border-gray-800 select-none flex flex-col justify-between p-4 sm:p-6 group">
-          {/* Background Video Poster with subtle blur */}
+        <a
+          href={ytUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative w-full aspect-video bg-neutral-950 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 select-none flex flex-col justify-between p-4 sm:p-6 group cursor-pointer"
+        >
+          {/* Background Video Poster with subtle dark overlay */}
           <div className="absolute inset-0 z-0">
             <img
               src={thumbUrl}
               alt={stream.name}
-              className="w-full h-full object-cover opacity-35 group-hover:opacity-45 group-hover:scale-105 transition-all duration-700"
+              className="w-full h-full object-cover opacity-60 group-hover:opacity-75 group-hover:scale-105 transition-all duration-500"
               onError={(e) => {
                 (e.target as any).src = `https://img.youtube.com/vi/${stream.youtubeVideoId}/hqdefault.jpg`;
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/40" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
           </div>
 
           {/* Top Header Badges */}
@@ -48,49 +53,26 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                 Official NFL Highlights
               </span>
             </div>
-            <span className="text-[10px] font-extrabold text-white/70 bg-white/10 px-2.5 py-1 rounded-full uppercase tracking-widest backdrop-blur-md">
-              4K / 1080p 60fps
+            <span className="text-[10px] font-extrabold text-white/80 bg-black/60 px-2.5 py-1 rounded-full uppercase tracking-widest backdrop-blur-md border border-white/10">
+              HD 60fps
             </span>
           </div>
 
-          {/* Center Play Button & CTA */}
-          <div className="relative z-10 flex flex-col items-center justify-center text-center my-auto px-4 max-w-lg mx-auto">
-            <a
-              href={ytUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group/btn relative inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer mb-3"
-            >
-              <Play className="w-8 h-8 sm:w-9 sm:h-9 fill-current ml-1 text-white" />
-              <span className="absolute -inset-1 rounded-full bg-red-600/30 animate-ping -z-10 pointer-events-none" />
-            </a>
+          {/* Center Play Button Only */}
+          <div className="relative z-10 flex flex-col items-center justify-center my-auto">
+            <div className="relative inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-600 group-hover:bg-red-500 text-white shadow-2xl transition-all duration-300 group-hover:scale-110 active:scale-95">
+              <Play className="w-9 h-9 sm:w-10 sm:h-10 fill-current ml-1 text-white" />
+              <span className="absolute -inset-1.5 rounded-full bg-red-600/40 animate-ping -z-10 pointer-events-none" />
+            </div>
+          </div>
 
-            <h3 className="text-sm sm:text-lg font-black text-white leading-snug line-clamp-2">
+          {/* Bottom Title Bar */}
+          <div className="relative z-10">
+            <h3 className="text-xs sm:text-sm font-black text-white line-clamp-1 drop-shadow-md">
               {stream.name}
             </h3>
-            <p className="text-[11px] sm:text-xs text-gray-300 mt-1 max-w-sm">
-              The NFL restricts third-party website embedding. Tap below to launch official highlights directly in YouTube without error.
-            </p>
-
-            <a
-              href={ytUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center space-x-2 bg-white hover:bg-gray-100 text-black text-xs font-black px-5 py-2.5 rounded-full shadow-lg transition active:scale-95"
-            >
-              <svg className="w-4 h-4 text-red-600 fill-current" viewBox="0 0 24 24">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-              </svg>
-              <span>Watch Official Highlights</span>
-            </a>
           </div>
-
-          {/* Bottom Bar info */}
-          <div className="relative z-10 flex items-center justify-between text-[11px] text-gray-400">
-            <span>Official NFL Broadcast</span>
-            <span>Opens directly in YouTube / App</span>
-          </div>
-        </div>
+        </a>
       );
     }
 
