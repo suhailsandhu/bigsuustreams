@@ -8,6 +8,7 @@ import { getScoreboard, getGameSummary, getStandings, getNflScoreboard, getNflGa
 import { analytics } from './src/server/analyticsService.ts';
 import { getGameHighlights } from './src/server/highlightsService.ts';
 import { applySecurityHeaders, createRateLimiter } from './src/server/securityMiddleware.ts';
+import { authService } from './src/server/authService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +43,91 @@ const apiLimiter = createRateLimiter({
 // Apply general rate limiter across API
 app.use('/api', apiLimiter);
 
-// 0. Site-Wide Access Gate Passcode Verification
+// 0. Account Authentication Endpoints (iOS-style Clean Setup)
+app.post('/api/auth/register', siteAuthLimiter, (req, res) => {
+  try {
+    const { username, email, password } = req.body || {};
+    const result = authService.register(username || '', email || '', password || '');
+    res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    res.status(400).json({ error: (err && err.message) || 'Registration failed' });
+  }
+});
+
+app.post('/api/auth/login', siteAuthLimiter, (req, res) => {
+  try {
+    const { identifier, password } = req.body || {};
+    const result = authService.login(identifier || '', password || '');
+    res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    res.status(401).json({ error: (err && err.message) || 'Invalid credentials' });
+  }
+});
+
+app.post('/api/auth/google', (req, res) => {
+  try {
+    const { email, displayName, avatarUrl } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: 'Email required for Google sign-in' });
+    }
+    const result = authService.loginWithGoogle(email, displayName || '', avatarUrl);
+    res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Google sign-in failed' });
+  }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  const session = authService.verifySession(String(token));
+  if (!session) {
+    return res.status(401).json({ error: 'Session expired or invalid' });
+  }
+  res.json({ success: true, session });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.body?.token;
+  if (token) {
+    authService.removeSession(String(token));
+  }
+  res.json({ success: true });
+});
+
+// Legacy passcode gate support
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
   if (typeof password === 'string' && password.trim().toLowerCase() === SITE_PASSCODE) {

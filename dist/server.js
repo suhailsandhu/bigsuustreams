@@ -1,8 +1,8 @@
 // server.js
 import express from "express";
 import cors from "cors";
-import path from "path";
-import fs from "fs";
+import path2 from "path";
+import fs2 from "fs";
 import { fileURLToPath } from "url";
 
 // src/server/streamService.ts
@@ -16,11 +16,11 @@ var cache = {
 };
 var CACHE_TTL_STREAMS_MS = 3e4;
 var CACHE_TTL_SOURCES_MS = 15e3;
-async function fetchWithFallback(path2, headers = {}) {
+async function fetchWithFallback(path3, headers = {}) {
   let lastErr = null;
   for (const mirror of MIRRORS) {
     try {
-      const url = `${mirror}${path2}`;
+      const url = `${mirror}${path3}`;
       const res = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -34,7 +34,7 @@ async function fetchWithFallback(path2, headers = {}) {
       lastErr = e;
     }
   }
-  throw lastErr || new Error(`Failed to fetch ${path2} from all mirrors`);
+  throw lastErr || new Error(`Failed to fetch ${path3} from all mirrors`);
 }
 async function getBasketballStreams(forceRefresh = false) {
   const now = Date.now();
@@ -1298,9 +1298,183 @@ function applySecurityHeaders(_req, res, next) {
   next();
 }
 
+// src/server/authService.ts
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+var DATA_DIR = path.join(process.cwd(), "data");
+var USERS_FILE = path.join(DATA_DIR, "users.json");
+var AuthService = class {
+  users = /* @__PURE__ */ new Map();
+  sessions = /* @__PURE__ */ new Map();
+  constructor() {
+    this.ensureDataStore();
+    this.loadUsers();
+  }
+  ensureDataStore() {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(USERS_FILE)) {
+        fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf-8");
+      }
+    } catch (err) {
+      console.warn("Could not initialize users data directory:", err);
+    }
+  }
+  loadUsers() {
+    try {
+      if (fs.existsSync(USERS_FILE)) {
+        const raw = fs.readFileSync(USERS_FILE, "utf-8");
+        const list = JSON.parse(raw);
+        this.users.clear();
+        for (const u of list) {
+          this.users.set(u.id, u);
+        }
+      }
+    } catch (err) {
+      console.warn("Error reading users store:", err);
+    }
+  }
+  persistUsers() {
+    try {
+      this.ensureDataStore();
+      const list = Array.from(this.users.values());
+      fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+    } catch (err) {
+      console.warn("Error saving users store:", err);
+    }
+  }
+  hashPassword(password, salt) {
+    return crypto.pbkdf2Sync(password, salt, 1e4, 64, "sha512").toString("hex");
+  }
+  register(username, email, password) {
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanUsername || cleanUsername.length < 3) {
+      throw new Error("Username must be at least 3 characters long");
+    }
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      throw new Error("Please provide a valid email address");
+    }
+    if (!password || password.length < 6) {
+      throw new Error("Password must be at least 6 characters long");
+    }
+    for (const u of this.users.values()) {
+      if (u.username === cleanUsername) {
+        throw new Error("This username is already taken. Please choose another.");
+      }
+      if (u.email === cleanEmail) {
+        throw new Error("An account with this email already exists. Please log in.");
+      }
+    }
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = this.hashPassword(password, salt);
+    const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const user = {
+      id,
+      username: cleanUsername,
+      email: cleanEmail,
+      displayName: username.trim(),
+      passwordHash,
+      salt,
+      provider: "local",
+      createdAt: now,
+      lastLogin: now
+    };
+    this.users.set(id, user);
+    this.persistUsers();
+    const session = this.createSession(user);
+    return { user, session };
+  }
+  login(identifier, password) {
+    const clean = identifier.trim().toLowerCase();
+    let foundUser;
+    for (const u of this.users.values()) {
+      if (u.username === clean || u.email === clean) {
+        foundUser = u;
+        break;
+      }
+    }
+    if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
+      throw new Error("Invalid username/email or password");
+    }
+    const inputHash = this.hashPassword(password, foundUser.salt);
+    if (inputHash !== foundUser.passwordHash) {
+      throw new Error("Invalid username/email or password");
+    }
+    foundUser.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
+    this.persistUsers();
+    const session = this.createSession(foundUser);
+    return { user: foundUser, session };
+  }
+  loginWithGoogle(email, displayName, avatarUrl) {
+    const cleanEmail = email.trim().toLowerCase();
+    let user;
+    for (const u of this.users.values()) {
+      if (u.email === cleanEmail) {
+        user = u;
+        break;
+      }
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    if (!user) {
+      const generatedUsername = cleanEmail.split("@")[0].replace(/[^a-z0-9]/g, "").slice(0, 15) || `user${Date.now() % 1e4}`;
+      const id = `google_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      user = {
+        id,
+        username: generatedUsername,
+        email: cleanEmail,
+        displayName: displayName || cleanEmail.split("@")[0],
+        provider: "google",
+        avatarUrl,
+        createdAt: now,
+        lastLogin: now
+      };
+      this.users.set(id, user);
+    } else {
+      user.lastLogin = now;
+      if (avatarUrl) user.avatarUrl = avatarUrl;
+    }
+    this.persistUsers();
+    const session = this.createSession(user);
+    return { user, session };
+  }
+  createSession(user) {
+    const token = `sess_${crypto.randomBytes(32).toString("hex")}`;
+    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1e3;
+    const session = {
+      token,
+      userId: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      expiresAt
+    };
+    this.sessions.set(token, session);
+    return session;
+  }
+  verifySession(token) {
+    if (!token) return null;
+    const session = this.sessions.get(token);
+    if (!session) return null;
+    if (Date.now() > session.expiresAt) {
+      this.sessions.delete(token);
+      return null;
+    }
+    return session;
+  }
+  removeSession(token) {
+    this.sessions.delete(token);
+  }
+};
+var authService = new AuthService();
+
 // server.js
 var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
+var __dirname = path2.dirname(__filename);
 var app = express();
 var PORT = process.env.PORT && process.env.PORT !== "80" ? process.env.PORT : 3e3;
 var SITE_PASSCODE = process.env.SITE_PASSCODE || "lebronisthegoat";
@@ -1321,6 +1495,84 @@ var apiLimiter = createRateLimiter({
   message: "High request volume detected. Please try again in a moment."
 });
 app.use("/api", apiLimiter);
+app.post("/api/auth/register", siteAuthLimiter, (req, res) => {
+  try {
+    const { username, email, password } = req.body || {};
+    const result = authService.register(username || "", email || "", password || "");
+    res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    res.status(400).json({ error: err && err.message || "Registration failed" });
+  }
+});
+app.post("/api/auth/login", siteAuthLimiter, (req, res) => {
+  try {
+    const { identifier, password } = req.body || {};
+    const result = authService.login(identifier || "", password || "");
+    res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    res.status(401).json({ error: err && err.message || "Invalid credentials" });
+  }
+});
+app.post("/api/auth/google", (req, res) => {
+  try {
+    const { email, displayName, avatarUrl } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: "Email required for Google sign-in" });
+    }
+    const result = authService.loginWithGoogle(email, displayName || "", avatarUrl);
+    res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    res.status(500).json({ error: err && err.message || "Google sign-in failed" });
+  }
+});
+app.get("/api/auth/me", (req, res) => {
+  const token = req.headers.authorization?.replace("Bearer ", "") || req.query.token;
+  if (!token) {
+    return res.status(401).json({ error: "No token provided" });
+  }
+  const session = authService.verifySession(String(token));
+  if (!session) {
+    return res.status(401).json({ error: "Session expired or invalid" });
+  }
+  res.json({ success: true, session });
+});
+app.post("/api/auth/logout", (req, res) => {
+  const token = req.headers.authorization?.replace("Bearer ", "") || req.body?.token;
+  if (token) {
+    authService.removeSession(String(token));
+  }
+  res.json({ success: true });
+});
 app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
   if (typeof password === "string" && password.trim().toLowerCase() === SITE_PASSCODE) {
@@ -1478,10 +1730,10 @@ app.get("/api/basketball/hls/:key.m3u8", handleHls);
 app.get("/api/basketball/hls/:key/:quality.m3u8", handleHls);
 app.post("/api/analytics/ping", (req, res) => {
   try {
-    const { sessionId, device, path: path2, streamKey, gameName, isInitial } = req.body || {};
+    const { sessionId, device, path: path3, streamKey, gameName, isInitial } = req.body || {};
     if (sessionId) {
       const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim();
-      analytics.recordPing(sessionId, { device, path: path2, streamKey, gameName, isInitial }, clientIp);
+      analytics.recordPing(sessionId, { device, path: path3, streamKey, gameName, isInitial }, clientIp);
     }
     res.json({ ok: true });
   } catch {
@@ -1502,26 +1754,26 @@ app.get("/api/analytics/stats", (req, res) => {
   }
   res.json(analytics.getStats());
 });
-var distPath = path.join(__dirname, "dist");
-if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, "index.html"))) {
+var distPath = path2.join(__dirname, "dist");
+if (!fs2.existsSync(distPath) && fs2.existsSync(path2.join(__dirname, "index.html"))) {
   distPath = __dirname;
 }
 app.get(/^\/(admin|stats)/, (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.sendFile(path.join(distPath, "index.html"));
+  res.sendFile(path2.join(distPath, "index.html"));
 });
 app.get("/sw.js", (req, res) => {
   res.setHeader("Content-Type", "text/javascript");
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.sendFile(path.join(distPath, "sw.js"));
+  res.sendFile(path2.join(distPath, "sw.js"));
 });
-app.use("/assets", express.static(path.join(distPath, "assets")), (req, res) => {
+app.use("/assets", express.static(path2.join(distPath, "assets")), (req, res) => {
   res.status(404).send("Asset not found");
 });
 app.use(express.static(distPath));
 app.use((req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.sendFile(path.join(distPath, "index.html"));
+  res.sendFile(path2.join(distPath, "index.html"));
 });
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);

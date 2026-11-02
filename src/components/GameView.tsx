@@ -235,7 +235,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
                     </span>
                   )}
                   <span className="text-[9px] font-bold text-gray-400 uppercase mt-0.5 tracking-wider">
-                    NBA
+                    {game?.league || stream.league || 'NBA'}
                   </span>
                 </div>
 

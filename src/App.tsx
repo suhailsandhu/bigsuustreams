@@ -11,7 +11,7 @@ import { GameView } from './components/GameView.tsx';
 import { Footer } from './components/Footer.tsx';
 import { PwaInstallModal } from './components/PwaInstallModal.tsx';
 import { AdminStatsModal } from './components/AdminStatsModal.tsx';
-import { SiteGate } from './components/SiteGate.tsx';
+import { AuthModal } from './components/AuthModal.tsx';
 import { LegalModal } from './components/LegalModal.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
@@ -20,15 +20,26 @@ export const App: React.FC = () => {
   // Current sport state ('nba' | 'nfl')
   const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>('nba');
 
-  // Password protection state ('lebronisthegoat')
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+  // iOS-style Account Authentication state
+  const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
-      const token = localStorage.getItem('bigsuu_site_token') || sessionStorage.getItem('bigsuu_site_token');
-      return !!token;
+      const stored = localStorage.getItem('bigsuu_auth_user');
+      const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
+      if (token && stored) {
+        return JSON.parse(stored);
+      }
+      return null;
     } catch {
-      return false;
+      return null;
     }
   });
+
+  const handleLogout = () => {
+    localStorage.removeItem('bigsuu_auth_token');
+    localStorage.removeItem('bigsuu_auth_user');
+    sessionStorage.removeItem('bigsuu_auth_token');
+    setCurrentUser(null);
+  };
 
   // Legal modal state
   const [showLegalModal, setShowLegalModal] = useState(false);
@@ -277,12 +288,14 @@ export const App: React.FC = () => {
     );
   }
 
-  // Render Gate if site passcode is not yet verified
-  if (!isAuthenticated) {
+  // Render iOS-Style Account Auth Modal if user has not yet signed in or created an account
+  if (!currentUser) {
     return (
-      <>
-        <SiteGate
-          onUnlock={() => setIsAuthenticated(true)}
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col justify-between items-center p-4 select-none">
+        <AuthModal
+          isOpen={true}
+          currentSport={currentSport}
+          onSuccess={(user) => setCurrentUser(user)}
           onOpenLegal={(tab) => {
             setLegalTab(tab || 'dmca');
             setShowLegalModal(true);
@@ -293,7 +306,7 @@ export const App: React.FC = () => {
           initialTab={legalTab}
           onClose={() => setShowLegalModal(false)}
         />
-      </>
+      </div>
     );
   }
 
@@ -303,6 +316,8 @@ export const App: React.FC = () => {
       <Header
         onNavigateHome={handleBackToHome}
         currentSport={currentSport}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);
