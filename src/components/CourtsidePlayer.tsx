@@ -65,20 +65,15 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     // Clear watchdog timer
     if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
 
-    // Watchdog: If playback does not start within 9 seconds, auto-fallback or show clear error
+    // Watchdog: If playback does not start within 6 seconds, auto-fallback to embed feed
     watchdogTimerRef.current = setTimeout(() => {
       if (video.paused && video.readyState < 2) {
         console.warn('Playback watchdog timeout fired for', stream.stream_key, selectedQuality);
-        if (selectedQuality !== '540p') {
-          console.log('Watchdog attempting quality fallback to 540p...');
-          onQualityChange('540p');
-        } else {
-          setIsLoading(false);
-          setHasError(true);
-          setErrorMessage('Direct HLS feed is taking longer than expected to buffer. You can retry or switch to the official embed feed.');
-        }
+        console.log('Seamlessly switching to official embed feed...');
+        setPlayerMode('embed');
+        setIsLoading(false);
       }
-    }, 9000);
+    }, 6000);
 
     // Destroy existing Hls instance
     if (hlsRef.current) {
@@ -137,12 +132,12 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
               hls.recoverMediaError();
             }
           } else {
-            // Maximum retries reached
+            // Maximum retries reached -> Seamlessly switch to embed mode
             if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
             hls.destroy();
+            console.log('Direct HLS feed unavailable on host, seamlessly falling back to official live embed...');
+            setPlayerMode('embed');
             setIsLoading(false);
-            setHasError(true);
-            setErrorMessage('Direct HLS feed encountered a network obstacle. Switch to the official embed feed or try another quality.');
           }
         }
       });
@@ -163,8 +158,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       video.addEventListener('error', () => {
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
-        setHasError(true);
-        setErrorMessage('Native video playback encountered an error.');
+        console.warn('Native HLS error, switching to official embed feed...');
+        setPlayerMode('embed');
         setIsLoading(false);
       });
     } else {
@@ -319,14 +314,38 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     }
   };
 
-  // Upstream embed URL for fallback tab
+  // Upstream embed URL for fallback tab (supports streamfree.top and strmfree.st)
   const embedSource = stream.sources.find(s => s.quality.toLowerCase() === selectedQuality.toLowerCase()) || stream.sources[0];
-  const embedUrl = embedSource ? embedSource.url : `https://strmfree.st/embed/basketball/${stream.stream_key}1080p`;
+  const embedUrl = embedSource ? embedSource.url.replace('strmfree.st', 'streamfree.top') : `https://streamfree.top/embed/basketball/${stream.stream_key}1080p`;
 
   return (
     <div className="w-full flex flex-col space-y-3">
       {/* Top Header Bar above Video (Clean & Minimal) */}
-      <div className="flex items-center justify-end px-1">
+      <div className="flex items-center justify-between px-1">
+        {/* Stream Source Mode Switcher */}
+        <div className="flex items-center space-x-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+          <button
+            onClick={() => setPlayerMode('direct')}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+              playerMode === 'direct'
+                ? 'bg-black text-white shadow-2xs'
+                : 'text-gray-600 hover:text-black'
+            }`}
+          >
+            Direct HLS
+          </button>
+          <button
+            onClick={() => setPlayerMode('embed')}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+              playerMode === 'embed'
+                ? 'bg-black text-white shadow-2xs'
+                : 'text-gray-600 hover:text-black'
+            }`}
+          >
+            Live Embed
+          </button>
+        </div>
+
         {/* Live Status Pill */}
         {stream.is_live ? (
           <div className="flex items-center space-x-1.5 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
@@ -588,8 +607,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
               <iframe
                 src={embedUrl}
                 title={stream.name}
-                allow="fullscreen; picture-in-picture; autoplay"
+                allow="fullscreen; picture-in-picture; autoplay; encrypted-media"
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
                 className="w-full h-full border-0"
               />
             </div>

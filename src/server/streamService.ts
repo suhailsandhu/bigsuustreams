@@ -143,61 +143,71 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   let quality = requestedQuality;
   if (!quality.endsWith('p')) quality += 'p';
 
-  // 1. Fetch canonical embed page to extract security tokens (_0x)
-  // Try requested quality first, then fallback to 1080p or 540p
-  let embedUrl = `https://strmfree.st/embed/basketball/${streamKey}${quality}`;
-  let embedRes = await fetch(embedUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  // Candidate mirrors (streamfree.top does not block datacenter cloud IPs, strmfree.st is fallback)
+  const mirrors = ['https://streamfree.top', 'https://strmfree.st'];
+  let successfulMirror = 'https://streamfree.top';
+  let embedUrl = '';
+  let embedRes: Response | null = null;
+  let tokens: Record<string, any> = {};
+
+  for (const mirror of mirrors) {
+    try {
+      const candidateQualities = [quality, '1080p', '540p', '720p'];
+      for (const q of candidateQualities) {
+        const u = `${mirror}/embed/basketball/${streamKey}${q}`;
+        const res = await fetch(u, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Referer': mirror
+          }
+        });
+        if (res.ok) {
+          const text = await res.text();
+          const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
+          if (match) {
+            embedUrl = u;
+            embedRes = res;
+            tokens = JSON.parse(match[1]);
+            successfulMirror = mirror;
+            break;
+          }
+        }
+      }
+      if (embedRes && Object.keys(tokens).length > 0) break;
+    } catch (e) {
+      // try next mirror
     }
-  });
-
-  if (!embedRes.ok) {
-    embedUrl = `https://strmfree.st/embed/basketball/${streamKey}1080p`;
-    embedRes = await fetch(embedUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      }
-    });
   }
 
-  if (!embedRes.ok) {
-    embedUrl = `https://strmfree.st/embed/basketball/${streamKey}540p`;
-    embedRes = await fetch(embedUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      }
-    });
+  if (!embedRes || Object.keys(tokens).length === 0) {
+    throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
   }
 
-  if (!embedRes.ok) {
-    throw new Error(`Embed page returned HTTP ${embedRes.status} for ${streamKey}`);
-  }
-
-  const html = await embedRes.text();
-  const tokenMatch = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
-  if (!tokenMatch) {
-    throw new Error(`Could not find security tokens (_0x) in embed page for ${streamKey}`);
-  }
-
-  const tokens = JSON.parse(tokenMatch[1]);
   const availableQualities = Object.keys(tokens);
-
-  // If requested quality is not in tokens, fall back to best available
   let selectedQuality = quality;
   if (!tokens[selectedQuality]) {
     selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : availableQualities[0]);
   }
 
   // 2. Query stream key metadata for server name
-  const keyRes = await fetch(`https://strmfree.st/get-stream-key/${streamKey}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Referer': embedUrl
+  let keyData: any = {};
+  for (const mirror of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
+    try {
+      const res = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Referer': embedUrl
+        }
+      });
+      if (res.ok) {
+        keyData = await res.json();
+        break;
+      }
+    } catch (e) {
+      // continue
     }
-  });
+  }
 
-  const keyData: any = await keyRes.json();
   if (keyData.is_external && keyData.external_url) {
     return {
       isExternal: true,
@@ -217,34 +227,55 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     pathPrefix = '/live-cdn/';
   }
 
-  // Helper to attempt m3u8 fetch with quality fallback
+  // Helper to attempt m3u8 fetch with mirror and quality fallback
   async function attemptM3u8(q: string) {
     const p = tokens[q];
     const v = `${streamKey}${q}`;
     const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
-    const u = `https://strmfree.st${pathPrefix}${v}/index.m3u8${qStr}`;
-    const res = await fetch(u, {
+
+    for (const host of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
+      try {
+        const u = `${host}${pathPrefix}${v}/index.m3u8${qStr}`;
+        const res = await fetch(u, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Referer': embedUrl,
+            'Origin': host
+          }
+        });
+        if (res.ok) {
+          return { res, url: u, host };
+        }
+      } catch (err) {
+        // continue
+      }
+    }
+
+    const fallbackUrl = `${successfulMirror}${pathPrefix}${v}/index.m3u8${qStr}`;
+    const res = await fetch(fallbackUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         'Referer': embedUrl,
-        'Origin': 'https://strmfree.st'
+        'Origin': successfulMirror
       }
     });
-    return { res, url: u };
+    return { res, url: fallbackUrl, host: successfulMirror };
   }
 
-  let { res: m3u8Res, url: finalM3u8Url } = await attemptM3u8(selectedQuality);
+  let { res: m3u8Res, url: finalM3u8Url, host: workingHost } = await attemptM3u8(selectedQuality);
   if (!m3u8Res.ok && selectedQuality !== '1080p' && tokens['1080p']) {
     selectedQuality = '1080p';
     const fallback = await attemptM3u8('1080p');
     m3u8Res = fallback.res;
     finalM3u8Url = fallback.url;
+    workingHost = fallback.host;
   }
   if (!m3u8Res.ok && selectedQuality !== '540p' && tokens['540p']) {
     selectedQuality = '540p';
     const fallback = await attemptM3u8('540p');
     m3u8Res = fallback.res;
     finalM3u8Url = fallback.url;
+    workingHost = fallback.host;
   }
 
   if (!m3u8Res.ok) {
@@ -255,20 +286,20 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   const variant = `${streamKey}${selectedQuality}`;
 
   // Robust M3U8 Normalization:
-  // 1. Rewrite broken/non-SSL CDN hosts (like cdn1.strmfree.st) to official working origin https://strmfree.st/live/
-  // 2. Expand relative segment paths (e.g. 1263.js) to absolute URLs on https://strmfree.st/live/${variant}/
+  // 1. Rewrite non-working CDN hosts to the verified working origin
+  // 2. Expand relative segment paths (e.g. 1263.js) to absolute URLs on working origin
   const m3u8Text = rawM3u8Text.split('\n').map(line => {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) return line;
     
     // Fix cdn1.strmfree.st which fails TLS handshake
     if (trimmed.includes('cdn1.strmfree.st/live/')) {
-      return trimmed.replace(/https?:\/\/cdn1\.strmfree\.st\/live\//, 'https://strmfree.st/live/');
+      return trimmed.replace(/https?:\/\/cdn1\.strmfree\.st\/live\//, `${workingHost}/live/`);
     }
     
     // Fix relative segment filenames
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      return `https://strmfree.st/live/${variant}/${trimmed}`;
+      return `${workingHost}${pathPrefix}${variant}/${trimmed}`;
     }
 
     return line;
