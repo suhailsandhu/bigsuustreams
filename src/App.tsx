@@ -394,7 +394,7 @@ export const App: React.FC = () => {
         }}
       />
 
-      <main className="flex-1 w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <main className="flex-1 w-full mx-auto px-2.5 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-6">
         {/* If a game stream or highlight is currently active, render the GameView */}
         {selectedStream ? (
           <GameView
@@ -403,8 +403,8 @@ export const App: React.FC = () => {
             onBack={handleBackToHome}
           />
         ) : (
-          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-5">
-            {/* NBA-Style Interactive Date Navigation Carousel */}
+          <div className="max-w-4xl mx-auto space-y-2 sm:space-y-2.5">
+            {/* NBA-Style Interactive Date Navigation Carousel (Thinner & Pushed to Top) */}
             <DateNavigation
               selectedDate={selectedDate}
               onSelectDate={handleSelectDate}
@@ -412,7 +412,7 @@ export const App: React.FC = () => {
 
             {/* Loading Skeleton */}
             {isLoading && (
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2 sm:space-y-2.5">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="h-28 rounded-2xl bg-white border border-gray-200 animate-pulse shadow-xs" />
                 ))}
@@ -437,7 +437,7 @@ export const App: React.FC = () => {
 
             {/* Games List (Scoreboard & Live Feeds & Highlights) */}
             {!isLoading && !error && (
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2 sm:space-y-2.5">
                 {allGames.length > 0 ? (
                   allGames.map((game) => (
                     <GameRow

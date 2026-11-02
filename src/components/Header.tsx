@@ -40,9 +40,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col items-center justify-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2 flex flex-col items-center justify-center">
         
-        {/* Balanced, Clean Sport Logo */}
+        {/* Prominent League Logo (NBA / NFL) - Big & Crisp */}
         <div
           onClick={onNavigateHome}
           className="flex items-center justify-center cursor-pointer group py-0.5"
@@ -52,11 +52,11 @@ export const Header: React.FC<HeaderProps> = ({
             <img
               src="/nba-logo.png"
               alt="NBA"
-              className="h-16 sm:h-20 md:h-22 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
+              className="h-20 sm:h-24 md:h-28 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
             />
           ) : (
             <div className="transition-transform group-hover:scale-105">
-              <NflLogo className="h-16 sm:h-20 md:h-22 w-auto" />
+              <NflLogo className="h-20 sm:h-24 md:h-28 w-auto" />
             </div>
           )}
         </div>
@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Switch Sport Button: Two arrows circling each other (Small & Sleek) */}
         <button
           onClick={onToggleSport}
-          className="mt-1 p-1 rounded-full bg-gray-100/80 hover:bg-gray-200 text-gray-500 hover:text-black border border-gray-200/60 shadow-2xs transition-all duration-300 active:scale-90 hover:rotate-180 cursor-pointer"
+          className="mt-0.5 p-1 rounded-full bg-gray-100/80 hover:bg-gray-200 text-gray-500 hover:text-black border border-gray-200/60 shadow-2xs transition-all duration-300 active:scale-90 hover:rotate-180 cursor-pointer"
           title={`Switch to ${currentSport === 'nba' ? 'NFL' : 'NBA'} Streams`}
           aria-label="Switch Sport"
         >

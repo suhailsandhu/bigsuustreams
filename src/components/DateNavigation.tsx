@@ -122,16 +122,16 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
 
   return (
     <div
-      className="w-full bg-white border border-gray-200/90 rounded-2xl p-3 sm:p-4 mb-4 shadow-xs select-none"
+      className="w-full bg-white border border-gray-200/90 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 mb-2 sm:mb-2.5 shadow-2xs select-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Top Header: Centered Month/Year (Arrows & Calendar Icon removed per user instruction) */}
-      <div className="flex items-center justify-center mb-3">
+      {/* Top Header: Compact Centered Month/Year pushed toward top */}
+      <div className="flex items-center justify-center mb-1">
         <div className="relative" ref={datePickerRef}>
           <button
             onClick={() => setShowDatePicker(!showDatePicker)}
-            className="text-sm sm:text-base font-black text-gray-900 hover:text-black transition-colors px-3 py-1 rounded-lg hover:bg-gray-100 cursor-pointer text-center"
+            className="text-xs sm:text-sm font-black text-gray-900 hover:text-black transition-colors px-2.5 py-0.5 rounded-md hover:bg-gray-100 cursor-pointer text-center"
             title="Click to select date"
           >
             <span>{currentMonthYear}</span>
@@ -139,8 +139,8 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
 
           {/* Date Picker Dropdown */}
           {showDatePicker && (
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white border border-gray-300 rounded-xl shadow-xl p-4 w-72">
-              <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider text-center">
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50 bg-white border border-gray-300 rounded-xl shadow-xl p-3.5 w-68">
+              <div className="text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider text-center">
                 Select Calendar Date
               </div>
               <input
@@ -153,9 +153,9 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
                     setShowDatePicker(false);
                   }
                 }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 text-sm text-gray-900 font-bold focus:border-black outline-none cursor-pointer"
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-1.5 text-xs text-gray-900 font-bold focus:border-black outline-none cursor-pointer"
               />
-              <div className="flex justify-between mt-3 pt-3 border-t border-gray-100">
+              <div className="flex justify-between mt-2.5 pt-2 border-t border-gray-100">
                 <button
                   onClick={() => {
                     onSelectDate(todayStr);
@@ -177,10 +177,10 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
         </div>
       </div>
 
-      {/* Swipeable & Scrollable Horizontal Date Carousel */}
+      {/* Thin & Compact Swipeable Horizontal Date Carousel */}
       <div
         ref={scrollContainerRef}
-        className="flex items-center space-x-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-1 -mx-1"
+        className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5"
         style={{
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
@@ -194,31 +194,31 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
               key={day.dateStr}
               ref={isSelected ? activeDayRef : undefined}
               onClick={() => onSelectDate(day.dateStr)}
-              className={`flex flex-col items-center justify-center flex-shrink-0 w-[58px] sm:w-[68px] py-2.5 px-2 rounded-xl transition-all cursor-pointer ${
+              className={`flex flex-col items-center justify-center flex-shrink-0 w-[48px] sm:w-[56px] py-1 sm:py-1.5 px-1 rounded-lg transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-gray-200 border-2 border-gray-300 text-gray-950 shadow-xs font-black scale-102'
+                  ? 'bg-gray-200 border-2 border-gray-300 text-gray-950 shadow-2xs font-black scale-102'
                   : 'bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 border border-gray-200/70'
               }`}
             >
               <span
-                className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${
-                  isSelected ? 'text-gray-700 font-bold' : 'text-gray-500'
+                className={`text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider leading-none ${
+                  isSelected ? 'text-gray-800 font-bold' : 'text-gray-500'
                 }`}
               >
                 {day.dayName}
               </span>
-              <span className="text-base sm:text-lg font-black mt-0.5 leading-tight text-gray-950">
+              <span className="text-xs sm:text-sm font-black mt-0.5 leading-tight text-gray-950">
                 {day.dayNum}
               </span>
               <span
-                className={`text-[9px] uppercase font-bold tracking-tight mt-0.5 ${
+                className={`text-[8px] sm:text-[9px] uppercase font-bold tracking-tight leading-none mt-0.5 ${
                   isSelected ? 'text-orange-600' : 'text-gray-400'
                 }`}
               >
                 {day.monthShort}
               </span>
               {day.isToday && !isSelected && (
-                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mt-1" />
+                <span className="w-1 h-1 bg-orange-500 rounded-full mt-0.5" />
               )}
             </button>
           );

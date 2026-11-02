@@ -58,17 +58,17 @@ export const GameRow: React.FC<GameRowProps> = ({
   return (
     <div
       onClick={handleRowClick}
-      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white border border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300 transition-all p-2.5 sm:p-3.5 select-none cursor-pointer ${
+      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white border border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300 transition-all p-2 sm:p-2.5 select-none cursor-pointer ${
         isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
       }`}
     >
       {/* Teams & Score / Matchup Row */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-4">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-3">
         
         {/* AWAY TEAM (Left Column) */}
         <div className="flex flex-col items-center text-center min-w-0">
-          {/* Pure Logo - Balanced & Crisp, No Gray Border */}
-          <div className="w-11 h-11 sm:w-13 sm:h-13 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+          {/* Pure Logo - Prominent & Crisp (Increased Size) */}
+          <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
             {away.logo ? (
               <img
                 src={away.logo}
@@ -77,7 +77,7 @@ export const GameRow: React.FC<GameRowProps> = ({
                 loading="lazy"
               />
             ) : (
-              <Trophy className="w-8 h-8 text-gray-400" />
+              <Trophy className="w-10 h-10 text-gray-400" />
             )}
           </div>
 
@@ -102,7 +102,7 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
 
         {/* CENTER COLUMN (Score & Game Status / Tipoff) */}
-        <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-3 text-center">
+        <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-2 text-center">
           {isUpcoming ? (
             /* Upcoming Game: Scheduled Tip-off Time (No Circle Border, No 'at' word) */
             <div className="flex flex-col items-center">
@@ -150,8 +150,8 @@ export const GameRow: React.FC<GameRowProps> = ({
 
         {/* HOME TEAM (Right Column) */}
         <div className="flex flex-col items-center text-center min-w-0">
-          {/* Pure Logo - Balanced & Crisp, No Gray Border */}
-          <div className="w-11 h-11 sm:w-13 sm:h-13 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+          {/* Pure Logo - Prominent & Crisp (Increased Size) */}
+          <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
             {home.logo ? (
               <img
                 src={home.logo}
@@ -160,7 +160,7 @@ export const GameRow: React.FC<GameRowProps> = ({
                 loading="lazy"
               />
             ) : (
-              <Trophy className="w-8 h-8 text-gray-400" />
+              <Trophy className="w-10 h-10 text-gray-400" />
             )}
           </div>
 
@@ -188,13 +188,13 @@ export const GameRow: React.FC<GameRowProps> = ({
 
       {/* For Live Games: Single 'Watch Live' Action Button */}
       {isLive && (
-        <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-center">
+        <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onWatchGame(game);
             }}
-            className="w-full sm:w-auto px-6 py-2 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Watch Live</span>
@@ -204,7 +204,7 @@ export const GameRow: React.FC<GameRowProps> = ({
 
       {/* For Completed Games: 'Watch Highlights' Button for NBA and NFL */}
       {isFinal && (
-        <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-center">
+        <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -214,7 +214,7 @@ export const GameRow: React.FC<GameRowProps> = ({
                 onWatchGame(game);
               }
             }}
-            className="w-full sm:w-auto px-6 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
           >
             <Film className="w-3.5 h-3.5" />
             <span>Watch Highlights</span>

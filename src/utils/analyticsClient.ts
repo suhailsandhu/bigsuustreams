@@ -90,6 +90,19 @@ function detectDetailedDevice(): { category: string; tag: string } {
 let pingInterval: any = null;
 let currentStreamKey: string | undefined = undefined;
 let currentGameName: string | undefined = undefined;
+const sessionStartTime = Date.now();
+
+function getTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+  } catch {
+    return 'America/New_York';
+  }
+}
+
+function getSessionDurationSeconds(): number {
+  return Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
+}
 
 export function trackPageView(streamKey?: string, gameName?: string) {
   currentStreamKey = streamKey;
@@ -123,6 +136,9 @@ function sendPing(isInitial: boolean) {
   const visitCount = getVisitCount();
   const { category, tag } = detectDetailedDevice();
   const path = window.location.hash || '/';
+  const timezone = getTimezone();
+  const sessionDuration = getSessionDurationSeconds();
+  const quality = localStorage.getItem('bss_default_quality') || '1080p';
 
   fetch('/api/analytics/ping', {
     method: 'POST',
@@ -138,6 +154,9 @@ function sendPing(isInitial: boolean) {
       path,
       streamKey: currentStreamKey,
       gameName: currentGameName,
+      timezone,
+      sessionDuration,
+      quality,
       isInitial
     }),
     keepalive: true

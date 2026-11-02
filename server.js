@@ -486,10 +486,10 @@ app.get('/api/basketball/hls/:key/:quality.m3u8', requireSiteAccess, handleHls);
 // 5. Real-Time Visitor & Stream Analytics Endpoints
 app.post('/api/analytics/ping', (req, res) => {
   try {
-    const { sessionId, device, path, streamKey, gameName, isInitial } = req.body || {};
+    const { sessionId } = req.body || {};
     if (sessionId) {
       const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
-      analytics.recordPing(sessionId, { device, path, streamKey, gameName, isInitial }, clientIp);
+      analytics.recordPing(sessionId, req.body, clientIp);
     }
     res.json({ ok: true });
   } catch {
