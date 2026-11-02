@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Play, RefreshCw } from 'lucide-react';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard.ts';
-import { fetchGameSummary } from '../services/api.ts';
+import { fetchGameSummary, fetchNflGameSummary } from '../services/api.ts';
 
 interface BoxScoreModalProps {
   game: ScoreboardGame | null;
@@ -24,7 +24,10 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
     setLoading(true);
     setError(null);
 
-    fetchGameSummary(game.espnId)
+    const isNfl = game.league === 'NFL';
+    const fetchFn = isNfl ? fetchNflGameSummary : fetchGameSummary;
+
+    fetchFn(game.espnId)
       .then((data) => {
         setSummary(data);
         setLoading(false);
@@ -94,7 +97,7 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
                 )}
               </div>
               <p className="text-[11px] sm:text-xs text-gray-400 font-medium">
-                Official NBA Box Score & Player Stats
+                {game.league === 'NFL' ? 'Official NFL Box Score & Player Stats' : 'Official NBA Box Score & Player Stats'}
               </p>
             </div>
 

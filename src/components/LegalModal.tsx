@@ -4,7 +4,7 @@ import { X, ShieldCheck, Scale, FileText, AlertTriangle } from 'lucide-react';
 interface LegalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'dmca' | 'disclaimer' | 'terms' | 'privacy';
+  initialTab?: 'dmca' | 'disclaimer' | 'terms';
 }
 
 export const LegalModal: React.FC<LegalModalProps> = ({
@@ -12,26 +12,26 @@ export const LegalModal: React.FC<LegalModalProps> = ({
   onClose,
   initialTab = 'dmca'
 }) => {
-  const [activeTab, setActiveTab] = useState<'dmca' | 'disclaimer' | 'terms' | 'privacy'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'dmca' | 'disclaimer' | 'terms'>(initialTab);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs select-none">
-      <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-200">
+      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-200">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-white">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-800">
-              <Scale className="w-4 h-4 text-gray-700" />
+        <div className="p-4 sm:p-6 border-b border-gray-100 flex items-center justify-between bg-white">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-800 shadow-2xs">
+              <Scale className="w-5 h-5 text-gray-800" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-extrabold text-gray-900 leading-tight">
-                Legal Compliance & Disclaimers
+              <h3 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                Legal Compliance & Statutory Disclaimers
               </h3>
-              <p className="text-[11px] text-gray-400">
-                DMCA Safe Harbor, Nominative Fair Use & Terms
+              <p className="text-[11px] text-gray-400 font-medium">
+                DMCA Safe Harbor (17 U.S.C. § 512), Nominative Fair Use & Terms
               </p>
             </div>
           </div>
@@ -45,137 +45,117 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="grid grid-cols-4 gap-1 p-2 bg-gray-50 border-b border-gray-100 text-center text-xs font-bold">
+        {/* Tab Navigation: 3 Wordy & Comprehensive Sections */}
+        <div className="grid grid-cols-3 gap-1.5 p-2 bg-gray-50 border-b border-gray-100 text-center text-xs font-bold">
           <button
             onClick={() => setActiveTab('dmca')}
-            className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
-              activeTab === 'dmca' ? 'bg-white text-gray-900 shadow-2xs font-extrabold' : 'text-gray-500 hover:text-gray-900'
+            className={`py-2 px-2 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'dmca' ? 'bg-white text-gray-900 shadow-2xs font-black' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            DMCA Policy
+            DMCA Safe Harbor
           </button>
           <button
             onClick={() => setActiveTab('disclaimer')}
-            className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
-              activeTab === 'disclaimer' ? 'bg-white text-gray-900 shadow-2xs font-extrabold' : 'text-gray-500 hover:text-gray-900'
+            className={`py-2 px-2 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'disclaimer' ? 'bg-white text-gray-900 shadow-2xs font-black' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            Disclaimer
+            Trademark Disclaimer
           </button>
           <button
             onClick={() => setActiveTab('terms')}
-            className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
-              activeTab === 'terms' ? 'bg-white text-gray-900 shadow-2xs font-extrabold' : 'text-gray-500 hover:text-gray-900'
+            className={`py-2 px-2 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'terms' ? 'bg-white text-gray-900 shadow-2xs font-black' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            Terms of Use
-          </button>
-          <button
-            onClick={() => setActiveTab('privacy')}
-            className={`py-2 px-1 rounded-lg transition-all cursor-pointer ${
-              activeTab === 'privacy' ? 'bg-white text-gray-900 shadow-2xs font-extrabold' : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            Privacy
+            Terms of Service
           </button>
         </div>
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 text-xs sm:text-sm text-gray-600 leading-relaxed space-y-4">
           
-          {/* DMCA POLICY */}
+          {/* SECTION 1: DMCA SAFE HARBOR POLICY */}
           {activeTab === 'dmca' && (
-            <div className="space-y-3.5">
-              <div className="flex items-center space-x-2 text-gray-900 font-extrabold text-sm sm:text-base">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-gray-900 font-black text-sm sm:text-base">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <h4>DMCA Copyright Notice & Takedown Procedure (17 U.S.C. § 512)</h4>
+                <h4>Digital Millennium Copyright Act (DMCA) Safe Harbor Notification (17 U.S.C. § 512)</h4>
               </div>
               <p>
-                <strong>BigSuuStreams</strong> is an informational aggregator and real-time basketball index. BigSuuStreams does not host, upload, encode, store, transmit, or broadcast any video files, streaming servers, or media content on its own infrastructure.
+                <strong>1. Nature of the Service:</strong> BigSuuStreams operates exclusively as an automated electronic information locator, search aggregation platform, and real-time athletic schedule indexing directory under the safe harbor provisions of Title 17, United States Code, Section 512. BigSuuStreams does not author, broadcast, encode, host, re-transmit, stream, store, or maintain any video files, audiovisual recordings, media servers, or digital broadcasts on its own servers, networks, or infrastructure.
               </p>
               <p>
-                Highlight videos are embedded directly from official third-party providers (specifically the verified <strong>@NBA YouTube Channel</strong> via YouTube's public embedded player API pursuant to the YouTube Terms of Service). All live streams referenced on this platform are hyperlinks to publicly available third-party web destinations operated by independent third parties over which BigSuuStreams exercises no direct editorial, legal, or technical control.
+                <strong>2. Third-Party Embedded Media & Search Indexing:</strong> All game recap videos and highlight clips presented on this service are embedded directly from publicly accessible third-party application programming interfaces (APIs)—specifically the verified <strong>@NBA YouTube Channel</strong> hosted and distributed by Google LLC / YouTube pursuant to the YouTube Terms of Service and API Services Terms of Use. All live transmission links provided on this service consist entirely of transient, unhosted hypertext references to third-party public web addresses operated independently across the global internet. BigSuuStreams maintains zero control over third-party servers, content streams, or their underlying digital rights.
               </p>
-              <div className="bg-gray-50 border border-gray-200/80 rounded-xl p-3.5 space-y-2">
-                <h5 className="font-bold text-gray-900 text-xs">Notice and Takedown Procedure (17 U.S.C. § 512(c)(3)):</h5>
+              <div className="bg-gray-50 border border-gray-200/90 rounded-2xl p-4 space-y-3">
+                <h5 className="font-extrabold text-gray-900 text-xs uppercase tracking-wider">
+                  Mandatory Notice & Takedown Requirements (17 U.S.C. § 512(c)(3)):
+                </h5>
                 <p className="text-xs text-gray-500">
-                  If you are a copyright owner or an authorized agent and believe that content accessible through our search index infringes upon your copyright, you may submit a written notification including:
+                  Copyright owners or designated agents desiring the expedited expungement of any specific indexed hyperlink must submit a legally sufficient notification containing all statutory elements prescribed by federal law:
                 </p>
-                <ol className="list-decimal list-inside space-y-1 text-xs text-gray-500 pl-1">
-                  <li>Physical or electronic signature of the authorized copyright owner.</li>
-                  <li>Identification of the copyrighted work claimed to have been infringed.</li>
-                  <li>Identification of the specific URL / index link on BigSuuStreams requested to be removed.</li>
-                  <li>Adequate contact information (email address and phone number).</li>
-                  <li>A statement of good faith belief that the disputed use is not authorized by law.</li>
-                  <li>A statement under penalty of perjury that the notification is accurate and authorized.</li>
+                <ol className="list-decimal list-inside space-y-1.5 text-xs text-gray-600 pl-1">
+                  <li>A physical or electronic signature of a person authorized to act on behalf of the owner of an exclusive right that is allegedly infringed.</li>
+                  <li>Identification of the copyrighted work claimed to have been infringed, or a representative list of such works.</li>
+                  <li>Identification of the specific URL, material, or hyperlink on this website that is requested to be disabled.</li>
+                  <li>Sufficient contact information, including physical legal address, telephone number, and active electronic mail address.</li>
+                  <li>A formal statement that the complaining party possesses a good faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent, or the law.</li>
+                  <li>A formal statement that the information in the notification is accurate, and under penalty of perjury, that the complaining party is authorized to act on behalf of the owner of an exclusive right that is allegedly infringed.</li>
                 </ol>
-                <p className="text-xs font-semibold text-gray-800 pt-1">
-                  Designated DMCA Agent Email: <a href="mailto:dmca@bigsuustreams.com" className="text-blue-600 underline">dmca@bigsuustreams.com</a>
-                </p>
-                <p className="text-[11px] text-gray-400">
-                  Compliant takedown notices are processed and links expunged within 24 to 48 business hours.
-                </p>
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs font-bold text-gray-900">
+                    Designated DMCA Compliance Agent: <a href="mailto:dmca@bigsuustreams.com" className="text-blue-600 underline">dmca@bigsuustreams.com</a>
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Submissions satisfying the statutory requirements of 17 U.S.C. § 512(c)(3) are expedited and disabled within 24 to 48 business hours.
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TRADEMARK & LEAGUE DISCLAIMER */}
+          {/* SECTION 2: TRADEMARK & NON-AFFILIATION DISCLAIMER */}
           {activeTab === 'disclaimer' && (
-            <div className="space-y-3.5">
-              <div className="flex items-center space-x-2 text-gray-900 font-extrabold text-sm sm:text-base">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-gray-900 font-black text-sm sm:text-base">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
-                <h4>Trademark & Non-Affiliation Disclaimer</h4>
+                <h4>Express Trademark & Non-Affiliation Disclaimer (15 U.S.C. § 1125)</h4>
               </div>
               <p>
-                <strong>Non-Affiliation Notice:</strong> BigSuuStreams is an independent, non-commercial fan portal and news index. BigSuuStreams is <strong>NOT</strong> affiliated with, associated with, sponsored by, authorized by, licensed by, or in any way officially connected with the <strong>National Basketball Association (NBA)</strong>, the <strong>National Basketball Players Association (NBPA)</strong>, or any of their respective 30 member franchises, subsidiaries, or television broadcast partners (including ESPN, TNT, and ABC).
+                <strong>1. Comprehensive Disclaimer of Affiliation:</strong> BigSuuStreams is an entirely independent, private, non-commercial sports enthusiast schedule aggregation service. BigSuuStreams is <strong>NOT</strong> affiliated with, associated with, sponsored by, endorsed by, authorized by, licensed by, or in any way officially connected with the <strong>National Basketball Association (NBA)</strong>, the <strong>National Football League (NFL)</strong>, the <strong>National Basketball Players Association (NBPA)</strong>, the <strong>NFL Players Association (NFLPA)</strong>, or any of their respective 30 NBA or 32 NFL member franchises, subsidiaries, holding entities, or regional and national broadcast television networks (including ESPN Inc., The Walt Disney Company, Warner Bros. Discovery / TNT Sports, NBCUniversal, CBS Sports, and Amazon Prime Video).
               </p>
               <p>
-                The official National Basketball Association website is located at <a href="https://www.nba.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">www.nba.com</a>.
+                Official information, licensed broadcasts, and subscription packages are available directly from the rights holders at <a href="https://www.nba.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">www.nba.com</a> and <a href="https://www.nfl.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">www.nfl.com</a>.
               </p>
               <p>
-                <strong>Nominative Fair Use:</strong> All NBA team names, logos, brand identifiers, player names, and likenesses displayed on this website are registered trademarks and property of their respective legal owners. Their display on this site is strictly for nominative identification, schedule reference, and informational reporting purposes under established principles of nominative fair use (15 U.S.C. § 1125).
+                <strong>2. Nominative Fair Use Statement:</strong> All league identifiers, franchise wordmarks, team logos, stylized insignia, uniforms, athlete names, and individual statistical figures displayed throughout this portal are registered trademarks, trade dress, and intellectual property of their respective legal owners. The descriptive display of such marks on this website is conducted strictly pursuant to the established federal doctrine of <em>nominative fair use</em> under Section 43(c) of the Lanham Act (15 U.S.C. § 1125(c)(3)(A)) and related common law principles, solely for identification, sports journalistic reporting, and real-time public score reference.
               </p>
             </div>
           )}
 
-          {/* TERMS OF USE */}
+          {/* SECTION 3: TERMS OF SERVICE & HOLD-HARMLESS */}
           {activeTab === 'terms' && (
-            <div className="space-y-3.5">
-              <div className="flex items-center space-x-2 text-gray-900 font-extrabold text-sm sm:text-base">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-gray-900 font-black text-sm sm:text-base">
                 <FileText className="w-5 h-5 text-blue-600" />
-                <h4>Terms of Service & User Agreement</h4>
+                <h4>Comprehensive Terms of Service & Hold-Harmless User Agreement</h4>
               </div>
               <p>
-                <strong>1. Acceptance of Terms:</strong> By entering and using BigSuuStreams, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree, you must exit immediately.
+                <strong>1. Binding Agreement & Conditions of Entry:</strong> By entering the access passcode, accessing, browsing, or utilizing BigSuuStreams, you irrevocably acknowledge that you have read, comprehended, and unconditionally agree to be bound by these Terms of Service. If you do not assent in full, your authorization to access this site is immediately revoked, and you must depart forthwith.
               </p>
               <p>
-                <strong>2. Non-Commercial Personal Use:</strong> This service is provided solely for personal, non-commercial, educational, and sports schedule reference purposes. Commercial exploitation, unauthorized automated scraping, mirroring, or distribution of this service is strictly prohibited.
+                <strong>2. Strictly Non-Commercial Personal Recreation:</strong> This service is extended exclusively for individual, non-commercial, educational, and sports news reference. Commercial distribution, programmatic crawling, automated scraping, mirroring, framing, reverse engineering, penetration probing, or denial-of-service activities directed at this infrastructure are expressly prohibited and constitute actionable civil and computer-crime violations.
               </p>
               <p>
-                <strong>3. Warranty Disclaimer ("AS IS"):</strong> The website and all indexed content are provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind, either express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, or uninterrupted uptime.
+                <strong>3. Absolute Disclaimer of Warranties ("AS IS" & "AS AVAILABLE"):</strong> To the fullest extent permissible by applicable law, this service, its indexing capabilities, and all third-party media players are provided on an strict "AS IS" and "AS AVAILABLE" basis, without representations or warranties of any kind, whether express, statutory, or implied. BigSuuStreams disclaims all warranties of merchantability, fitness for a particular purpose, non-infringement, stream continuity, uptime, low latency, or audiovisual clarity.
               </p>
               <p>
-                <strong>4. Limitation of Liability:</strong> Under no circumstances shall BigSuuStreams, its creators, operators, or hosting providers be held liable for any direct, indirect, incidental, punitive, or consequential damages resulting from the use of, or inability to use, any third-party link, stream, or service indexed on this platform.
-              </p>
-            </div>
-          )}
-
-          {/* PRIVACY POLICY */}
-          {activeTab === 'privacy' && (
-            <div className="space-y-3.5">
-              <div className="flex items-center space-x-2 text-gray-900 font-extrabold text-sm sm:text-base">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                <h4>Privacy Policy</h4>
-              </div>
-              <p>
-                <strong>Privacy-First Commitment:</strong> BigSuuStreams values user confidentiality. We do not sell, rent, monetize, or disclose visitor data to advertisers, brokers, or data analytics firms.
+                <strong>4. Total Limitation of Liability & Hold-Harmless Covenant:</strong> In no event shall the developers, operators, domain administrators, or infrastructure hosts of BigSuuStreams be liable for any direct, indirect, incidental, special, punitive, exemplary, or consequential damages (including, but not limited to, loss of profits, internet data overages, service interruptions, or third-party web content) arising out of or in connection with your access to, reliance upon, or utilization of any third-party hyperlink, stream, or embedded player indexed on this website. You expressly agree to indemnify, defend, and hold harmless BigSuuStreams and its operators from any third-party claims arising from your conduct.
               </p>
               <p>
-                <strong>Zero Personal Data Stored:</strong> We do not require account registration, and we never collect personal identifiers such as names, physical addresses, phone numbers, or credit card details.
-              </p>
-              <p>
-                <strong>Ephemeral Server Telemetry:</strong> Real-time visitor counts and general device classifications (e.g., iPhone vs. Desktop) are stored exclusively in temporary server RAM to gauge live traffic and are purged automatically on server restart.
+                <strong>5. Severability & Construction:</strong> If any provision of these Terms is deemed unlawful, void, or for any reason unenforceable by a court of competent jurisdiction, that provision shall be deemed severable from these Terms and shall not affect the validity and enforceability of any remaining provisions.
               </p>
             </div>
           )}
@@ -183,13 +163,13 @@ export const LegalModal: React.FC<LegalModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 sm:p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-          <span>BigSuuStreams Legal Shield v1.0</span>
+        <div className="p-3 sm:p-5 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
+          <span className="font-semibold text-[11px] text-gray-400">BigSuuStreams Legal Shield • 17 U.S.C. § 512</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-full bg-black text-white font-bold hover:bg-neutral-800 transition active:scale-95 cursor-pointer text-xs"
+            className="px-5 py-2 rounded-full bg-black text-white font-bold hover:bg-neutral-800 transition active:scale-95 cursor-pointer text-xs"
           >
-            Close
+            Acknowledge & Close
           </button>
         </div>
 

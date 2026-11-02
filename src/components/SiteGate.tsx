@@ -3,7 +3,7 @@ import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 interface SiteGateProps {
   onUnlock: () => void;
-  onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms' | 'privacy') => void;
+  onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms') => void;
 }
 
 const CORRECT_PASSCODE = 'lebronisthegoat';
@@ -79,12 +79,12 @@ export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => 
       {/* Main Lock Card with Big Official NBA Streams Logo */}
       <div className="w-full max-w-sm flex flex-col items-center">
         
-        {/* Prominent Official NBA Streams Logo */}
+        {/* Prominent Official NBA Streams Logo (Noticeably Bigger) */}
         <div className="mb-6 flex items-center justify-center">
           <img
             src="/logo.png"
             alt="NBA Streams"
-            className="h-16 sm:h-20 w-auto object-contain filter drop-shadow-2xs transition-transform hover:scale-105"
+            className="h-36 sm:h-48 md:h-52 w-auto object-contain filter drop-shadow-sm transition-transform hover:scale-105"
           />
         </div>
 

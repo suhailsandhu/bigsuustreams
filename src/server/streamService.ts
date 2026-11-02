@@ -96,6 +96,59 @@ export async function getBasketballStreams(forceRefresh = false): Promise<Stream
   }
 }
 
+let footballStreamsCache: { data: StreamsResponse; time: number } | null = null;
+
+export async function getFootballStreams(forceRefresh = false): Promise<StreamsResponse> {
+  const now = Date.now();
+  if (!forceRefresh && footballStreamsCache && (now - footballStreamsCache.time < CACHE_TTL_STREAMS_MS)) {
+    return { ...footballStreamsCache.data, fromCache: true };
+  }
+
+  try {
+    const { res } = await fetchWithFallback('/api/v1/streams?category=football');
+    const data: any = await res.json();
+    
+    // Filter to football / NFL
+    const streams: any[] = (data.streams || []).filter((s: any) => 
+      s.category?.toLowerCase() === 'football' || s.league?.toUpperCase() === 'NFL'
+    );
+    
+    const processedStreams: Stream[] = streams.map((s) => {
+      const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
+      return {
+        ...s,
+        league: 'NFL',
+        is_live: isLive,
+        status: isLive ? 'live' : (s.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
+      };
+    });
+
+    processedStreams.sort((a, b) => {
+      if (a.is_live && !b.is_live) return -1;
+      if (!a.is_live && b.is_live) return 1;
+      if (a.is_live && b.is_live) return (b.viewers || 0) - (a.viewers || 0);
+      return a.match_timestamp - b.match_timestamp;
+    });
+
+    const result: StreamsResponse = {
+      count: processedStreams.length,
+      streams: processedStreams,
+      updated_at: new Date().toISOString(),
+      cache_ttl_sec: CACHE_TTL_STREAMS_MS / 1000,
+      fromCache: false
+    };
+
+    footballStreamsCache = { data: result, time: now };
+    return result;
+  } catch (err: any) {
+    console.error('getFootballStreams error:', err.message);
+    if (footballStreamsCache) {
+      return { ...footballStreamsCache.data, fromCache: true };
+    }
+    return { count: 0, streams: [], updated_at: new Date().toISOString(), cache_ttl_sec: 0, fromCache: false };
+  }
+}
+
 export async function getStreamByKey(streamKey: string): Promise<Stream> {
   const now = Date.now();
   const cached = cache.singleStream.get(streamKey);

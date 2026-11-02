@@ -68,7 +68,7 @@ export interface ScoreboardGame {
   date: string;
   name: string;
   shortName: string;
-  league: 'NBA' | 'NCAA' | 'BASKETBALL';
+  league: 'NBA' | 'NCAA' | 'BASKETBALL' | 'NFL';
   status: {
     state: 'pre' | 'in' | 'post';
     detail: string;
@@ -110,7 +110,7 @@ export interface AthleteBoxscoreStat {
     position: string;
     headshot?: string;
   };
-  starter: boolean;
+  starter?: boolean;
   didNotPlay?: boolean;
   reason?: string;
   stats: string[]; // MIN, PTS, REB, AST, FG, 3PT, FT, etc.
@@ -131,8 +131,8 @@ export interface TeamBoxscore {
 
 export interface GameSummaryResponse {
   id: string;
-  name: string;
-  status: string;
+  name?: string;
+  status?: string;
   boxscore?: {
     home: TeamBoxscore;
     away: TeamBoxscore;

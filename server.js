@@ -3,8 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { getBasketballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
-import { getScoreboard, getGameSummary, getStandings } from './src/server/scoreboardService.ts';
+import { getBasketballStreams, getFootballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
+import { getScoreboard, getGameSummary, getStandings, getNflScoreboard, getNflGameSummary } from './src/server/scoreboardService.ts';
 import { analytics } from './src/server/analyticsService.ts';
 import { getGameHighlights } from './src/server/highlightsService.ts';
 import { applySecurityHeaders, createRateLimiter } from './src/server/securityMiddleware.ts';
@@ -90,6 +90,53 @@ app.get('/api/basketball/highlights', async (req, res) => {
     res.status(500).json({ error: (err && err.message) || 'Failed to fetch highlights' });
   }
 });
+
+// ============================================================================
+// NFL (Football) API Endpoints
+// ============================================================================
+
+app.get('/api/football/scoreboard', async (req, res) => {
+  try {
+    const dateStr = req.query.date ? String(req.query.date) : undefined;
+    const data = await getNflScoreboard(dateStr);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Failed to fetch NFL scoreboard' });
+  }
+});
+
+app.get('/api/football/game-summary/:id', async (req, res) => {
+  try {
+    const data = await getNflGameSummary(req.params.id);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Failed to fetch NFL game summary' });
+  }
+});
+
+app.get('/api/football/streams', async (req, res) => {
+  try {
+    const refresh = req.query.refresh === 'true';
+    const data = await getFootballStreams(refresh);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Failed to fetch NFL streams' });
+  }
+});
+
+app.get('/api/football/stream/:key', async (req, res) => {
+  try {
+    const data = await getStreamByKey(req.params.key);
+    res.json(data);
+  } catch (err) {
+    res.status(404).json({ error: 'Stream not found' });
+  }
+});
+
+app.get('/api/football/resolve/:key', handleResolve);
+app.get('/api/football/resolve/:key/:quality', handleResolve);
+app.get('/api/football/hls/:key.m3u8', handleHls);
+app.get('/api/football/hls/:key/:quality.m3u8', handleHls);
 
 // 2b. Standings
 app.get('/api/basketball/standings', async (req, res) => {

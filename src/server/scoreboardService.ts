@@ -3,7 +3,7 @@ import type {
   TeamLeaderSummary, AthleteBoxscoreStat, GameLeadersDisplay, LeaderStatLine,
   ConferenceStandings, StandingsTeam
 } from '../types/scoreboard.ts';
-import { getBasketballStreams } from './streamService.ts';
+import { getBasketballStreams, getFootballStreams } from './streamService.ts';
 import { getTodayDateString } from '../utils/date.ts';
 
 interface ScoreboardCache {
@@ -534,3 +534,293 @@ export async function getStandings(): Promise<ConferenceStandings[]> {
   standingsCache = { data: conferences, timestamp: now };
   return conferences;
 }
+
+// ============================================================================
+// NFL SCOREBOARD & GAME SUMMARY (Football Support)
+// ============================================================================
+
+const nflScoreboardCache = new Map<string, { data: ScoreboardResponse; timestamp: number }>();
+const nflSummaryCache = new Map<string, { data: GameSummaryResponse; timestamp: number }>();
+
+export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResponse> {
+  const targetDate = dateStr || getTodayDateString();
+  const now = Date.now();
+  const cached = nflScoreboardCache.get(targetDate);
+  const isToday = targetDate === getTodayDateString();
+  const ttlMs = isToday ? 15000 : 300000;
+
+  if (cached && (now - cached.timestamp < ttlMs)) {
+    return { ...cached.data, fromCache: true };
+  }
+
+  const espnNflUrl = dateStr 
+    ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${targetDate}`
+    : `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard`;
+
+  let nflEvents: any[] = [];
+  let streamsList: any[] = [];
+
+  try {
+    const [nflRes, streamData] = await Promise.all([
+      fetch(espnNflUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }).then(r => r.ok ? r.json() : { events: [] }).catch(() => ({ events: [] })),
+      getFootballStreams().catch(() => ({ streams: [] }))
+    ]);
+
+    nflEvents = (nflRes as any).events || [];
+    streamsList = (streamData as any).streams || [];
+  } catch (err: any) {
+    console.warn('NFL Scoreboard fetch error:', err.message);
+  }
+
+  const games: ScoreboardGame[] = nflEvents.map((event: any) => {
+    const comp = event.competitions?.[0] || {};
+    const competitors = comp.competitors || [];
+    const homeComp = competitors.find((c: any) => c.homeAway === 'home') || competitors[0] || {};
+    const awayComp = competitors.find((c: any) => c.homeAway === 'away') || competitors[1] || {};
+
+    const homeTeam: CompetitorTeam = {
+      id: homeComp.team?.id || '',
+      name: homeComp.team?.name || '',
+      displayName: homeComp.team?.displayName || 'Home Team',
+      shortDisplayName: homeComp.team?.shortDisplayName || homeComp.team?.name || '',
+      abbreviation: homeComp.team?.abbreviation || '',
+      logo: homeComp.team?.logo || (homeComp.team?.abbreviation ? `https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/${homeComp.team.abbreviation.toLowerCase()}.png` : ''),
+      color: homeComp.team?.color ? `#${homeComp.team.color}` : '#013369',
+      score: parseInt(homeComp.score || '0', 10),
+      record: homeComp.records?.[0]?.summary || '',
+      winner: homeComp.winner || false,
+      linescores: (homeComp.linescores || []).map((l: any) => parseInt(l?.displayValue ?? l?.value ?? '0', 10))
+    };
+
+    const awayTeam: CompetitorTeam = {
+      id: awayComp.team?.id || '',
+      name: awayComp.team?.name || '',
+      displayName: awayComp.team?.displayName || 'Away Team',
+      shortDisplayName: awayComp.team?.shortDisplayName || awayComp.team?.name || '',
+      abbreviation: awayComp.team?.abbreviation || '',
+      logo: awayComp.team?.logo || (awayComp.team?.abbreviation ? `https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/${awayComp.team.abbreviation.toLowerCase()}.png` : ''),
+      color: awayComp.team?.color ? `#${awayComp.team.color}` : '#D50A0A',
+      score: parseInt(awayComp.score || '0', 10),
+      record: awayComp.records?.[0]?.summary || '',
+      winner: awayComp.winner || false,
+      linescores: (awayComp.linescores || []).map((l: any) => parseInt(l?.displayValue ?? l?.value ?? '0', 10))
+    };
+
+    const homeNorm = normalizeName(homeTeam.displayName);
+    const homeShort = normalizeName(homeTeam.shortDisplayName || homeTeam.name);
+    const awayNorm = normalizeName(awayTeam.displayName);
+    const awayShort = normalizeName(awayTeam.shortDisplayName || awayTeam.name);
+
+    const matchedStream = streamsList.find((s: any) => {
+      const streamKeyNorm = normalizeName(s.stream_key);
+      const matchHome = streamKeyNorm.includes(homeNorm) || (homeShort.length > 3 && streamKeyNorm.includes(homeShort));
+      const matchAway = streamKeyNorm.includes(awayNorm) || (awayShort.length > 3 && streamKeyNorm.includes(awayShort));
+      return (matchHome && matchAway) || streamKeyNorm.includes('redzone');
+    });
+
+    const isStreamLive = !!(matchedStream?.is_live || (Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0));
+    const statusType = event.status?.type || {};
+    const rawState = (statusType.state || 'pre') as 'pre' | 'in' | 'post';
+    const isLive = rawState === 'in' || (isStreamLive && (rawState as string) !== 'post');
+    const state: 'pre' | 'in' | 'post' = (isLive && (rawState as string) !== 'post') ? 'in' : rawState;
+
+    let displayDetail = statusType.detail || statusType.description || '';
+    if (isLive) {
+      displayDetail = statusType.shortDetail || 'LIVE';
+    } else if (state === 'pre') {
+      try {
+        const gameDate = new Date(event.date);
+        displayDetail = gameDate.toLocaleTimeString('en-US', {
+          timeZone: 'America/New_York',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }) + ' ET';
+      } catch {
+        displayDetail = statusType.shortDetail || 'Upcoming';
+      }
+    }
+
+    const streamInfo = matchedStream ? {
+      available: true,
+      isLive: isStreamLive,
+      streamKey: matchedStream.stream_key,
+      qualities: ['1080p', '720p', '540p', '2160p'],
+      viewers: matchedStream.viewers || 0,
+      streamData: matchedStream
+    } : {
+      available: false,
+      isLive: false,
+      qualities: [],
+      viewers: 0
+    };
+
+    return {
+      id: event.id,
+      espnId: event.id,
+      date: event.date,
+      name: `${awayTeam.displayName} at ${homeTeam.displayName}`,
+      shortName: `${awayTeam.abbreviation} @ ${homeTeam.abbreviation}`,
+      league: 'NFL',
+      status: {
+        state,
+        detail: displayDetail,
+        shortDetail: isLive ? 'LIVE' : (statusType.shortDetail || displayDetail),
+        isLive,
+        period: event.status?.period || (isLive ? 1 : 0),
+        clock: event.status?.displayClock || ''
+      },
+      homeTeam,
+      awayTeam,
+      stream: streamInfo
+    };
+  });
+
+  const parsedYear = targetDate.slice(0, 4);
+  const parsedMonth = targetDate.slice(4, 6);
+  const parsedDay = targetDate.slice(6, 8);
+  const dateObj = new Date(parseInt(parsedYear, 10), parseInt(parsedMonth, 10) - 1, parseInt(parsedDay, 10));
+  const formattedDate = dateObj.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  const result: ScoreboardResponse = {
+    date: targetDate,
+    formattedDate,
+    games,
+    liveCount: games.filter(g => g.status.isLive).length,
+    fromCache: false
+  };
+
+  nflScoreboardCache.set(targetDate, { data: result, timestamp: now });
+  return result;
+}
+
+export async function getNflGameSummary(eventId: string): Promise<GameSummaryResponse> {
+  const now = Date.now();
+  const cached = nflSummaryCache.get(eventId);
+  if (cached && (now - cached.timestamp < 30000)) {
+    return cached.data;
+  }
+
+  const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`ESPN NFL summary API returned status ${res.status}`);
+  const data: any = await res.json();
+
+  const comp = data.header?.competitions?.[0] || {};
+  const competitors = comp.competitors || [];
+  const homeComp = competitors.find((c: any) => c.homeAway === 'home') || competitors[0] || {};
+  const awayComp = competitors.find((c: any) => c.homeAway === 'away') || competitors[1] || {};
+
+  function parseNflTeamBox(playerGroup: any, compObj: any) {
+    const rawLinescores = compObj?.linescores || [];
+    const linescores = rawLinescores.map((l: any) => parseInt(l?.displayValue ?? l?.value ?? '0', 10));
+    const statsCategories = playerGroup?.statistics || [];
+
+    // Parse top offensive football players
+    const athletes: AthleteBoxscoreStat[] = [];
+    const passing = statsCategories.find((s: any) => s.name === 'passing');
+    const rushing = statsCategories.find((s: any) => s.name === 'rushing');
+    const receiving = statsCategories.find((s: any) => s.name === 'receiving');
+
+    if (passing?.athletes) {
+      passing.athletes.forEach((a: any) => {
+        athletes.push({
+          athlete: {
+            id: a.athlete?.id || '',
+            displayName: a.athlete?.displayName || 'Player',
+            jersey: a.athlete?.jersey || '',
+            position: 'QB',
+            headshot: a.athlete?.headshot?.href || ''
+          },
+          stats: [
+            a.stats?.[0] || '-', // C/ATT
+            a.stats?.[1] || '0', // YDS
+            a.stats?.[3] || '0', // TD
+            a.stats?.[4] || '0', // INT
+            a.stats?.[7] || '-'  // RTG
+          ]
+        });
+      });
+    }
+
+    if (rushing?.athletes) {
+      rushing.athletes.slice(0, 4).forEach((a: any) => {
+        athletes.push({
+          athlete: {
+            id: a.athlete?.id || '',
+            displayName: a.athlete?.displayName || 'Player',
+            jersey: a.athlete?.jersey || '',
+            position: 'RB',
+            headshot: a.athlete?.headshot?.href || ''
+          },
+          stats: [
+            a.stats?.[0] || '-', // CAR
+            a.stats?.[1] || '0', // YDS
+            a.stats?.[3] || '0', // TD
+            '-',
+            a.stats?.[2] || '-'  // AVG
+          ]
+        });
+      });
+    }
+
+    if (receiving?.athletes) {
+      receiving.athletes.slice(0, 4).forEach((a: any) => {
+        athletes.push({
+          athlete: {
+            id: a.athlete?.id || '',
+            displayName: a.athlete?.displayName || 'Player',
+            jersey: a.athlete?.jersey || '',
+            position: 'WR',
+            headshot: a.athlete?.headshot?.href || ''
+          },
+          stats: [
+            a.stats?.[0] || '-', // REC
+            a.stats?.[1] || '0', // YDS
+            a.stats?.[3] || '0', // TD
+            '-',
+            a.stats?.[2] || '-'  // AVG
+          ]
+        });
+      });
+    }
+
+    return {
+      team: {
+        id: compObj.team?.id || '',
+        displayName: compObj.team?.displayName || 'Team',
+        name: compObj.team?.name || '',
+        logo: compObj.team?.logo || '',
+        record: compObj.records?.[0]?.summary || ''
+      },
+      score: parseInt(compObj.score || '0', 10),
+      linescores,
+      statLabels: ['ATT/CAR/REC', 'YDS', 'TD', 'INT', 'RTG/AVG'],
+      athletes
+    };
+  }
+
+  const playerGroups = data.boxscore?.players || [];
+  const awayGroup = playerGroups[0] || {};
+  const homeGroup = playerGroups[1] || {};
+
+  const awayBox = parseNflTeamBox(awayGroup, awayComp);
+  const homeBox = parseNflTeamBox(homeGroup, homeComp);
+
+  const result: GameSummaryResponse = {
+    id: eventId,
+    boxscore: {
+      away: awayBox,
+      home: homeBox
+    }
+  };
+
+  nflSummaryCache.set(eventId, { data: result, timestamp: now });
+  return result;
+}
+

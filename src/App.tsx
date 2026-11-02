@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import type { Stream } from './types/stream.ts';
 import type { ScoreboardGame, ScoreboardResponse } from './types/scoreboard.ts';
-import { fetchScoreboard, fetchStreamDetails } from './services/api.ts';
+import { fetchScoreboard, fetchNflScoreboard, fetchStreamDetails } from './services/api.ts';
 import { getTodayDateString } from './utils/date.ts';
 import { Header } from './components/Header.tsx';
 import { DateNavigation } from './components/DateNavigation.tsx';
@@ -17,6 +17,9 @@ import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Current sport state ('nba' | 'nfl')
+  const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>('nba');
+
   // Password protection state ('lebronisthegoat')
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
@@ -29,7 +32,7 @@ export const App: React.FC = () => {
 
   // Legal modal state
   const [showLegalModal, setShowLegalModal] = useState(false);
-  const [legalTab, setLegalTab] = useState<'dmca' | 'disclaimer' | 'terms' | 'privacy'>('dmca');
+  const [legalTab, setLegalTab] = useState<'dmca' | 'disclaimer' | 'terms'>('dmca');
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [scoreboard, setScoreboard] = useState<ScoreboardResponse | null>(null);
@@ -71,9 +74,9 @@ export const App: React.FC = () => {
   }, []);
 
   const allGames = useMemo(() => {
-    // Only NBA games per user request
-    return (scoreboard?.games || []).filter((g) => g.league === 'NBA');
-  }, [scoreboard]);
+    const targetLeague = currentSport === 'nfl' ? 'NFL' : 'NBA';
+    return (scoreboard?.games || []).filter((g) => g.league === targetLeague);
+  }, [scoreboard, currentSport]);
 
   const handleWatchHighlights = useCallback(async (game: ScoreboardGame) => {
     setSelectedGame(game);
@@ -186,37 +189,39 @@ export const App: React.FC = () => {
   }, [selectedStream, allGames]);
 
   // Load scoreboard data for selectedDate with silent background auto-refresh
-  const loadScoreboardData = useCallback(async (dateStr: string, silent = false) => {
+  const loadScoreboardData = useCallback(async (dateStr: string, silent = false, sport: 'nba' | 'nfl' = currentSport) => {
     if (!silent) {
       setIsLoading(true);
     }
     setError(null);
 
     try {
-      const data = await fetchScoreboard(dateStr);
+      const data = sport === 'nfl'
+        ? await fetchNflScoreboard(dateStr)
+        : await fetchScoreboard(dateStr);
       setScoreboard(data);
     } catch (err: any) {
-      console.error('Failed to load scoreboard:', err);
+      console.error(`Failed to load ${sport} scoreboard:`, err);
       if (!silent) {
-        setError('Unable to load live scoreboard data. Please check your network connection.');
+        setError(`Unable to load live ${sport.toUpperCase()} scoreboard data. Please check your network connection.`);
       }
     } finally {
       if (!silent) {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [currentSport]);
 
   useEffect(() => {
-    loadScoreboardData(selectedDate, false);
+    loadScoreboardData(selectedDate, false, currentSport);
 
     // Auto-refresh every 15 seconds silently for live scores and stream updates
     const interval = setInterval(() => {
-      loadScoreboardData(selectedDate, true);
+      loadScoreboardData(selectedDate, true, currentSport);
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [selectedDate, loadScoreboardData]);
+  }, [selectedDate, currentSport, loadScoreboardData]);
 
   const handleSelectDate = (newDateStr: string) => {
     setSelectedDate(newDateStr);
@@ -248,6 +253,30 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Direct admin routing via /admin or #/admin
+  const isAdminPath = typeof window !== 'undefined' && (
+    window.location.pathname === '/admin' || 
+    window.location.pathname === '/stats' || 
+    window.location.hash === '#/admin' || 
+    window.location.hash === '#admin'
+  );
+
+  if (showStatsModal || isAdminPath) {
+    return (
+      <AdminStatsModal
+        isOpen={true}
+        onClose={() => {
+          setShowStatsModal(false);
+          if (window.location.pathname === '/admin' || window.location.pathname === '/stats') {
+            window.history.pushState({}, '', '/');
+          } else {
+            window.location.hash = '';
+          }
+        }}
+      />
+    );
+  }
+
   // Render Gate if site passcode is not yet verified
   if (!isAuthenticated) {
     return (
@@ -270,8 +299,16 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col text-gray-900 selection:bg-orange-500/20 selection:text-orange-900">
-      {/* Top White Header with NBA Streams logo */}
-      <Header onNavigateHome={handleBackToHome} />
+      {/* Top White Header with Sport Logo and Switcher */}
+      <Header
+        onNavigateHome={handleBackToHome}
+        currentSport={currentSport}
+        onToggleSport={() => {
+          setSelectedStream(null);
+          setSelectedGame(null);
+          setCurrentSport((prev) => (prev === 'nba' ? 'nfl' : 'nba'));
+        }}
+      />
 
       <main className="flex-1 w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* If a game stream or highlight is currently active, render the GameView */}
@@ -330,15 +367,17 @@ export const App: React.FC = () => {
                 ) : (
                   <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center shadow-xs">
                     <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">No NBA Games Scheduled</h3>
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                      No {currentSport.toUpperCase()} Games Scheduled
+                    </h3>
                     <p className="text-sm text-gray-500 max-w-sm mx-auto mb-4">
-                      There are no NBA games scheduled for this date. Use the date bar above to check games for other days.
+                      There are no {currentSport.toUpperCase()} games scheduled for this date. Use the date bar above to check games for other days.
                     </p>
                     <button
                       onClick={() => handleSelectDate(getTodayDateString())}
                       className="bg-black hover:bg-neutral-800 text-white text-xs font-bold px-5 py-2.5 rounded-full transition-colors cursor-pointer"
                     >
-                      Return to Today's Games
+                      Go to Today
                     </button>
                   </div>
                 )}

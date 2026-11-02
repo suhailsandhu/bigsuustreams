@@ -195,8 +195,8 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
       )}
 
-      {/* For Completed Games: ONLY 'Watch Highlights' Button (Box Score removed per user request) */}
-      {isFinal && (
+      {/* For Completed Games: ONLY 'Watch Highlights' Button for NBA (highlights not embedded for NFL yet per user request) */}
+      {isFinal && game.league !== 'NFL' && (
         <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-center">
           <button
             onClick={(e) => {

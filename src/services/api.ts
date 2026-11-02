@@ -48,6 +48,35 @@ export async function fetchGameSummary(eventId: string): Promise<GameSummaryResp
   return await res.json();
 }
 
+export async function fetchNflScoreboard(dateStr?: string, forceRefresh = false): Promise<ScoreboardResponse> {
+  const targetDate = dateStr || '';
+  const now = Date.now();
+  const cached = scoreboardClientCache.get(`nfl_${targetDate}`);
+
+  if (!forceRefresh && cached && (now - cached.timestamp < CLIENT_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  const url = `/api/football/scoreboard${targetDate ? `?date=${targetDate}` : ''}`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`NFL Scoreboard request returned HTTP ${res.status}`);
+  }
+
+  const data: ScoreboardResponse = await res.json();
+  scoreboardClientCache.set(`nfl_${targetDate}`, { data, timestamp: now });
+  return data;
+}
+
+export async function fetchNflGameSummary(eventId: string): Promise<GameSummaryResponse> {
+  const url = `/api/football/game-summary/${encodeURIComponent(eventId)}`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`NFL Game summary request returned HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
 export async function fetchBasketballStreams(forceRefresh = false): Promise<StreamsResponse> {
   const now = Date.now();
   if (!forceRefresh && streamsCache && (now - streamsCache.timestamp < CLIENT_CACHE_TTL_MS)) {
