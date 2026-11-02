@@ -43,7 +43,7 @@ export const App: React.FC = () => {
 
   // Legal modal state
   const [showLegalModal, setShowLegalModal] = useState(false);
-  const [legalTab, setLegalTab] = useState<'dmca' | 'disclaimer' | 'terms'>('dmca');
+  const [legalTab, setLegalTab] = useState<'dmca' | 'disclaimer' | 'terms' | 'privacy'>('dmca');
 
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [scoreboard, setScoreboard] = useState<ScoreboardResponse | null>(null);

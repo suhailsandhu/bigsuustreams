@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col items-center justify-center">
         
-        {/* Prominent, Noticeably Bigger Sport Logo */}
+        {/* Noticeably Bigger Sport Logo */}
         <div
           onClick={onNavigateHome}
           className="flex items-center justify-center cursor-pointer group py-1"
@@ -48,23 +48,23 @@ export const Header: React.FC<HeaderProps> = ({
             <img
               src="/nba-logo.png"
               alt="NBA"
-              className="h-20 sm:h-28 md:h-32 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
+              className="h-28 sm:h-36 md:h-40 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
             />
           ) : (
             <div className="transition-transform group-hover:scale-105">
-              <NflLogo className="h-20 sm:h-28 md:h-32 w-auto" />
+              <NflLogo className="h-28 sm:h-36 md:h-40 w-auto" />
             </div>
           )}
         </div>
 
-        {/* Switch Sport Button: Two arrows circling each other (Smaller, Sleeker) */}
+        {/* Switch Sport Button: Two arrows circling each other (Small & Sleek) */}
         <button
           onClick={onToggleSport}
-          className="mt-1.5 p-1.5 rounded-full bg-gray-100/90 hover:bg-gray-200 text-gray-600 hover:text-black border border-gray-200/80 shadow-2xs transition-all duration-300 active:scale-90 hover:rotate-180 cursor-pointer"
+          className="mt-1 p-1 rounded-full bg-gray-100/80 hover:bg-gray-200 text-gray-500 hover:text-black border border-gray-200/60 shadow-2xs transition-all duration-300 active:scale-90 hover:rotate-180 cursor-pointer"
           title={`Switch to ${currentSport === 'nba' ? 'NFL' : 'NBA'} Streams`}
           aria-label="Switch Sport"
         >
-          <RefreshCw className="w-3 h-3 text-gray-600 hover:text-black transition-colors" />
+          <RefreshCw className="w-2.5 h-2.5 text-gray-500 hover:text-black transition-colors" />
         </button>
 
       </div>

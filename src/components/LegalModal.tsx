@@ -4,7 +4,7 @@ import { X, ShieldCheck, Scale, FileText, AlertTriangle } from 'lucide-react';
 interface LegalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'dmca' | 'disclaimer' | 'terms';
+  initialTab?: 'dmca' | 'disclaimer' | 'terms' | 'privacy';
 }
 
 export const LegalModal: React.FC<LegalModalProps> = ({
@@ -12,7 +12,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
   onClose,
   initialTab = 'dmca'
 }) => {
-  const [activeTab, setActiveTab] = useState<'dmca' | 'disclaimer' | 'terms'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'dmca' | 'disclaimer' | 'terms' | 'privacy'>(initialTab);
 
   if (!isOpen) return null;
 
@@ -31,7 +31,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 Legal Compliance & Statutory Disclaimers
               </h3>
               <p className="text-[11px] text-gray-400 font-medium">
-                DMCA Safe Harbor (17 U.S.C. § 512), Nominative Fair Use & Terms
+                DMCA Safe Harbor (17 U.S.C. § 512), Nominative Fair Use, Privacy & Terms
               </p>
             </div>
           </div>
@@ -45,8 +45,8 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Navigation: 3 Wordy & Comprehensive Sections */}
-        <div className="grid grid-cols-3 gap-1.5 p-2 bg-gray-50 border-b border-gray-100 text-center text-xs font-bold">
+        {/* Tab Navigation: 4 Comprehensive Sections */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-2 bg-gray-50 border-b border-gray-100 text-center text-xs font-bold">
           <button
             onClick={() => setActiveTab('dmca')}
             className={`py-2 px-2 rounded-xl transition-all cursor-pointer ${
@@ -70,6 +70,14 @@ export const LegalModal: React.FC<LegalModalProps> = ({
             }`}
           >
             Terms of Service
+          </button>
+          <button
+            onClick={() => setActiveTab('privacy')}
+            className={`py-2 px-2 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'privacy' ? 'bg-white text-gray-900 shadow-2xs font-black' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            Privacy Policy
           </button>
         </div>
 
@@ -156,6 +164,34 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </p>
               <p>
                 <strong>5. Severability & Construction:</strong> If any provision of these Terms is deemed unlawful, void, or for any reason unenforceable by a court of competent jurisdiction, that provision shall be deemed severable from these Terms and shall not affect the validity and enforceability of any remaining provisions.
+              </p>
+            </div>
+          )}
+
+          {/* SECTION 4: PRIVACY POLICY & USER DATA INTEGRITY */}
+          {activeTab === 'privacy' && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-gray-900 font-black text-sm sm:text-base">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <h4>Privacy Policy & Strict User Non-Tracking Commitment</h4>
+              </div>
+              <p>
+                <strong>1. Core Privacy Principle:</strong> BSS operates under a strict principle of user anonymity, data minimization, and privacy-first architecture. We do not sell, rent, monetize, trade, or distribute your personal identifiable information (PII), browsing behavior, or viewing selections to advertising exchanges, marketing brokers, or third parties under any circumstances.
+              </p>
+              <p>
+                <strong>2. Strict No-Logs Operation:</strong> BSS does not track or store persistent logs of individual user IP addresses, viewing histories, stream durations, or device identifiers. All stream routing and access verifications are executed ephemerally in volatile memory (RAM) and are permanently expunged upon session termination.
+              </p>
+              <p>
+                <strong>3. Client-Side Session Storage Only:</strong> This website utilizes localized browser storage (sessionStorage / localStorage) strictly to maintain temporary access authentication tokens and functional display preferences (such as audio volume and sport toggle state). BSS does not deploy cross-site tracking cookies, persistent advertising identifiers, or browser fingerprinting scripts.
+              </p>
+              <p>
+                <strong>4. Third-Party Embedded Media & External Services:</strong> Official game highlights and box scores displayed on BSS are referenced from public third-party services (such as the verified YouTube Embedded Player and public ESPN sport data feeds). Interactions with embedded players are subject to YouTube's Terms of Service and Google's Privacy Policy. BSS maintains zero control over third-party cookie practices or external platforms.
+              </p>
+              <p>
+                <strong>5. End-to-End Transport Security:</strong> All web traffic and API communications are encrypted via modern Transport Layer Security (TLS / HTTPS) protocols, safeguarding your browsing session against eavesdropping, unauthorized interception, and packet inspection.
+              </p>
+              <p>
+                <strong>6. Inquiries & Data Rights:</strong> If you have questions regarding this Privacy Policy or wish to verify our non-retention standards, contact our privacy compliance desk at <strong>dmca@bigsuustreams.com</strong>.
               </p>
             </div>
           )}

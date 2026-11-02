@@ -5,7 +5,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onSuccess: (user: any) => void;
   currentSport?: 'nba' | 'nfl';
-  onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms') => void;
+  onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms' | 'privacy') => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -410,13 +410,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             {onOpenLegal && (
-              <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-semibold">
+              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-gray-400 font-semibold px-2">
                 <button
                   type="button"
                   onClick={() => onOpenLegal('terms')}
                   className="hover:underline hover:text-gray-600 cursor-pointer"
                 >
                   Terms of Service
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal('privacy')}
+                  className="hover:underline hover:text-gray-600 cursor-pointer"
+                >
+                  Privacy Policy
                 </button>
                 <span>•</span>
                 <button

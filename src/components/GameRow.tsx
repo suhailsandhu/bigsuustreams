@@ -66,46 +66,48 @@ export const GameRow: React.FC<GameRowProps> = ({
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-6">
         
         {/* AWAY TEAM (Left Column) */}
-        <div className="flex flex-col sm:flex-row items-center sm:space-x-3.5 text-center sm:text-left min-w-0">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center p-1.5 bg-gray-50/90 border border-gray-100 shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
+        <div className="flex flex-col items-center text-center min-w-0">
+          {/* Pure Logo - Noticeably Bigger, No Gray Border / Box */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
             {away.logo ? (
               <img
                 src={away.logo}
                 alt={away.displayName}
-                className="w-full h-full object-contain filter drop-shadow-2xs"
+                className="w-full h-full object-contain filter drop-shadow-sm"
                 loading="lazy"
               />
             ) : (
-              <Trophy className="w-6 h-6 text-gray-400" />
+              <Trophy className="w-10 h-10 text-gray-400" />
             )}
           </div>
-          <div className="min-w-0 mt-1.5 sm:mt-0">
-            <div className="text-xs sm:text-base font-extrabold text-gray-900 leading-tight truncate">
-              {away.name || away.displayName}
+
+          {/* 1. Team Name Under Logo */}
+          <div className="text-xs sm:text-base font-extrabold text-gray-900 leading-tight truncate mt-1.5 max-w-full">
+            {away.name || away.displayName}
+          </div>
+
+          {/* 2. Record Under Team Name */}
+          {away.record && (
+            <div className="text-[10px] sm:text-xs text-gray-400 font-medium mt-0.5">
+              {away.record}
             </div>
-            <div className="flex items-center justify-center sm:justify-start space-x-1.5 mt-0.5">
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                AWAY
-              </span>
-              {away.record && (
-                <span className="text-[10px] sm:text-xs text-gray-400 font-normal">
-                  {away.record}
-                </span>
-              )}
-            </div>
+          )}
+
+          {/* 3. AWAY Under Record */}
+          <div className="mt-1">
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+              AWAY
+            </span>
           </div>
         </div>
 
         {/* CENTER COLUMN (Score & Game Status / Tipoff) */}
         <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-4 text-center">
           {isUpcoming ? (
-            /* Upcoming Game: Scheduled Tip-off Time & 'at' Matchup */
+            /* Upcoming Game: Scheduled Tip-off Time (No Circle Border, No 'at' word) */
             <div className="flex flex-col items-center">
-              <div className="text-xs sm:text-sm font-bold text-gray-800 bg-gray-100/90 border border-gray-200/80 px-3 py-1 rounded-full shadow-2xs whitespace-nowrap">
+              <div className="text-sm sm:text-base font-extrabold text-gray-800 whitespace-nowrap">
                 {formatTipoff(game.date, game.status.detail)}
-              </div>
-              <div className="flex items-center space-x-1 text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                <span>at</span>
               </div>
             </div>
           ) : (
@@ -147,33 +149,38 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
 
         {/* HOME TEAM (Right Column) */}
-        <div className="flex flex-col sm:flex-row-reverse items-center sm:space-x-3.5 sm:space-x-reverse text-center sm:text-right min-w-0">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center p-1.5 bg-gray-50/90 border border-gray-100 shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200">
+        <div className="flex flex-col items-center text-center min-w-0">
+          {/* Pure Logo - Noticeably Bigger, No Gray Border / Box */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
             {home.logo ? (
               <img
                 src={home.logo}
                 alt={home.displayName}
-                className="w-full h-full object-contain filter drop-shadow-2xs"
+                className="w-full h-full object-contain filter drop-shadow-sm"
                 loading="lazy"
               />
             ) : (
-              <Trophy className="w-6 h-6 text-gray-400" />
+              <Trophy className="w-10 h-10 text-gray-400" />
             )}
           </div>
-          <div className="min-w-0 mt-1.5 sm:mt-0">
-            <div className="text-xs sm:text-base font-extrabold text-gray-900 leading-tight truncate">
-              {home.name || home.displayName}
+
+          {/* 1. Team Name Under Logo */}
+          <div className="text-xs sm:text-base font-extrabold text-gray-900 leading-tight truncate mt-1.5 max-w-full">
+            {home.name || home.displayName}
+          </div>
+
+          {/* 2. Record Under Team Name */}
+          {home.record && (
+            <div className="text-[10px] sm:text-xs text-gray-400 font-medium mt-0.5">
+              {home.record}
             </div>
-            <div className="flex items-center justify-center sm:justify-end space-x-1.5 mt-0.5">
-              {home.record && (
-                <span className="text-[10px] sm:text-xs text-gray-400 font-normal">
-                  {home.record}
-                </span>
-              )}
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                HOME
-              </span>
-            </div>
+          )}
+
+          {/* 3. HOME Under Record */}
+          <div className="mt-1">
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+              HOME
+            </span>
           </div>
         </div>
 

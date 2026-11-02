@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface FooterProps {
-  onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms') => void;
+  onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms' | 'privacy') => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onOpenLegal }) => {
@@ -36,6 +36,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLegal }) => {
               className="hover:text-gray-900 transition-colors cursor-pointer"
             >
               Terms of Service
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => onOpenLegal('privacy')}
+              className="hover:text-gray-900 transition-colors cursor-pointer"
+            >
+              Privacy Policy
             </button>
           </div>
         )}

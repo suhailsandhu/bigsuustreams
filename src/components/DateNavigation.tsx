@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DateNavigationProps {
   selectedDate: string; // YYYYMMDD
@@ -116,18 +115,6 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
     touchStartYRef.current = null;
   };
 
-  const handlePrevDay = () => {
-    const d = new Date(currentDateObj);
-    d.setDate(currentDateObj.getDate() - 1);
-    onSelectDate(formatDateToStr(d));
-  };
-
-  const handleNextDay = () => {
-    const d = new Date(currentDateObj);
-    d.setDate(currentDateObj.getDate() + 1);
-    onSelectDate(formatDateToStr(d));
-  };
-
   const currentMonthYear = currentDateObj.toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric'
@@ -139,22 +126,21 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Top Header: Month/Year on left, Jump to Today and Day Arrows */}
-      <div className="flex items-center justify-between mb-3">
-        {/* Month / Year button with date picker popup */}
+      {/* Top Header: Centered Month/Year (Arrows & Calendar Icon removed per user instruction) */}
+      <div className="flex items-center justify-center mb-3">
         <div className="relative" ref={datePickerRef}>
           <button
             onClick={() => setShowDatePicker(!showDatePicker)}
-            className="flex items-center space-x-1.5 text-sm sm:text-base font-black text-gray-900 hover:text-orange-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+            className="text-sm sm:text-base font-black text-gray-900 hover:text-black transition-colors px-3 py-1 rounded-lg hover:bg-gray-100 cursor-pointer text-center"
+            title="Click to select date"
           >
             <span>{currentMonthYear}</span>
-            <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 ml-1" />
           </button>
 
           {/* Date Picker Dropdown */}
           {showDatePicker && (
-            <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-300 rounded-xl shadow-xl p-4 w-72">
-              <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white border border-gray-300 rounded-xl shadow-xl p-4 w-72">
+              <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider text-center">
                 Select Calendar Date
               </div>
               <input
@@ -167,7 +153,7 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
                     setShowDatePicker(false);
                   }
                 }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 text-sm text-gray-900 font-bold focus:border-orange-500 outline-none cursor-pointer"
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 text-sm text-gray-900 font-bold focus:border-black outline-none cursor-pointer"
               />
               <div className="flex justify-between mt-3 pt-3 border-t border-gray-100">
                 <button
@@ -175,7 +161,7 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
                     onSelectDate(todayStr);
                     setShowDatePicker(false);
                   }}
-                  className="text-xs font-bold text-orange-600 hover:underline cursor-pointer"
+                  className="text-xs font-bold text-black hover:underline cursor-pointer"
                 >
                   Jump to Today
                 </button>
@@ -188,32 +174,6 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Quick controls: Jump to Today + Prev/Next Day buttons */}
-        <div className="flex items-center space-x-1 sm:space-x-1.5">
-          {selectedDate !== todayStr && (
-            <button
-              onClick={() => onSelectDate(todayStr)}
-              className="text-xs font-bold text-black hover:text-orange-600 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer mr-1"
-            >
-              Today
-            </button>
-          )}
-          <button
-            onClick={handlePrevDay}
-            title="Previous Day"
-            className="p-1.5 sm:p-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200/80 transition-colors cursor-pointer"
-          >
-            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-          <button
-            onClick={handleNextDay}
-            title="Next Day"
-            className="p-1.5 sm:p-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200/80 transition-colors cursor-pointer"
-          >
-            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
         </div>
       </div>
 
