@@ -95,16 +95,18 @@ export const App: React.FC = () => {
     try {
       const awayName = game.awayTeam?.name || game.awayTeam?.displayName || '';
       const homeName = game.homeTeam?.name || game.homeTeam?.displayName || '';
+      const isNfl = game.league === 'NFL';
+      const endpoint = isNfl ? '/api/football/highlights' : '/api/basketball/highlights';
       const res = await fetch(
-        `/api/basketball/highlights?away=${encodeURIComponent(awayName)}&home=${encodeURIComponent(homeName)}&date=${encodeURIComponent(game.date)}`
+        `${endpoint}?away=${encodeURIComponent(awayName)}&home=${encodeURIComponent(homeName)}&date=${encodeURIComponent(game.date)}`
       );
       if (res.ok) {
         const data = await res.json();
         const highlightStream: Stream = {
           id: `highlight-${game.id}`,
-          name: `${awayName} at ${homeName} — Official Game Highlights`,
-          category: 'basketball',
-          league: 'NBA',
+          name: `${awayName} at ${homeName} — Official ${isNfl ? 'NFL' : 'NBA'} Highlights`,
+          category: isNfl ? 'football' : 'basketball',
+          league: isNfl ? 'NFL' : 'NBA',
           stream_key: `highlight-${game.id}`,
           match_timestamp: Math.floor(new Date(game.date).getTime() / 1000),
           viewers: 0,

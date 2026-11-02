@@ -103,12 +103,17 @@ export async function getGameHighlights(
     if (res.ok) {
       const html = await res.text();
       // Look for videoId inside the JSON data of the search page
-      const videoIdMatches = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g);
-      if (videoIdMatches && videoIdMatches.length > 0) {
-        const firstId = videoIdMatches[0].replace(/"videoId":"|"/g, '');
+      const matches = [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"([^"]+)"/g)];
+      const valid = matches.find(m => {
+        const title = m[2].toUpperCase();
+        return !title.includes('#SHORTS') && (title.includes(cleanAway.toUpperCase()) || title.includes(cleanHome.toUpperCase()));
+      }) || matches[0];
+
+      if (valid) {
+        const firstId = valid[1];
         const result: HighlightResult = {
           videoId: firstId,
-          title: `${awayTeam} vs ${homeTeam} Full Game Highlights`,
+          title: valid[2] || `${awayTeam} vs ${homeTeam} Full Game Highlights`,
           embedUrl: `https://www.youtube-nocookie.com/embed/${firstId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`
         };
         highlightCache.set(cacheKey, result);
@@ -117,6 +122,66 @@ export async function getGameHighlights(
     }
   } catch (err) {
     console.warn('YouTube search fallback error:', err);
+  }
+
+  return null;
+}
+
+export async function getNflGameHighlights(
+  awayTeam: string,
+  homeTeam: string,
+  gameDate?: string
+): Promise<HighlightResult | null> {
+  const cacheKey = `nfl_${awayTeam.toLowerCase()}_vs_${homeTeam.toLowerCase()}_${gameDate || ''}`;
+  if (highlightCache.has(cacheKey)) {
+    return highlightCache.get(cacheKey)!;
+  }
+
+  const cleanAway = awayTeam.split(' ').pop() || awayTeam;
+  const cleanHome = homeTeam.split(' ').pop() || homeTeam;
+
+  try {
+    const searchQuery = encodeURIComponent(
+      `NFL "${cleanAway}" vs "${cleanHome}" game highlights full NFL`
+    );
+    const searchUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+    const res = await fetch(searchUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+
+    if (res.ok) {
+      const html = await res.text();
+      const matches = [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"([^"]+)"/g)];
+      
+      // Filter out shorts and ensure full game highlights
+      const valid = matches.find(m => {
+        const title = m[2].toUpperCase();
+        const isShort = title.includes('#SHORTS') || title.includes('SHORT');
+        const hasTeams = (title.includes(cleanAway.toUpperCase()) || awayTeam.toUpperCase().split(' ').some(w => w.length > 3 && title.includes(w))) &&
+                         (title.includes(cleanHome.toUpperCase()) || homeTeam.toUpperCase().split(' ').some(w => w.length > 3 && title.includes(w)));
+        return !isShort && hasTeams;
+      }) || matches.find(m => {
+        const title = m[2].toUpperCase();
+        return !title.includes('#SHORTS') && (title.includes(cleanAway.toUpperCase()) || title.includes(cleanHome.toUpperCase()));
+      }) || matches[0];
+
+      if (valid) {
+        const videoId = valid[1];
+        const result: HighlightResult = {
+          videoId,
+          title: valid[2] || `${awayTeam} at ${homeTeam} Official NFL Game Highlights`,
+          embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`
+        };
+        highlightCache.set(cacheKey, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn('NFL YouTube search error:', err);
   }
 
   return null;

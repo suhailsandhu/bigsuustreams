@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { getBasketballStreams, getFootballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings, getNflScoreboard, getNflGameSummary } from './src/server/scoreboardService.ts';
 import { analytics } from './src/server/analyticsService.ts';
-import { getGameHighlights } from './src/server/highlightsService.ts';
+import { getGameHighlights, getNflGameHighlights } from './src/server/highlightsService.ts';
 import { applySecurityHeaders, createRateLimiter } from './src/server/securityMiddleware.ts';
 import { authService } from './src/server/authService.ts';
 
@@ -262,6 +262,24 @@ app.get('/api/football/stream/:key', async (req, res) => {
     res.json(data);
   } catch (err) {
     res.status(404).json({ error: 'Stream not found' });
+  }
+});
+
+app.get('/api/football/highlights', async (req, res) => {
+  try {
+    const away = String(req.query.away || '');
+    const home = String(req.query.home || '');
+    const date = req.query.date ? String(req.query.date) : undefined;
+    if (!away || !home) {
+      return res.status(400).json({ error: 'Away and home team required' });
+    }
+    const highlight = await getNflGameHighlights(away, home, date);
+    if (!highlight) {
+      return res.status(404).json({ error: 'No highlights found' });
+    }
+    res.json(highlight);
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Failed to fetch NFL highlights' });
   }
 });
 

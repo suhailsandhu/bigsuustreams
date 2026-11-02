@@ -45,13 +45,13 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {currentSport === 'nba' ? (
             <img
-              src="/logo.png"
-              alt="NBA Streams"
-              className="h-20 sm:h-28 md:h-32 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-2xs"
+              src="/nba-logo.png"
+              alt="NBA"
+              className="h-16 sm:h-22 md:h-24 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-2xs"
             />
           ) : (
             <div className="transition-transform group-hover:scale-105">
-              <NflLogo className="h-20 sm:h-28 md:h-32 w-auto" />
+              <NflLogo className="h-16 sm:h-22 md:h-24 w-auto" />
             </div>
           )}
         </div>
