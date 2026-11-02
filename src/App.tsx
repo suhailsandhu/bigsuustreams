@@ -10,6 +10,8 @@ import { BoxScoreModal } from './components/BoxScoreModal.tsx';
 import { GameView } from './components/GameView.tsx';
 import { Footer } from './components/Footer.tsx';
 import { PwaInstallModal } from './components/PwaInstallModal.tsx';
+import { AdminStatsModal } from './components/AdminStatsModal.tsx';
+import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -22,9 +24,24 @@ export const App: React.FC = () => {
   const [selectedGame, setSelectedGame] = useState<ScoreboardGame | null>(null);
   const [boxScoreGame, setBoxScoreGame] = useState<ScoreboardGame | null>(null);
 
-  // PWA states
+  // Admin & PWA modal states
+  const [showStatsModal, setShowStatsModal] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
+
+  // Initialize analytics visitor tracking
+  useEffect(() => {
+    trackPageView();
+  }, []);
+
+  // Update telemetry when switching streams
+  useEffect(() => {
+    if (selectedStream) {
+      updateCurrentStream(selectedStream.stream_key, selectedGame?.name || selectedStream.name);
+    } else {
+      updateCurrentStream(undefined, undefined);
+    }
+  }, [selectedStream, selectedGame]);
 
   // Detect standalone mode
   useEffect(() => {
@@ -42,9 +59,14 @@ export const App: React.FC = () => {
     return (scoreboard?.games || []).filter((g) => g.league === 'NBA');
   }, [scoreboard]);
 
-  // Hash-based routing for direct links
+  // Hash-based routing for direct links and admin
   const handleHashChange = useCallback(async () => {
     const hash = window.location.hash;
+    if (hash === '#/stats' || hash === '#/admin' || hash === '#stats' || hash === '#admin') {
+      setShowStatsModal(true);
+      return;
+    }
+
     if (hash.startsWith('#/game/')) {
       const key = hash.replace('#/game/', '');
       try {
@@ -63,6 +85,8 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     window.addEventListener('hashchange', handleHashChange);
+    // Check initial hash
+    handleHashChange();
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [handleHashChange]);
 
@@ -222,14 +246,25 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Centered Clean Footer */}
-      <Footer />
+      {/* Centered Clean Footer with Live Stats Trigger */}
+      <Footer onOpenStats={() => setShowStatsModal(true)} />
 
       {/* Interactive Box Score Modal */}
       <BoxScoreModal
         game={boxScoreGame}
         onClose={() => setBoxScoreGame(null)}
         onWatchGame={handleWatchGame}
+      />
+
+      {/* Live Admin Analytics & Activity Telemetry Modal */}
+      <AdminStatsModal
+        isOpen={showStatsModal}
+        onClose={() => {
+          setShowStatsModal(false);
+          if (window.location.hash === '#/stats' || window.location.hash === '#/admin' || window.location.hash === '#stats' || window.location.hash === '#admin') {
+            window.location.hash = '';
+          }
+        }}
       />
 
       {/* PWA Install Guide Modal */}

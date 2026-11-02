@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { getBasketballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings } from './src/server/scoreboardService.ts';
+import { analytics } from './src/server/analyticsService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,6 +125,36 @@ const handleHls = async (req, res) => {
 
 app.get('/api/basketball/hls/:key.m3u8', handleHls);
 app.get('/api/basketball/hls/:key/:quality.m3u8', handleHls);
+
+// 5. Real-Time Visitor & Stream Analytics Endpoints
+app.post('/api/analytics/ping', (req, res) => {
+  try {
+    const { sessionId, device, path, streamKey, gameName, isInitial } = req.body || {};
+    if (sessionId) {
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+      analytics.recordPing(sessionId, { device, path, streamKey, gameName, isInitial }, clientIp);
+    }
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: false });
+  }
+});
+
+app.post('/api/analytics/auth', (req, res) => {
+  const { pin } = req.body || {};
+  if (analytics.verifyPin(pin)) {
+    return res.json({ success: true });
+  }
+  return res.status(401).json({ error: 'Incorrect PIN' });
+});
+
+app.get('/api/analytics/stats', (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: 'Unauthorized. PIN required.' });
+  }
+  res.json(analytics.getStats());
+});
 
 // Detect dist directory whether running from root or dist/
 let distPath = path.join(__dirname, 'dist');

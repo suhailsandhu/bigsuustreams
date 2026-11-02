@@ -697,6 +697,144 @@ async function getStandings() {
   return conferences;
 }
 
+// src/server/analyticsService.ts
+var AnalyticsTracker = class {
+  activeSessions = /* @__PURE__ */ new Map();
+  uniqueVisitorsToday = /* @__PURE__ */ new Set();
+  totalPageViewsToday = 0;
+  todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  deviceCounts = {
+    iPhone: 0,
+    Android: 0,
+    Desktop: 0,
+    Other: 0
+  };
+  streamStats = /* @__PURE__ */ new Map();
+  recentActivity = [];
+  adminPin = process.env.ADMIN_PIN || "suu2026";
+  constructor() {
+    setInterval(() => {
+      this.cleanup();
+    }, 3e4);
+  }
+  resetDailyIfNewDay() {
+    const currentDay = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    if (currentDay !== this.todayStr) {
+      this.todayStr = currentDay;
+      this.uniqueVisitorsToday.clear();
+      this.totalPageViewsToday = 0;
+      this.deviceCounts = { iPhone: 0, Android: 0, Desktop: 0, Other: 0 };
+      this.streamStats.clear();
+    }
+  }
+  cleanup() {
+    const cutoff = Date.now() - 6e4;
+    for (const [id, session] of this.activeSessions.entries()) {
+      if (session.lastPing < cutoff) {
+        this.activeSessions.delete(id);
+      }
+    }
+  }
+  normalizeDevice(raw) {
+    const lower = (raw || "").toLowerCase();
+    if (lower.includes("iphone") || lower.includes("ipad") || lower.includes("ios")) return "iPhone";
+    if (lower.includes("android")) return "Android";
+    if (lower.includes("windows") || lower.includes("mac") || lower.includes("linux")) return "Desktop";
+    return "Other";
+  }
+  recordPing(sessionId, payload, clientIp) {
+    this.resetDailyIfNewDay();
+    const device = this.normalizeDevice(payload.device || "");
+    const clientHash = `${clientIp || "client"}_${sessionId}`;
+    const isNewToday = !this.uniqueVisitorsToday.has(clientHash);
+    if (isNewToday) {
+      this.uniqueVisitorsToday.add(clientHash);
+      this.deviceCounts[device] = (this.deviceCounts[device] || 0) + 1;
+      this.addEvent({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now(),
+        text: `New visitor joined on ${device}`,
+        type: "visit",
+        device
+      });
+    }
+    if (payload.isInitial) {
+      this.totalPageViewsToday++;
+    }
+    const prevSession = this.activeSessions.get(sessionId);
+    const becameWatching = payload.streamKey && (!prevSession || prevSession.streamKey !== payload.streamKey);
+    if (becameWatching && payload.streamKey) {
+      const gName = payload.gameName || payload.streamKey;
+      const existing = this.streamStats.get(payload.streamKey) || { name: gName, views: 0 };
+      existing.views += 1;
+      this.streamStats.set(payload.streamKey, existing);
+      this.addEvent({
+        id: Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now(),
+        text: `Viewer started watching ${gName}`,
+        type: "watch",
+        device
+      });
+    }
+    this.activeSessions.set(sessionId, {
+      lastPing: Date.now(),
+      device,
+      path: payload.path || "/",
+      streamKey: payload.streamKey,
+      gameName: payload.gameName,
+      clientHash
+    });
+  }
+  addEvent(event) {
+    this.recentActivity.unshift(event);
+    if (this.recentActivity.length > 30) {
+      this.recentActivity.pop();
+    }
+  }
+  verifyPin(pin) {
+    return (pin || "").trim() === this.adminPin;
+  }
+  getStats() {
+    this.cleanup();
+    const now = Date.now();
+    const cutoff = now - 6e4;
+    let liveVisitors = 0;
+    let liveWatchers = 0;
+    const currentWatchersByStream = /* @__PURE__ */ new Map();
+    for (const session of this.activeSessions.values()) {
+      if (session.lastPing >= cutoff) {
+        liveVisitors++;
+        if (session.streamKey) {
+          liveWatchers++;
+          const cur = currentWatchersByStream.get(session.streamKey) || 0;
+          currentWatchersByStream.set(session.streamKey, cur + 1);
+        }
+      }
+    }
+    const topStreams = Array.from(this.streamStats.entries()).map(([key, data]) => ({
+      streamKey: key,
+      name: data.name,
+      totalViewsToday: data.views,
+      currentWatchers: currentWatchersByStream.get(key) || 0
+    })).sort((a, b) => b.currentWatchers * 10 + b.totalViewsToday - (a.currentWatchers * 10 + a.totalViewsToday));
+    return {
+      success: true,
+      timestamp: now,
+      serverTime: (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: true }),
+      liveVisitors: Math.max(liveVisitors, 1),
+      // At least the current admin
+      liveWatchers,
+      totalVisitorsToday: Math.max(this.uniqueVisitorsToday.size, 1),
+      totalPageViewsToday: Math.max(this.totalPageViewsToday, 1),
+      devices: this.deviceCounts,
+      topStreams,
+      recentActivity: this.recentActivity.slice(0, 20),
+      uptimeSeconds: Math.floor(process.uptime())
+    };
+  }
+};
+var analytics = new AnalyticsTracker();
+
 // server.js
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -796,6 +934,32 @@ var handleHls = async (req, res) => {
 };
 app.get("/api/basketball/hls/:key.m3u8", handleHls);
 app.get("/api/basketball/hls/:key/:quality.m3u8", handleHls);
+app.post("/api/analytics/ping", (req, res) => {
+  try {
+    const { sessionId, device, path: path2, streamKey, gameName, isInitial } = req.body || {};
+    if (sessionId) {
+      const clientIp = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim();
+      analytics.recordPing(sessionId, { device, path: path2, streamKey, gameName, isInitial }, clientIp);
+    }
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: false });
+  }
+});
+app.post("/api/analytics/auth", (req, res) => {
+  const { pin } = req.body || {};
+  if (analytics.verifyPin(pin)) {
+    return res.json({ success: true });
+  }
+  return res.status(401).json({ error: "Incorrect PIN" });
+});
+app.get("/api/analytics/stats", (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: "Unauthorized. PIN required." });
+  }
+  res.json(analytics.getStats());
+});
 var distPath = path.join(__dirname, "dist");
 if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, "index.html"))) {
   distPath = __dirname;
