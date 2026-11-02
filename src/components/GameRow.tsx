@@ -37,6 +37,26 @@ function formatTipoff(dateStr?: string, fallback = 'Scheduled'): string {
   return fallback;
 }
 
+// Calculates remaining minutes if the game starts within 1 hour (60 minutes)
+function getMinutesUntilStart(dateStr?: string): number | null {
+  if (!dateStr) return null;
+  try {
+    const gameTime = new Date(dateStr).getTime();
+    if (isNaN(gameTime)) return null;
+    const diffMs = gameTime - Date.now();
+    const diffMinutes = Math.ceil(diffMs / 60000);
+    if (diffMinutes > 0 && diffMinutes <= 60) {
+      return diffMinutes;
+    }
+    if (diffMinutes === 0 && diffMs > 0) {
+      return 1;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export const GameRow: React.FC<GameRowProps> = ({
   game,
   hideScores = false,
@@ -54,6 +74,19 @@ export const GameRow: React.FC<GameRowProps> = ({
 
   const awayScore = hideScores ? '-' : away.score ?? '-';
   const homeScore = hideScores ? '-' : home.score ?? '-';
+
+  // Live countdown for upcoming games starting within 1 hour
+  const [minutesUntilStart, setMinutesUntilStart] = React.useState<number | null>(() =>
+    isUpcoming ? getMinutesUntilStart(game.date) : null
+  );
+
+  React.useEffect(() => {
+    if (!isUpcoming) return;
+    const update = () => setMinutesUntilStart(getMinutesUntilStart(game.date));
+    update();
+    const timer = setInterval(update, 30000);
+    return () => clearInterval(timer);
+  }, [game.date, isUpcoming]);
 
   // Check if this matchup features the user's favorite team
   const isFavoriteGame = Boolean(
@@ -146,6 +179,11 @@ export const GameRow: React.FC<GameRowProps> = ({
               <div className="text-xs sm:text-sm font-extrabold text-gray-800 whitespace-nowrap">
                 {formatTipoff(game.date, game.status.detail)}
               </div>
+              {minutesUntilStart !== null && (
+                <div className="text-[10px] sm:text-[11px] text-gray-400 font-medium whitespace-nowrap mt-0.5">
+                  Stream starting in {minutesUntilStart} {minutesUntilStart === 1 ? 'minute' : 'minutes'}
+                </div>
+              )}
             </div>
           ) : (
             /* Live or Completed Game: Scores & Status */
