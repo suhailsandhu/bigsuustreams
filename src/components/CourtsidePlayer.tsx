@@ -13,6 +13,71 @@ interface CourtsidePlayerProps {
   onQualityChange: (quality: string) => void;
 }
 
+// Dedicated 1080p NBA Highlights YouTube Player
+const NbaYoutubePlayer: React.FC<{ videoId: string; title: string }> = ({ videoId, title }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    // Send postMessage commands to enforce 1080p playback quality
+    const enforce1080p = () => {
+      try {
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'setPlaybackQuality', args: ['hd1080'] }),
+            '*'
+          );
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'setPlaybackQualityRange', args: ['hd1080'] }),
+            '*'
+          );
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'setSuggestedQuality', args: ['hd1080'] }),
+            '*'
+          );
+        }
+      } catch {
+        // cross-origin safe
+      }
+    };
+
+    const t1 = setTimeout(enforce1080p, 400);
+    const t2 = setTimeout(enforce1080p, 1200);
+    const t3 = setTimeout(enforce1080p, 2500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [videoId]);
+
+  return (
+    <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl border border-gray-200 select-none">
+      <iframe
+        ref={iframeRef}
+        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&playsinline=1&vq=hd1080&hd=1&enablejsapi=1`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        className="w-full h-full border-0"
+        onLoad={() => {
+          try {
+            iframeRef.current?.contentWindow?.postMessage(
+              JSON.stringify({ event: 'command', func: 'setPlaybackQuality', args: ['hd1080'] }),
+              '*'
+            );
+          } catch {}
+        }}
+      />
+      <div className="absolute top-3 left-3 pointer-events-none z-10 flex items-center space-x-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+        <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+        <span className="text-[11px] font-black text-white uppercase tracking-wider">
+          Official NBA Highlights • 1080p HD
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   stream,
   selectedQuality,
@@ -76,23 +141,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       );
     }
 
-    return (
-      <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl border border-gray-200 select-none">
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${stream.youtubeVideoId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`}
-          title={stream.name}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="w-full h-full border-0"
-        />
-        <div className="absolute top-3 left-3 pointer-events-none z-10 flex items-center space-x-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-          <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-          <span className="text-[11px] font-black text-white uppercase tracking-wider">
-            Official NBA Highlights
-          </span>
-        </div>
-      </div>
-    );
+    return <NbaYoutubePlayer videoId={stream.youtubeVideoId} title={stream.name} />;
   }
 
   const videoRef = useRef<HTMLVideoElement>(null);

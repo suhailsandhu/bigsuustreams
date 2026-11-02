@@ -190,9 +190,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               alt="NBA & NFL"
               className="h-16 sm:h-20 w-auto object-contain rounded-2xl filter drop-shadow-md mb-2 transition transform hover:scale-105"
             />
-            <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight text-center">
-              {showPasscodeMode ? 'Quick Access' : mode === 'login' ? 'Welcome' : 'Create an Account'}
-            </h2>
+            {showPasscodeMode ? (
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight text-center">
+                Quick Access
+              </h2>
+            ) : mode === 'register' ? (
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight text-center">
+                Create an Account
+              </h2>
+            ) : null}
             <p className="text-xs text-gray-400 font-medium text-center mt-1 max-w-xs">
               {showPasscodeMode
                 ? 'Enter authorized access passcode.'
