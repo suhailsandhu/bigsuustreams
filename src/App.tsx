@@ -4,18 +4,15 @@ import type { ScoreboardGame, ScoreboardResponse } from './types/scoreboard.ts';
 import { fetchScoreboard, fetchStreamDetails } from './services/api.ts';
 import { getTodayDateString } from './utils/date.ts';
 import { Header } from './components/Header.tsx';
-import type { NavTab } from './components/Header.tsx';
 import { DateNavigation } from './components/DateNavigation.tsx';
 import { GameRow } from './components/GameRow.tsx';
 import { BoxScoreModal } from './components/BoxScoreModal.tsx';
 import { GameView } from './components/GameView.tsx';
-import { StandingsView } from './components/StandingsView.tsx';
 import { Footer } from './components/Footer.tsx';
 import { PwaInstallModal } from './components/PwaInstallModal.tsx';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTab>('games');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [scoreboard, setScoreboard] = useState<ScoreboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,15 +145,8 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col text-gray-900 selection:bg-orange-500/20 selection:text-orange-900">
-      {/* Top White Header with NBA Streams logo and GAMES & STANDINGS navigation */}
-      <Header
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          if (selectedStream) handleBackToHome();
-        }}
-        onNavigateHome={handleBackToHome}
-      />
+      {/* Top White Header with NBA Streams logo */}
+      <Header onNavigateHome={handleBackToHome} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* If a game stream is currently active, render the GameView */}
@@ -168,90 +158,64 @@ export const App: React.FC = () => {
           />
         ) : (
           <>
-            {/* ========================================================= */}
-            {/* TAB 1: GAMES (NBA Games & Scores with Date Navigation)    */}
-            {/* ========================================================= */}
-            {activeTab === 'games' && (
-              <>
-                {/* NBA-Style Interactive 7-Day Date Navigation */}
-                <DateNavigation
-                  selectedDate={selectedDate}
-                  onSelectDate={handleSelectDate}
-                />
+            {/* NBA-Style Interactive 7-Day Date Navigation */}
+            <DateNavigation
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+            />
 
-                {/* Loading Skeleton */}
-                {isLoading && (
-                  <div className="space-y-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-32 rounded-lg bg-white border border-gray-200 animate-pulse shadow-xs" />
-                    ))}
-                  </div>
-                )}
+            {/* Loading Skeleton */}
+            {isLoading && (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-32 rounded-lg bg-white border border-gray-200 animate-pulse shadow-xs" />
+                ))}
+              </div>
+            )}
 
-                {/* Error Notice */}
-                {error && !isLoading && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center my-6">
-                    <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-                    <h3 className="text-base font-bold text-gray-900 mb-1">Scoreboard Notice</h3>
-                    <p className="text-xs text-gray-600 max-w-md mx-auto mb-4">{error}</p>
+            {/* Error Notice */}
+            {error && !isLoading && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center my-6">
+                <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                <h3 className="text-base font-bold text-gray-900 mb-1">Scoreboard Notice</h3>
+                <p className="text-xs text-gray-600 max-w-md mx-auto mb-4">{error}</p>
+                <button
+                  onClick={() => loadScoreboardData(selectedDate)}
+                  className="inline-flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold px-4 py-2 rounded-md transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                  Retry Loading
+                </button>
+              </div>
+            )}
+
+            {/* Games List (Scoreboard & Live Feeds) */}
+            {!isLoading && !error && (
+              <div className="space-y-4 sm:space-y-5">
+                {allGames.length > 0 ? (
+                  allGames.map((game) => (
+                    <GameRow
+                      key={game.id}
+                      game={game}
+                      onWatchGame={handleWatchGame}
+                      onOpenBoxScore={(g) => setBoxScoreGame(g)}
+                    />
+                  ))
+                ) : (
+                  <div className="bg-white border border-gray-200 rounded-lg p-12 text-center shadow-xs">
+                    <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">No NBA Games Scheduled</h3>
+                    <p className="text-sm text-gray-500 max-w-sm mx-auto mb-4">
+                      There are no NBA games scheduled for this date. Use the date bar above to check games for other days.
+                    </p>
                     <button
-                      onClick={() => loadScoreboardData(selectedDate)}
-                      className="inline-flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold px-4 py-2 rounded-md transition-colors cursor-pointer"
+                      onClick={() => handleSelectDate(getTodayDateString())}
+                      className="bg-black hover:bg-neutral-800 text-white text-xs font-bold px-4 py-2 rounded-md transition-colors cursor-pointer"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Retry Scoreboard</span>
+                      Return to Today's Games
                     </button>
                   </div>
                 )}
-
-                {/* NBA Game Cards List */}
-                {!isLoading && !error && (
-                  <>
-                    {allGames.length > 0 ? (
-                      <div className="space-y-3.5">
-                        {allGames.map((game) => (
-                          <GameRow
-                            key={game.id}
-                            game={game}
-                            onWatchGame={handleWatchGame}
-                            onOpenBoxScore={(g) => setBoxScoreGame(g)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      /* Empty state */
-                      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center my-6 shadow-xs">
-                        <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <h3 className="text-base font-bold text-gray-900 mb-1">No NBA Games Scheduled</h3>
-                        <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
-                          No NBA games scheduled for {scoreboard?.formattedDate || 'this date'}.
-                        </p>
-                        <button
-                          onClick={() => {
-                            setSelectedDate(getTodayDateString());
-                          }}
-                          className="text-xs font-bold text-orange-600 hover:underline cursor-pointer"
-                        >
-                          Reset to Today’s Games
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            {/* ========================================================= */}
-            {/* TAB 2: STANDINGS (Eastern & Western Conference Standings)  */}
-            {/* ========================================================= */}
-            {activeTab === 'standings' && (
-              <div>
-                <div className="mb-6 text-center">
-                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight uppercase">
-                    NBA STANDINGS
-                  </h1>
-                </div>
-                <StandingsView />
               </div>
             )}
           </>
