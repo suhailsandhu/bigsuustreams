@@ -87,19 +87,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       hlsRef.current = null;
     }
 
-    // Resolve direct stream URL via API
-    let targetUrl = `/api/basketball/hls/${stream.stream_key}/${selectedQuality}.m3u8`;
-    try {
-      const resolveRes = await fetch(`/api/basketball/resolve/${stream.stream_key}/${selectedQuality}`);
-      if (resolveRes.ok) {
-        const resolveData = await resolveRes.json();
-        if (resolveData.streamUrl) {
-          targetUrl = resolveData.streamUrl;
-        }
-      }
-    } catch {
-      // fallback to proxy route
-    }
+    // Load direct HLS stream via backend proxy route
+    const targetUrl = `/api/basketball/hls/${stream.stream_key}/${selectedQuality}.m3u8`;
 
     // 1. Check if Hls.js is supported
     if (Hls.isSupported()) {
