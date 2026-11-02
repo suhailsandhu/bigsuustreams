@@ -86,8 +86,13 @@ interface GameViewProps {
 }
 
 export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
-  // Always default to 1080p as requested
-  const [selectedQuality, setSelectedQuality] = useState('1080p');
+  // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
+  const [selectedQuality, setSelectedQuality] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('bss_default_quality') || '1080p';
+    }
+    return '1080p';
+  });
   const [copied, setCopied] = useState(false);
 
   // Box score state

@@ -8,6 +8,7 @@ interface HeaderProps {
   onToggleSport: () => void;
   currentUser?: any;
   onLogout?: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,23 +16,26 @@ export const Header: React.FC<HeaderProps> = ({
   currentSport,
   onToggleSport,
   currentUser,
-  onLogout
+  onOpenProfile
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-2xs select-none relative">
-      {/* User Session Pill in Top Right */}
-      {currentUser && onLogout && (
+      {/* VIP Member Profile Button in Top Right on iPhone & Desktop */}
+      {currentUser && onOpenProfile && (
         <div className="absolute right-3 sm:right-6 top-3 sm:top-4 flex items-center space-x-2 z-20">
-          <div className="hidden sm:flex items-center space-x-1.5 text-xs font-bold text-gray-700 bg-gray-100/90 border border-gray-200/80 px-3 py-1 rounded-full shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="truncate max-w-[120px]">{currentUser.displayName || currentUser.username}</span>
-          </div>
           <button
-            onClick={onLogout}
-            className="text-[11px] font-bold text-gray-400 hover:text-red-600 bg-gray-50 sm:bg-transparent border border-gray-200 sm:border-0 px-2 py-0.5 rounded-full transition cursor-pointer"
-            title="Sign Out"
+            onClick={onOpenProfile}
+            className="flex items-center space-x-1.5 text-xs font-bold text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-200/80 px-2.5 py-1 rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
+            title="VIP Member Profile & Settings"
           >
-            Sign Out
+            <span className="text-sm leading-none">
+              {typeof window !== 'undefined' ? (localStorage.getItem('bss_profile_emoji') || '👑') : '👑'}
+            </span>
+            <span className="truncate max-w-[85px] sm:max-w-[120px]">
+              {currentUser.displayName === 'vip_guest' || currentUser.displayName === 'VIP Member'
+                ? 'VIP Member'
+                : (currentUser.displayName || currentUser.username || 'VIP Member')}
+            </span>
           </button>
         </div>
       )}

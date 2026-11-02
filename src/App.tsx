@@ -13,6 +13,7 @@ import { PwaInstallModal } from './components/PwaInstallModal.tsx';
 import { AdminStatsModal } from './components/AdminStatsModal.tsx';
 import { AuthModal } from './components/AuthModal.tsx';
 import { LegalModal } from './components/LegalModal.tsx';
+import { ProfileModal } from './components/ProfileModal.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
@@ -58,6 +59,10 @@ export const App: React.FC = () => {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
+
+  // VIP Member Profile modal & custom settings reactivity
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [settingsTick, setSettingsTick] = useState(0);
 
   // Anti-reverse-engineering & client-side security guards
   useEffect(() => {
@@ -126,8 +131,29 @@ export const App: React.FC = () => {
 
   const allGames = useMemo(() => {
     const targetLeague = currentSport === 'nfl' ? 'NFL' : 'NBA';
-    return (scoreboard?.games || []).filter((g) => g.league === targetLeague);
-  }, [scoreboard, currentSport]);
+    const games = (scoreboard?.games || []).filter((g) => g.league === targetLeague);
+    const fav = (typeof window !== 'undefined' ? (localStorage.getItem('bss_favorite_team') || '') : '').trim().toLowerCase();
+
+    if (!fav) return games;
+
+    return [...games].sort((a, b) => {
+      const aMatches =
+        (a.awayTeam?.name && a.awayTeam.name.toLowerCase().includes(fav)) ||
+        (a.awayTeam?.displayName && a.awayTeam.displayName.toLowerCase().includes(fav)) ||
+        (a.homeTeam?.name && a.homeTeam.name.toLowerCase().includes(fav)) ||
+        (a.homeTeam?.displayName && a.homeTeam.displayName.toLowerCase().includes(fav));
+
+      const bMatches =
+        (b.awayTeam?.name && b.awayTeam.name.toLowerCase().includes(fav)) ||
+        (b.awayTeam?.displayName && b.awayTeam.displayName.toLowerCase().includes(fav)) ||
+        (b.homeTeam?.name && b.homeTeam.name.toLowerCase().includes(fav)) ||
+        (b.homeTeam?.displayName && b.homeTeam.displayName.toLowerCase().includes(fav));
+
+      if (aMatches && !bMatches) return -1;
+      if (!aMatches && bMatches) return 1;
+      return 0;
+    });
+  }, [scoreboard, currentSport, settingsTick]);
 
   const handleWatchHighlights = useCallback(async (game: ScoreboardGame) => {
     setSelectedGame(game);
@@ -360,6 +386,7 @@ export const App: React.FC = () => {
         currentSport={currentSport}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenProfile={() => setShowProfileModal(true)}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);
@@ -478,6 +505,15 @@ export const App: React.FC = () => {
             window.location.hash = '';
           }
         }}
+      />
+
+      {/* VIP Member Profile & Settings Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onSettingsChange={() => setSettingsTick((t) => t + 1)}
       />
 
       {/* PWA Install Guide Modal */}

@@ -151,7 +151,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const watchdogTimerRef = useRef<any>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const autoSound = localStorage.getItem('bss_autoplay_sound') === 'true';
+      return !autoSound; // If autoplay with sound is enabled, attempt unmuted (false)
+    }
+    return false;
+  });
   const [volume, setVolume] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -234,12 +240,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
     // 1. Check if Hls.js is supported
     if (Hls.isSupported()) {
+      const ultraLow = typeof window !== 'undefined' && localStorage.getItem('bss_low_latency') === 'true';
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 30,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
+        lowLatencyMode: ultraLow,
+        backBufferLength: ultraLow ? 15 : 30,
+        liveSyncDurationCount: ultraLow ? 2 : 3,
+        liveMaxLatencyDurationCount: ultraLow ? 4 : 6,
         fragLoadingMaxRetry: 5,
         manifestLoadingMaxRetry: 5,
         levelLoadingMaxRetry: 5,
