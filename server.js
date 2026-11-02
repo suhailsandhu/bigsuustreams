@@ -84,6 +84,61 @@ app.post('/api/auth/login', siteAuthLimiter, (req, res) => {
   }
 });
 
+// Google OAuth Configuration & Verification (Google Identity Services API)
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+
+app.get('/api/auth/google/config', (req, res) => {
+  res.json({ clientId: GOOGLE_CLIENT_ID });
+});
+
+app.get('/api/auth/google/login', (req, res) => {
+  if (GOOGLE_CLIENT_ID) {
+    const host = req.get('host') || 'bigsuustreams.com';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+    return res.redirect(authUrl);
+  }
+  // Standard redirect to Google account portal
+  return res.redirect('https://accounts.google.com/signin/v2/identifier?service=accountsettings');
+});
+
+app.post('/api/auth/google/verify', async (req, res) => {
+  try {
+    const { credential } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ error: 'Missing Google credential token' });
+    }
+    // Verify Google ID token securely via Google API tokeninfo endpoint
+    const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    if (!verifyRes.ok) {
+      return res.status(401).json({ error: 'Invalid Google identity token' });
+    }
+    const payload = await verifyRes.json();
+    const email = (payload.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: 'Email not provided in Google account token' });
+    }
+    const name = payload.name || payload.given_name || email.split('@')[0];
+    const picture = payload.picture || '';
+
+    const result = authService.loginWithGoogle(email, name, picture);
+    return res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    return res.status(500).json({ error: (err && err.message) || 'Failed to verify Google login' });
+  }
+});
+
 app.post('/api/auth/google', (req, res) => {
   try {
     const { email, displayName, avatarUrl } = req.body || {};

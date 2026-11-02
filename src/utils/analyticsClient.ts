@@ -1,7 +1,20 @@
-// Client-side analytics heartbeat sender for BigSuuStreams
-// Includes Owner Exclusion (newvalorantpc@gmail.com), Device Fingerprint Tagging, and Retention Tracking
+// Client-side analytics heartbeat sender for BSS
+// Includes Owner Exclusion, Device Fingerprint Tagging, and Retention Tracking
 
-const EXCLUDED_EMAILS = ['newvalorantpc@gmail.com'];
+function isOwnerOrAdmin(): boolean {
+  try {
+    if (sessionStorage.getItem('bigsuu_admin_authorized') === 'true') return true;
+    if (localStorage.getItem('bigsuu_admin_bypass') === 'true') return true;
+    const raw = localStorage.getItem('bigsuu_auth_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_2222' || u.username === 'admin') return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
 
 function getDeviceId(): string {
   try {
@@ -98,18 +111,12 @@ export function updateCurrentStream(streamKey?: string, gameName?: string) {
 }
 
 function sendPing(isInitial: boolean) {
+  // OWNER EXCLUSION: If from admin / owner session, exclude completely from analytics
+  if (isOwnerOrAdmin()) {
+    return;
+  }
+
   const user = getLoggedInUser();
-  const userEmail = (user?.email || '').trim().toLowerCase();
-
-  // OWNER EXCLUSION: If from admin / owner account (newvalorantpc@gmail.com), exclude completely from analytics
-  if (EXCLUDED_EMAILS.includes(userEmail)) {
-    return;
-  }
-
-  // Also check if admin authorized
-  if (sessionStorage.getItem('bigsuu_admin_authorized') === 'true') {
-    return;
-  }
 
   const sessionId = getSessionId();
   const deviceId = getDeviceId();

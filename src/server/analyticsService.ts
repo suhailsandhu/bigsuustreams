@@ -1,11 +1,15 @@
-// Real-time In-Memory & Persistent Analytics Tracker for BigSuuStreams
+// Real-time In-Memory & Persistent Analytics Tracker for BSS
 // Designed with Shopify-grade metrics, device tagging, retention tracking, and owner exclusion
 import fs from 'fs';
 import path from 'path';
 
 declare const process: any;
 
-const EXCLUDED_EMAILS = ['newvalorantpc@gmail.com'];
+const EXCLUDED_EMAILS = [
+  (process.env.ADMIN_EMAIL || '').trim().toLowerCase(),
+  'owner@bss.internal',
+  'vip@bss.internal'
+].filter(Boolean);
 const DATA_DIR = path.join(process.cwd(), 'data');
 const VISITORS_FILE = path.join(DATA_DIR, 'visitors.json');
 
@@ -145,9 +149,9 @@ class AnalyticsTracker {
     },
     clientIp?: string
   ) {
-    // 1. FILTER OWNER/ADMIN TRAFFIC: Ignore if user is newvalorantpc@gmail.com
+    // 1. FILTER OWNER/ADMIN TRAFFIC: Ignore if user matches configured admin email
     const email = (payload.userEmail || '').trim().toLowerCase();
-    if (EXCLUDED_EMAILS.includes(email)) {
+    if (email && EXCLUDED_EMAILS.includes(email)) {
       return;
     }
 
@@ -338,7 +342,7 @@ class AnalyticsTracker {
       bounceRate: 11.2,
       recentActivity: this.recentActivity.slice(0, 30),
       uptimeSeconds: Math.floor(process.uptime()),
-      adminFilteredEmail: 'newvalorantpc@gmail.com'
+      adminFilteredEmail: 'Protected Admin Device / Owner Account'
     };
   }
 }

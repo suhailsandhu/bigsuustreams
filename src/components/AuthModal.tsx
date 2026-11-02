@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, ChevronLeft, KeyRound } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound } from 'lucide-react';
 import { NflLogo } from './NflLogo';
 
 interface AuthModalProps {
@@ -16,8 +16,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onOpenLegal
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [showGooglePicker, setShowGooglePicker] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
   
   // Quick Passcode State (Passcode: 2222)
   const [showPasscodeMode, setShowPasscodeMode] = useState(false);
@@ -31,6 +29,85 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Google OAuth Client ID if available
+  const [googleClientId, setGoogleClientId] = useState<string>('');
+
+  useEffect(() => {
+    // Check if Google Client ID is configured on the backend
+    fetch('/api/auth/google/config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.clientId) {
+          setGoogleClientId(data.clientId);
+          initGoogleIdentity(data.clientId);
+        }
+      })
+      .catch(() => {
+        // silent fallback
+      });
+  }, []);
+
+  const initGoogleIdentity = (clientId: string) => {
+    if (typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true
+        });
+      } catch (err) {
+        console.warn('Google Identity initialization notice:', err);
+      }
+    }
+  };
+
+  const handleGoogleCredentialResponse = async (response: any) => {
+    if (!response || !response.credential) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/google/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        localStorage.setItem('bigsuu_auth_token', data.token);
+        localStorage.setItem('bigsuu_auth_user', JSON.stringify(data.user));
+        sessionStorage.setItem('bigsuu_auth_token', data.token);
+        onSuccess(data.user);
+      } else {
+        setError(data.error || 'Google verification failed.');
+      }
+    } catch {
+      setError('Unable to reach authentication server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignInClick = () => {
+    setError(null);
+    // If Google Identity Services is available with a configured Client ID, prompt official Google dialog
+    if (googleClientId && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            window.location.href = '/api/auth/google/login';
+          }
+        });
+        return;
+      } catch {
+        // fallback
+      }
+    }
+
+    // Direct official Google login redirect
+    window.location.href = '/api/auth/google/login';
+  };
 
   if (!isOpen) return null;
 
@@ -49,7 +126,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       id: 'vip_2222',
       username: 'vip_guest',
       displayName: 'VIP Member',
-      email: 'vip@bigsuustreams.com'
+      email: 'vip@bss.internal'
     };
 
     try {
@@ -151,50 +228,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         id: `local_${Date.now()}`,
         username: username.trim() || 'sportsfan',
         displayName: username.trim() || 'Sports Fan',
-        email: email.trim() || 'fan@bigsuustreams.com'
+        email: email.trim() || 'fan@bss.internal'
       };
       localStorage.setItem('bigsuu_auth_token', 'local_token_' + Date.now());
       localStorage.setItem('bigsuu_auth_user', JSON.stringify(mockUser));
       onSuccess(mockUser);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const executeGoogleLogin = async (targetEmail: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const cleanEmail = targetEmail.trim().toLowerCase();
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          displayName: cleanEmail.split('@')[0],
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=128&q=80'
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.token) {
-        localStorage.setItem('bigsuu_auth_token', data.token);
-        localStorage.setItem('bigsuu_auth_user', JSON.stringify(data.user));
-        sessionStorage.setItem('bigsuu_auth_token', data.token);
-        onSuccess(data.user);
-      } else {
-        setError(data.error || 'Google sign-in failed');
-      }
-    } catch {
-      const mockGoogleUser = {
-        id: `google_${Date.now()}`,
-        username: targetEmail.split('@')[0],
-        displayName: targetEmail.split('@')[0],
-        email: targetEmail
-      };
-      localStorage.setItem('bigsuu_auth_token', 'google_token_' + Date.now());
-      localStorage.setItem('bigsuu_auth_user', JSON.stringify(mockGoogleUser));
-      onSuccess(mockGoogleUser);
     } finally {
       setLoading(false);
     }
@@ -213,7 +251,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             type="button"
             onClick={() => {
               setShowPasscodeMode(!showPasscodeMode);
-              setShowGooglePicker(false);
               setError(null);
               setPasscodeError(null);
             }}
@@ -239,16 +276,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <NflLogo className="h-16 sm:h-20 w-auto mb-2" />
             )}
             <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight text-center">
-              {showPasscodeMode ? 'Quick Access' : showGooglePicker ? 'Sign in with Google' : mode === 'login' ? 'Welcome Back' : 'Create an Account'}
+              {showPasscodeMode ? 'Quick Access' : mode === 'login' ? 'Welcome Back' : 'Create an Account'}
             </h2>
             <p className="text-xs text-gray-400 font-medium text-center mt-1 max-w-xs">
               {showPasscodeMode
                 ? 'Enter the 4-digit site passcode (2222) for instant access.'
-                : showGooglePicker
-                ? 'Select a Google Account to continue to bigsuustreams.com'
                 : mode === 'login'
                 ? 'Sign in to access live 4K feeds, box scores, and multi-angle streams.'
-                : 'Join Courtside Streams for unlimited free sports streaming.'}
+                : 'Join BSS for unlimited free sports streaming.'}
             </p>
           </div>
 
@@ -305,81 +340,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
               </form>
             </div>
-          ) : showGooglePicker ? (
-            /* ========================================================= */
-            /* GOOGLE ACCOUNT PICKER (No ugly browser native prompt)    */
-            /* ========================================================= */
-            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-150">
-              <button
-                type="button"
-                onClick={() => setShowGooglePicker(false)}
-                className="inline-flex items-center space-x-1 text-xs font-bold text-gray-500 hover:text-black mb-1 cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Back to other options</span>
-              </button>
-
-              {/* 1-Tap Google Account Card: newvalorantpc@gmail.com */}
-              <div
-                onClick={() => executeGoogleLogin('newvalorantpc@gmail.com')}
-                className="flex items-center justify-between p-3.5 rounded-2xl border border-gray-200 hover:border-black hover:bg-gray-50 transition cursor-pointer group shadow-2xs"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-black text-base flex items-center justify-center shadow-xs">
-                    N
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">
-                      New Valorant PC
-                    </div>
-                    <div className="text-[11px] text-gray-400 font-medium">
-                      newvalorantpc@gmail.com
-                    </div>
-                  </div>
-                </div>
-                <div className="text-[11px] font-bold text-blue-600 group-hover:underline">
-                  Sign in
-                </div>
-              </div>
-
-              {/* Or enter any other Google email */}
-              <div className="pt-2">
-                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                  Or enter another Google email:
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="email"
-                    value={customGoogleEmail}
-                    onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                    placeholder="you@gmail.com"
-                    className="flex-1 px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-black"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (customGoogleEmail && customGoogleEmail.includes('@')) {
-                        executeGoogleLogin(customGoogleEmail);
-                      }
-                    }}
-                    disabled={!customGoogleEmail || !customGoogleEmail.includes('@') || loading}
-                    className="px-4 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
-            </div>
           ) : (
             <>
-              {/* Social Log In: Continue with Google Button */}
+              {/* Social Log In: Official Continue with Google Button */}
               <button
                 type="button"
-                onClick={() => setShowGooglePicker(true)}
+                onClick={handleGoogleSignInClick}
                 disabled={loading}
                 className="w-full flex items-center justify-center space-x-3 py-3 px-4 rounded-2xl bg-white hover:bg-gray-50 border border-gray-300 text-gray-800 text-sm font-bold shadow-2xs transition active:scale-[0.98] cursor-pointer"
               >
-                {/* Google Multi-Color SVG Icon */}
+                {/* Official Google Multi-Color SVG Icon */}
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"

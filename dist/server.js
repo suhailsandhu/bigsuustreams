@@ -1007,7 +1007,11 @@ async function getNflGameSummary(eventId) {
 // src/server/analyticsService.ts
 import fs from "fs";
 import path from "path";
-var EXCLUDED_EMAILS = ["newvalorantpc@gmail.com"];
+var EXCLUDED_EMAILS = [
+  (process.env.ADMIN_EMAIL || "").trim().toLowerCase(),
+  "owner@bss.internal",
+  "vip@bss.internal"
+].filter(Boolean);
 var DATA_DIR = path.join(process.cwd(), "data");
 var VISITORS_FILE = path.join(DATA_DIR, "visitors.json");
 var AnalyticsTracker = class {
@@ -1089,7 +1093,7 @@ var AnalyticsTracker = class {
   }
   recordPing(sessionId, payload, clientIp) {
     const email = (payload.userEmail || "").trim().toLowerCase();
-    if (EXCLUDED_EMAILS.includes(email)) {
+    if (email && EXCLUDED_EMAILS.includes(email)) {
       return;
     }
     this.resetDailyIfNewDay();
@@ -1250,7 +1254,7 @@ var AnalyticsTracker = class {
       bounceRate: 11.2,
       recentActivity: this.recentActivity.slice(0, 30),
       uptimeSeconds: Math.floor(process.uptime()),
-      adminFilteredEmail: "newvalorantpc@gmail.com"
+      adminFilteredEmail: "Protected Admin Device / Owner Account"
     };
   }
 };
@@ -1675,6 +1679,53 @@ app.post("/api/auth/login", siteAuthLimiter, (req, res) => {
     });
   } catch (err) {
     res.status(401).json({ error: err && err.message || "Invalid credentials" });
+  }
+});
+var GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+app.get("/api/auth/google/config", (req, res) => {
+  res.json({ clientId: GOOGLE_CLIENT_ID });
+});
+app.get("/api/auth/google/login", (req, res) => {
+  if (GOOGLE_CLIENT_ID) {
+    const host = req.get("host") || "bigsuustreams.com";
+    const protocol = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
+    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+    return res.redirect(authUrl);
+  }
+  return res.redirect("https://accounts.google.com/signin/v2/identifier?service=accountsettings");
+});
+app.post("/api/auth/google/verify", async (req, res) => {
+  try {
+    const { credential } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ error: "Missing Google credential token" });
+    }
+    const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+    if (!verifyRes.ok) {
+      return res.status(401).json({ error: "Invalid Google identity token" });
+    }
+    const payload = await verifyRes.json();
+    const email = (payload.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: "Email not provided in Google account token" });
+    }
+    const name = payload.name || payload.given_name || email.split("@")[0];
+    const picture = payload.picture || "";
+    const result = authService.loginWithGoogle(email, name, picture);
+    return res.json({
+      success: true,
+      user: {
+        id: result.user.id,
+        username: result.user.username,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        avatarUrl: result.user.avatarUrl
+      },
+      token: result.session.token
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err && err.message || "Failed to verify Google login" });
   }
 });
 app.post("/api/auth/google", (req, res) => {

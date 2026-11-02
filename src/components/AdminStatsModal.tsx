@@ -274,7 +274,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
               <div className="flex items-center space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span className="font-bold">Owner Traffic Excluded:</span>
-                <span className="text-emerald-700">Pings from <code className="bg-emerald-100/80 px-1.5 py-0.5 rounded font-mono font-bold">newvalorantpc@gmail.com</code> and admin devices are filtered out.</span>
+                <span className="text-emerald-700">Pings from administrator/owner accounts and admin hardware are automatically filtered out.</span>
               </div>
               <span className="text-[10px] font-extrabold bg-emerald-200/60 text-emerald-900 px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
                 Active Filter
