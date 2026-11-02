@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { getBasketballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings } from './src/server/scoreboardService.ts';
 import { analytics } from './src/server/analyticsService.ts';
+import { getGameHighlights } from './src/server/highlightsService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,25 @@ app.get('/api/basketball/game-summary/:id', async (req, res) => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Failed to fetch game summary' });
+  }
+});
+
+// 2b. Official NBA YouTube Highlights
+app.get('/api/basketball/highlights', async (req, res) => {
+  try {
+    const away = String(req.query.away || '');
+    const home = String(req.query.home || '');
+    const date = req.query.date ? String(req.query.date) : undefined;
+    if (!away || !home) {
+      return res.status(400).json({ error: 'Away and home team required' });
+    }
+    const highlight = await getGameHighlights(away, home, date);
+    if (!highlight) {
+      return res.status(404).json({ error: 'No highlights found' });
+    }
+    res.json(highlight);
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Failed to fetch highlights' });
   }
 });
 

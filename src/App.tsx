@@ -59,6 +59,49 @@ export const App: React.FC = () => {
     return (scoreboard?.games || []).filter((g) => g.league === 'NBA');
   }, [scoreboard]);
 
+  const handleWatchHighlights = useCallback(async (game: ScoreboardGame) => {
+    setSelectedGame(game);
+    setIsLoading(true);
+    try {
+      const awayName = game.awayTeam?.name || game.awayTeam?.displayName || '';
+      const homeName = game.homeTeam?.name || game.homeTeam?.displayName || '';
+      const res = await fetch(
+        `/api/basketball/highlights?away=${encodeURIComponent(awayName)}&home=${encodeURIComponent(homeName)}&date=${encodeURIComponent(game.date)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const highlightStream: Stream = {
+          id: `highlight-${game.id}`,
+          name: `${awayName} at ${homeName} — Official Game Highlights`,
+          category: 'basketball',
+          league: 'NBA',
+          stream_key: `highlight-${game.id}`,
+          match_timestamp: Math.floor(new Date(game.date).getTime() / 1000),
+          viewers: 0,
+          is_external: false,
+          thumbnail_url: '',
+          sources: [],
+          live_sources: [],
+          team1: { name: awayName, logo: game.awayTeam?.logo || '' },
+          team2: { name: homeName, logo: game.homeTeam?.logo || '' },
+          is_live: false,
+          status: 'ended',
+          youtubeVideoId: data.videoId,
+          is_highlight: true
+        };
+        setSelectedStream(highlightStream);
+        window.location.hash = `#/game/highlight-${game.id}`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setBoxScoreGame(game);
+      }
+    } catch {
+      setBoxScoreGame(game);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Hash-based routing for direct links and admin
   const handleHashChange = useCallback(async () => {
     const hash = window.location.hash;
@@ -69,6 +112,15 @@ export const App: React.FC = () => {
 
     if (hash.startsWith('#/game/')) {
       const key = hash.replace('#/game/', '');
+      if (key.startsWith('highlight-')) {
+        const gameId = key.replace('highlight-', '');
+        const matched = allGames.find((g) => g.id === gameId);
+        if (matched) {
+          handleWatchHighlights(matched);
+          return;
+        }
+      }
+
       try {
         const fetched = await fetchStreamDetails(key);
         setSelectedStream(fetched);
@@ -81,7 +133,7 @@ export const App: React.FC = () => {
       setSelectedStream(null);
       setSelectedGame(null);
     }
-  }, [allGames]);
+  }, [allGames, handleWatchHighlights]);
 
   useEffect(() => {
     window.addEventListener('hashchange', handleHashChange);
@@ -173,7 +225,7 @@ export const App: React.FC = () => {
       <Header onNavigateHome={handleBackToHome} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* If a game stream is currently active, render the GameView */}
+        {/* If a game stream or highlight is currently active, render the GameView */}
         {selectedStream ? (
           <GameView
             stream={selectedStream}
@@ -213,7 +265,7 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* Games List (Scoreboard & Live Feeds) */}
+            {/* Games List (Scoreboard & Live Feeds & Highlights) */}
             {!isLoading && !error && (
               <div className="space-y-4 sm:space-y-5">
                 {allGames.length > 0 ? (
@@ -222,6 +274,7 @@ export const App: React.FC = () => {
                       key={game.id}
                       game={game}
                       onWatchGame={handleWatchGame}
+                      onWatchHighlights={handleWatchHighlights}
                       onOpenBoxScore={(g) => setBoxScoreGame(g)}
                     />
                   ))

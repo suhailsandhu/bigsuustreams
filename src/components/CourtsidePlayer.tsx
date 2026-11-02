@@ -18,6 +18,26 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   selectedQuality,
   onQualityChange
 }) => {
+  if (stream.youtubeVideoId) {
+    return (
+      <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-xl border border-gray-200 select-none">
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${stream.youtubeVideoId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`}
+          title={stream.name}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="w-full h-full border-0"
+        />
+        <div className="absolute top-3 left-3 pointer-events-none z-10 flex items-center space-x-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+          <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+          <span className="text-[11px] font-black text-white uppercase tracking-wider">
+            Official NBA Highlights
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);

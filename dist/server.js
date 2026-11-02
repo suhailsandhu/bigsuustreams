@@ -835,6 +835,97 @@ var AnalyticsTracker = class {
 };
 var analytics = new AnalyticsTracker();
 
+// src/server/highlightsService.ts
+var highlightCache = /* @__PURE__ */ new Map();
+var rssCache = [];
+var lastRssFetch = 0;
+async function fetchNbaRssFeed() {
+  const now = Date.now();
+  if (rssCache.length > 0 && now - lastRssFetch < 12e4) {
+    return rssCache;
+  }
+  try {
+    const url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCWJ2lWNubArHWmf3FIHbfcQ";
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.ok) return rssCache;
+    const xml = await res.text();
+    const items = [];
+    const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+    let match;
+    while ((match = entryRegex.exec(xml)) !== null) {
+      const entry = match[1];
+      const idMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+      const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
+      if (idMatch && titleMatch) {
+        items.push({
+          videoId: idMatch[1].trim(),
+          title: titleMatch[1].trim()
+        });
+      }
+    }
+    if (items.length > 0) {
+      rssCache = items;
+      lastRssFetch = now;
+    }
+    return rssCache;
+  } catch (err) {
+    console.warn("NBA RSS feed fetch error:", err);
+    return rssCache;
+  }
+}
+async function getGameHighlights(awayTeam, homeTeam, gameDate) {
+  const cacheKey = `${awayTeam.toLowerCase()}_vs_${homeTeam.toLowerCase()}_${gameDate || ""}`;
+  if (highlightCache.has(cacheKey)) {
+    return highlightCache.get(cacheKey);
+  }
+  const cleanAway = awayTeam.split(" ").pop() || awayTeam;
+  const cleanHome = homeTeam.split(" ").pop() || homeTeam;
+  const rssVideos = await fetchNbaRssFeed();
+  for (const v of rssVideos) {
+    const upper = v.title.toUpperCase();
+    const awayUpper = cleanAway.toUpperCase();
+    const homeUpper = cleanHome.toUpperCase();
+    if (upper.includes(awayUpper) && upper.includes(homeUpper) && (upper.includes("HIGHLIGHTS") || upper.includes("RECAP"))) {
+      const result = {
+        videoId: v.videoId,
+        title: v.title,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${v.videoId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`
+      };
+      highlightCache.set(cacheKey, result);
+      return result;
+    }
+  }
+  try {
+    const searchQuery = encodeURIComponent(
+      `NBA ${cleanAway} at ${cleanHome} FULL GAME HIGHLIGHTS`
+    );
+    const searchUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+    const res = await fetch(searchUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const videoIdMatches = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/g);
+      if (videoIdMatches && videoIdMatches.length > 0) {
+        const firstId = videoIdMatches[0].replace(/"videoId":"|"/g, "");
+        const result = {
+          videoId: firstId,
+          title: `${awayTeam} vs ${homeTeam} Full Game Highlights`,
+          embedUrl: `https://www.youtube-nocookie.com/embed/${firstId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`
+        };
+        highlightCache.set(cacheKey, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn("YouTube search fallback error:", err);
+  }
+  return null;
+}
+
 // server.js
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
@@ -857,6 +948,23 @@ app.get("/api/basketball/game-summary/:id", async (req, res) => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err && err.message || "Failed to fetch game summary" });
+  }
+});
+app.get("/api/basketball/highlights", async (req, res) => {
+  try {
+    const away = String(req.query.away || "");
+    const home = String(req.query.home || "");
+    const date = req.query.date ? String(req.query.date) : void 0;
+    if (!away || !home) {
+      return res.status(400).json({ error: "Away and home team required" });
+    }
+    const highlight = await getGameHighlights(away, home, date);
+    if (!highlight) {
+      return res.status(404).json({ error: "No highlights found" });
+    }
+    res.json(highlight);
+  } catch (err) {
+    res.status(500).json({ error: err && err.message || "Failed to fetch highlights" });
   }
 });
 app.get("/api/basketball/standings", async (req, res) => {

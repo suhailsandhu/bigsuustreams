@@ -24,6 +24,8 @@ export interface Stream {
   team2?: Team;
   is_live: boolean;
   status: 'live' | 'upcoming' | 'ended';
+  youtubeVideoId?: string;
+  is_highlight?: boolean;
 }
 
 export interface StreamsResponse {
