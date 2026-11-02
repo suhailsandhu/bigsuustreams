@@ -7,12 +7,26 @@ const scoreboardClientCache = new Map<string, { data: ScoreboardResponse; timest
 let standingsClientCache: { data: ConferenceStandings[]; timestamp: number } | null = null;
 const CLIENT_CACHE_TTL_MS = 20000; // 20 seconds
 
+// Security Helper: Attach active session token to all internal API calls
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Accept': 'application/json' };
+  try {
+    const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {
+    // ignore
+  }
+  return headers;
+}
+
 export async function fetchStandings(): Promise<ConferenceStandings[]> {
   const now = Date.now();
   if (standingsClientCache && (now - standingsClientCache.timestamp < 300000)) {
     return standingsClientCache.data;
   }
-  const res = await fetch('/api/basketball/standings', { headers: { 'Accept': 'application/json' } });
+  const res = await fetch('/api/basketball/standings', { headers: getAuthHeaders() });
   if (!res.ok) throw new Error('Failed to load standings');
   const data = await res.json();
   standingsClientCache = { data, timestamp: now };
@@ -29,7 +43,7 @@ export async function fetchScoreboard(dateStr?: string, forceRefresh = false): P
   }
 
   const url = `/api/basketball/scoreboard${targetDate ? `?date=${targetDate}` : ''}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     throw new Error(`Scoreboard request returned HTTP ${res.status}`);
   }
@@ -41,7 +55,7 @@ export async function fetchScoreboard(dateStr?: string, forceRefresh = false): P
 
 export async function fetchGameSummary(eventId: string): Promise<GameSummaryResponse> {
   const url = `/api/basketball/game-summary/${encodeURIComponent(eventId)}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     throw new Error(`Game summary request returned HTTP ${res.status}`);
   }
@@ -58,7 +72,7 @@ export async function fetchNflScoreboard(dateStr?: string, forceRefresh = false)
   }
 
   const url = `/api/football/scoreboard${targetDate ? `?date=${targetDate}` : ''}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     throw new Error(`NFL Scoreboard request returned HTTP ${res.status}`);
   }
@@ -70,7 +84,7 @@ export async function fetchNflScoreboard(dateStr?: string, forceRefresh = false)
 
 export async function fetchNflGameSummary(eventId: string): Promise<GameSummaryResponse> {
   const url = `/api/football/game-summary/${encodeURIComponent(eventId)}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     throw new Error(`NFL Game summary request returned HTTP ${res.status}`);
   }
@@ -83,80 +97,26 @@ export async function fetchBasketballStreams(forceRefresh = false): Promise<Stre
     return streamsCache.data;
   }
 
-  // 1. Try local proxy/server endpoint first
-  try {
-    const res = await fetch(`/api/basketball/streams${forceRefresh ? '?refresh=true' : ''}`, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (res.ok) {
-      const data: StreamsResponse = await res.json();
-      streamsCache = { data, timestamp: now };
-      return data;
-    }
-  } catch (err) {
-    console.warn('Local API unavailable, falling back to direct public API:', err);
-  }
-
-  // 2. Direct public API fallback with mirror rotation
-  const mirrors = ['https://strmfree.st', 'https://streamfree.top'];
-  for (const mirror of mirrors) {
-    try {
-      const res = await fetch(`${mirror}/api/v1/streams?category=basketball`, {
-        headers: { 'Accept': 'application/json' },
-      });
-      if (res.ok) {
-        const raw = await res.json();
-        const streams: Stream[] = (raw.streams || [])
-          .filter((s: any) => s.category?.toLowerCase() === 'basketball')
-          .map((s: any) => {
-            const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
-            return {
-              ...s,
-              is_live: isLive,
-              status: isLive ? 'live' : (s.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
-            };
-          });
-
-        streams.sort((a, b) => {
-          if (a.is_live && !b.is_live) return -1;
-          if (!a.is_live && b.is_live) return 1;
-          if (a.is_live && b.is_live) return (b.viewers || 0) - (a.viewers || 0);
-          return a.match_timestamp - b.match_timestamp;
-        });
-
-        const data: StreamsResponse = {
-          count: streams.length,
-          streams,
-          updated_at: new Date().toISOString(),
-          fromCache: false
-        };
-
-        streamsCache = { data, timestamp: now };
-        return data;
-      }
-    } catch (e) {
-      console.warn(`Mirror ${mirror} failed:`, e);
-    }
+  const res = await fetch(`/api/basketball/streams${forceRefresh ? '?refresh=true' : ''}`, {
+    headers: getAuthHeaders(),
+  });
+  if (res.ok) {
+    const data: StreamsResponse = await res.json();
+    streamsCache = { data, timestamp: now };
+    return data;
   }
 
   if (streamsCache) {
     return streamsCache.data;
   }
 
-  throw new Error('Unable to connect to basketball streaming servers. Please check your internet connection.');
+  throw new Error('Unable to connect to streaming portal. Please check your credentials.');
 }
 
 export async function fetchStreamDetails(streamKey: string): Promise<Stream> {
-  try {
-    const res = await fetch(`/api/basketball/stream/${encodeURIComponent(streamKey)}`);
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (e) {
-    // fallback
-  }
-
-  const res = await fetch(`https://strmfree.st/api/v1/streams/${encodeURIComponent(streamKey)}`);
+  const res = await fetch(`/api/basketball/stream/${encodeURIComponent(streamKey)}`, {
+    headers: getAuthHeaders()
+  });
   if (!res.ok) {
     throw new Error('Game stream not found or has concluded.');
   }

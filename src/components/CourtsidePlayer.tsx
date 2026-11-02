@@ -164,8 +164,10 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       hlsRef.current = null;
     }
 
-    // Load direct HLS stream via backend proxy route
-    const targetUrl = `/api/basketball/hls/${stream.stream_key}/${selectedQuality}.m3u8`;
+    // Load direct HLS stream via protected backend proxy route
+    const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token') || '';
+    const tokenParam = token ? `?t=${encodeURIComponent(token)}` : '';
+    const targetUrl = `/api/basketball/hls/${stream.stream_key}/${selectedQuality}.m3u8${tokenParam}`;
 
     // 1. Check if Hls.js is supported
     if (Hls.isSupported()) {
@@ -178,6 +180,11 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         fragLoadingMaxRetry: 5,
         manifestLoadingMaxRetry: 5,
         levelLoadingMaxRetry: 5,
+        xhrSetup: (xhr) => {
+          if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+        }
       });
 
       hlsRef.current = hls;

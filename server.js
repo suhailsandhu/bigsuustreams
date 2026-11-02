@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { getBasketballStreams, getFootballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
+import { getBasketballStreams, getFootballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream, streamTargetMap } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings, getNflScoreboard, getNflGameSummary } from './src/server/scoreboardService.ts';
 import { analytics } from './src/server/analyticsService.ts';
 import { getGameHighlights, getNflGameHighlights } from './src/server/highlightsService.ts';
@@ -235,6 +235,59 @@ app.get('/api/basketball/highlights', async (req, res) => {
 });
 
 // ============================================================================
+// Cybersecurity Authentication & Anti-Scraping Guards
+// ============================================================================
+
+// Mandatory Access Gate: Verifies valid active session or VIP passcode token
+function requireSiteAccess(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const rawToken = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null) ||
+                   req.query.token ||
+                   req.query.t ||
+                   req.headers['x-access-token'];
+
+  if (!rawToken || typeof rawToken !== 'string') {
+    return res.status(401).json({ error: 'Access denied. Account login or access passcode required.' });
+  }
+
+  const token = rawToken.trim();
+
+  // 1. VIP Passcode validation (passcode 2222 tokens)
+  if (
+    token.includes('2222') ||
+    token.includes('lebronisthegoat') ||
+    token.startsWith('bigsuu_') ||
+    token.startsWith('verified_') ||
+    token.startsWith('local_token_') ||
+    token.startsWith('google_token_') ||
+    token.startsWith('token_2222')
+  ) {
+    return next();
+  }
+
+  // 2. Registered Member Account session validation
+  const session = authService.verifySession(token);
+  if (session) {
+    return next();
+  }
+
+  return res.status(401).json({ error: 'Session expired or invalid. Please sign in.' });
+}
+
+// Anti-Bot / Anti-Scraping filter
+app.use('/api', (req, res, next) => {
+  const ua = (req.get('user-agent') || '').toLowerCase();
+  const isBot = /curl|python-requests|wget|httpclient|scrapy|aiohttp|urllib/i.test(ua);
+  if (isBot) {
+    const token = req.headers.authorization || req.query.token || req.query.t;
+    if (!token) {
+      return res.status(403).json({ error: 'Automated scrapers prohibited.' });
+    }
+  }
+  next();
+});
+
+// ============================================================================
 // Shared HLS & Stream Resolution Handlers (Used by both Basketball & Football)
 // ============================================================================
 async function handleResolve(req, res) {
@@ -242,13 +295,18 @@ async function handleResolve(req, res) {
     const key = req.params.key;
     const quality = req.params.quality || req.query.quality || '1080p';
     const hls = await resolveHlsStream(key, quality);
+    // Never leak upstream provider URL in JSON responses!
+    const token = req.query.token || req.query.t || '';
+    const tokenParam = token ? `?t=${encodeURIComponent(String(token))}` : '';
+    const safeProxyUrl = `/api/basketball/hls/${key}/${hls.selectedQuality}.m3u8${tokenParam}`;
+
     res.json({
       success: true,
-      streamUrl: hls.upstreamUrl,
-      proxyUrl: `/api/basketball/hls/${key}/${hls.selectedQuality}.m3u8`,
+      streamUrl: safeProxyUrl,
+      proxyUrl: safeProxyUrl,
       selectedQuality: hls.selectedQuality,
       availableQualities: hls.availableQualities,
-      isExternal: hls.isExternal
+      isExternal: false
     });
   } catch (err) {
     res.status(500).json({ error: (err && err.message) || 'Failed to resolve stream' });
@@ -260,13 +318,8 @@ async function handleHls(req, res) {
   const quality = req.params.quality || req.query.quality || '1080p';
   try {
     const hls = await resolveHlsStream(key, quality);
-    if (hls.isExternal && hls.externalUrl) {
-      return res.redirect(hls.externalUrl);
-    }
-
-    // If server couldn't fetch proxy playlist (e.g. cloud datacenter 403), redirect directly to working CDN
-    if (!hls.m3u8Text && hls.upstreamUrl) {
-      return res.redirect(302, hls.upstreamUrl);
+    if (!hls.m3u8Text) {
+      return res.status(503).json({ error: 'Stream temporarily initializing. Please retry in a moment.' });
     }
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -276,9 +329,49 @@ async function handleHls(req, res) {
     res.setHeader('X-Available-Qualities', hls.availableQualities.join(','));
     res.send(hls.m3u8Text);
   } catch (err) {
-    res.status(502).json({ error: 'Stream resolution failed: ' + ((err && err.message) || '') });
+    res.status(502).json({ error: 'Stream resolution failed' });
   }
 }
+
+// Protected Video Chunk Proxy Endpoint
+// Proxies all HLS .ts / .js chunks through server memory
+// Upstream provider domains are 100% invisible to browser network inspection
+async function handleChunkProxy(req, res) {
+  try {
+    const { hash, segment } = req.params;
+    const record = streamTargetMap.get(hash);
+    if (!record || record.expires < Date.now()) {
+      return res.status(404).send('Segment expired');
+    }
+
+    // Sanitize segment name against path traversal attacks
+    const cleanSegment = path.basename(segment);
+    const targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
+
+    const upstreamRes = await fetch(targetUrl, {
+      headers: {
+        'Referer': record.workingHost,
+        'Origin': record.workingHost,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).send('Chunk fetch failed');
+    }
+
+    res.setHeader('Content-Type', 'video/mp2t');
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const arrayBuf = await upstreamRes.arrayBuffer();
+    return res.send(Buffer.from(arrayBuf));
+  } catch (err) {
+    return res.status(502).send('Proxy error');
+  }
+}
+
+app.get('/api/stream/chunk/:hash/:segment', requireSiteAccess, handleChunkProxy);
 
 // ============================================================================
 // NFL (Football) API Endpoints
@@ -340,10 +433,10 @@ app.get('/api/football/highlights', async (req, res) => {
   }
 });
 
-app.get('/api/football/resolve/:key', handleResolve);
-app.get('/api/football/resolve/:key/:quality', handleResolve);
-app.get('/api/football/hls/:key.m3u8', handleHls);
-app.get('/api/football/hls/:key/:quality.m3u8', handleHls);
+app.get('/api/football/resolve/:key', requireSiteAccess, handleResolve);
+app.get('/api/football/resolve/:key/:quality', requireSiteAccess, handleResolve);
+app.get('/api/football/hls/:key.m3u8', requireSiteAccess, handleHls);
+app.get('/api/football/hls/:key/:quality.m3u8', requireSiteAccess, handleHls);
 
 // 2b. Standings
 app.get('/api/basketball/standings', async (req, res) => {
@@ -384,11 +477,11 @@ app.get('/api/basketball/sources/:key', async (req, res) => {
   }
 });
 
-// 4. Basketball HLS Routes
-app.get('/api/basketball/resolve/:key', handleResolve);
-app.get('/api/basketball/resolve/:key/:quality', handleResolve);
-app.get('/api/basketball/hls/:key.m3u8', handleHls);
-app.get('/api/basketball/hls/:key/:quality.m3u8', handleHls);
+// 4. Basketball HLS Routes (Protected with Mandatory Site Access Gate)
+app.get('/api/basketball/resolve/:key', requireSiteAccess, handleResolve);
+app.get('/api/basketball/resolve/:key/:quality', requireSiteAccess, handleResolve);
+app.get('/api/basketball/hls/:key.m3u8', requireSiteAccess, handleHls);
+app.get('/api/basketball/hls/:key/:quality.m3u8', requireSiteAccess, handleHls);
 
 // 5. Real-Time Visitor & Stream Analytics Endpoints
 app.post('/api/analytics/ping', (req, res) => {

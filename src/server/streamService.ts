@@ -191,6 +191,28 @@ export interface ResolvedHls {
   upstreamUrl: string;
 }
 
+export interface StreamTargetRecord {
+  baseUrl: string;
+  workingHost: string;
+  qStr: string;
+  expires: number;
+}
+
+// In-memory mapping of opaque stream hashes -> upstream chunk endpoints
+// Prevents any reverse-engineering of upstream provider domains or stream locations
+export const streamTargetMap = new Map<string, StreamTargetRecord>();
+
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of streamTargetMap.entries()) {
+      if (record.expires < now) {
+        streamTargetMap.delete(key);
+      }
+    }
+  }, 300000);
+}
+
 export async function resolveHlsStream(streamKey: string, requestedQuality = '1080p'): Promise<ResolvedHls> {
   // Normalize quality
   let quality = requestedQuality;
@@ -321,25 +343,29 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
 
   const rawM3u8Text = await m3u8Res.text();
   const variant = `${streamKey}${selectedQuality}`;
+  const p = tokens[selectedQuality];
+  const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-  // Robust M3U8 Normalization:
-  // 1. Rewrite non-working CDN hosts to the verified working origin
-  // 2. Expand relative segment paths (e.g. 1263.js) to absolute URLs on working origin
+  // Generate an opaque, random secure hash for this stream session
+  // Completely eliminates any upstream provider domains or mirrors from client playlists
+  const streamHash = Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(4);
+  const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
+  streamTargetMap.set(streamHash, {
+    baseUrl,
+    workingHost,
+    qStr,
+    expires: Date.now() + 3600000 // 1 hour validity
+  });
+
+  // Rewrite all segment URLs to point strictly to our internal proxy endpoint
   const m3u8Text = rawM3u8Text.split('\n').map(line => {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) return line;
     
-    // Fix cdn1.strmfree.st which fails TLS handshake
-    if (trimmed.includes('cdn1.strmfree.st/live/')) {
-      return trimmed.replace(/https?:\/\/cdn1\.strmfree\.st\/live\//, `${workingHost}/live/`);
-    }
-    
-    // Fix relative segment filenames
-    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      return `${workingHost}${pathPrefix}${variant}/${trimmed}`;
-    }
-
-    return line;
+    // Extract segment name (e.g. 1263.js or segment.ts)
+    const segmentName = trimmed.includes('/') ? trimmed.split('/').pop() || trimmed : trimmed;
+    // Return internal proxy URL with streamHash
+    return `/api/stream/chunk/${streamHash}/${segmentName}`;
   }).join('\n');
 
   return {
@@ -347,6 +373,6 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     selectedQuality,
     availableQualities,
     m3u8Text,
-    upstreamUrl: finalM3u8Url
+    upstreamUrl: `/api/basketball/hls/${streamKey}/${selectedQuality}.m3u8`
   };
 }

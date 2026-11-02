@@ -59,6 +59,46 @@ export const App: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
+  // Anti-reverse-engineering & client-side security guards
+  useEffect(() => {
+    // 1. Disable context menu (right-click)
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    // 2. Block inspection hotkeys (F12, Ctrl+Shift+I/J/C, Ctrl+U, Ctrl+S)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+        (e.metaKey && e.altKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+        (e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S')) ||
+        (e.metaKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S'))
+      ) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    // 3. Silence console outputs in production to prevent data leakage
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+      const noop = () => {};
+      console.log = noop;
+      console.debug = noop;
+      console.info = noop;
+      console.warn = noop;
+    }
+
+    document.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Initialize analytics visitor tracking
   useEffect(() => {
     trackPageView();
