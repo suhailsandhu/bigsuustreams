@@ -11,10 +11,26 @@ import { GameView } from './components/GameView.tsx';
 import { Footer } from './components/Footer.tsx';
 import { PwaInstallModal } from './components/PwaInstallModal.tsx';
 import { AdminStatsModal } from './components/AdminStatsModal.tsx';
+import { SiteGate } from './components/SiteGate.tsx';
+import { LegalModal } from './components/LegalModal.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Password protection state ('lebronisthegoat')
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const token = localStorage.getItem('bigsuu_site_token') || sessionStorage.getItem('bigsuu_site_token');
+      return !!token;
+    } catch {
+      return false;
+    }
+  });
+
+  // Legal modal state
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalTab, setLegalTab] = useState<'dmca' | 'disclaimer' | 'terms' | 'privacy'>('dmca');
+
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [scoreboard, setScoreboard] = useState<ScoreboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -232,6 +248,26 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Render Gate if site passcode is not yet verified
+  if (!isAuthenticated) {
+    return (
+      <>
+        <SiteGate
+          onUnlock={() => setIsAuthenticated(true)}
+          onOpenLegal={(tab) => {
+            setLegalTab(tab || 'dmca');
+            setShowLegalModal(true);
+          }}
+        />
+        <LegalModal
+          isOpen={showLegalModal}
+          initialTab={legalTab}
+          onClose={() => setShowLegalModal(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col text-gray-900 selection:bg-orange-500/20 selection:text-orange-900">
       {/* Top White Header with NBA Streams logo */}
@@ -312,8 +348,20 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Centered Clean Footer without visible public admin button */}
-      <Footer />
+      {/* Centered Clean Footer with Legal Links */}
+      <Footer
+        onOpenLegal={(tab) => {
+          setLegalTab(tab || 'dmca');
+          setShowLegalModal(true);
+        }}
+      />
+
+      {/* Legal Shield Modal (DMCA, Trademark Non-Affiliation, Terms & Privacy) */}
+      <LegalModal
+        isOpen={showLegalModal}
+        initialTab={legalTab}
+        onClose={() => setShowLegalModal(false)}
+      />
 
       {/* Interactive Box Score Modal */}
       <BoxScoreModal

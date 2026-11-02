@@ -43,6 +43,15 @@ Welcome to your update log! This is a simple, plain-English record of every chan
 - **Private Admin URL**: Removed the visible "Site Activity" button from the public footer. The live visitor telemetry dashboard is now strictly hidden and only accessible by navigating directly to **`bigsuustreams.com/admin`**.
 - **Desktop Focus & Layout Balance**: Constrained schedule feed width (`max-w-4xl`) on desktop to eliminate awkward empty gaps and match the refined presentation of major sports platforms like Apple Sports and NBA.com.
 
+### 🛡️ Cybersecurity & Legal Defense Suite
+- **Site-Wide Password Gate**: Locked the website behind an authorized passcode (`lebronisthegoat`). Once entered, an encrypted verification token is saved locally so authorized visitors don't have to retype it on every visit.
+- **Brute-Force & DDoS Mitigation**: Added an in-memory sliding window rate limiter to the authentication and API endpoints (max 10 attempts per 10 minutes) to stop automated dictionary and brute-force attacks in their tracks.
+- **HTTP Security Headers**: Injected enterprise headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `HSTS`, `X-XSS-Protection`, and strict Referrer Policy).
+- **Express Fingerprint Concealed**: Removed the `X-Powered-By` header to hide server technology from network scanners.
+- **DMCA Safe Harbor Compliance (17 U.S.C. § 512)**: Embedded full copyright notice and designated agent takedown procedure (`dmca@bigsuustreams.com`) establishing that BigSuuStreams is a non-hosting indexing portal.
+- **Nominative Fair Use Trademark Disclaimer**: Express legal notice of non-affiliation with the National Basketball Association (NBA) and member franchises pursuant to 15 U.S.C. § 1125.
+- **Terms of Service & Privacy Policy**: Added full limitation of liability, "AS IS" warranty disclaimers, and zero-PII privacy protections.
+
 ---
 
 ## 🔒 Safe 3-Step Workflow for Future Updates

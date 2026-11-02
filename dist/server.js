@@ -926,13 +926,82 @@ async function getGameHighlights(awayTeam, homeTeam, gameDate) {
   return null;
 }
 
+// src/server/securityMiddleware.ts
+var rateLimitMap = /* @__PURE__ */ new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of rateLimitMap.entries()) {
+    if (now > record.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 3e5);
+function createRateLimiter(options) {
+  const { windowMs, max, message = "Too many requests. Please try again shortly." } = options;
+  return (req, res, next) => {
+    const rawIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+    const clientIp = Array.isArray(rawIp) ? rawIp[0] : String(rawIp).split(",")[0].trim();
+    const key = `${req.baseUrl || req.path}:${clientIp}`;
+    const now = Date.now();
+    let record = rateLimitMap.get(key);
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + windowMs };
+      rateLimitMap.set(key, record);
+      return next();
+    }
+    record.count += 1;
+    if (record.count > max) {
+      const retryAfterSec = Math.ceil((record.resetTime - now) / 1e3);
+      res.setHeader("Retry-After", retryAfterSec);
+      return res.status(429).json({
+        error: message,
+        retryAfter: retryAfterSec
+      });
+    }
+    next();
+  };
+}
+function applySecurityHeaders(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+}
+
 // server.js
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
 var app = express();
 var PORT = process.env.PORT || 3e3;
+var SITE_PASSCODE = process.env.SITE_PASSCODE || "lebronisthegoat";
+app.disable("x-powered-by");
+app.use(applySecurityHeaders);
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
+var siteAuthLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1e3,
+  // 10 minutes
+  max: 10,
+  message: "Too many passcode attempts. Access temporarily paused for security."
+});
+var apiLimiter = createRateLimiter({
+  windowMs: 60 * 1e3,
+  // 1 minute
+  max: 120,
+  message: "High request volume detected. Please try again in a moment."
+});
+app.use("/api", apiLimiter);
+app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
+  const { password } = req.body || {};
+  if (typeof password === "string" && password.trim().toLowerCase() === SITE_PASSCODE) {
+    const token = Buffer.from(`bigsuu_${Date.now()}_lebronisthegoat`).toString("base64");
+    return res.json({ success: true, token });
+  }
+  return res.status(401).json({ error: "Incorrect passcode. Access denied." });
+});
 app.get("/api/basketball/scoreboard", async (req, res) => {
   try {
     const dateStr = req.query.date ? String(req.query.date) : void 0;

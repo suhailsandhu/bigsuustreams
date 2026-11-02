@@ -7,15 +7,49 @@ import { getBasketballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream
 import { getScoreboard, getGameSummary, getStandings } from './src/server/scoreboardService.ts';
 import { analytics } from './src/server/analyticsService.ts';
 import { getGameHighlights } from './src/server/highlightsService.ts';
+import { applySecurityHeaders, createRateLimiter } from './src/server/securityMiddleware.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SITE_PASSCODE = process.env.SITE_PASSCODE || 'lebronisthegoat';
+
+// Disable Express fingerprinting header
+app.disable('x-powered-by');
+
+// Enforce modern HTTP security headers (XSS, Framing, HSTS, Sniffing)
+app.use(applySecurityHeaders);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+
+// Cybersecurity Rate Limiters: protect against brute force and DDoS
+const siteAuthLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10,
+  message: 'Too many passcode attempts. Access temporarily paused for security.'
+});
+
+const apiLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,
+  message: 'High request volume detected. Please try again in a moment.'
+});
+
+// Apply general rate limiter across API
+app.use('/api', apiLimiter);
+
+// 0. Site-Wide Access Gate Passcode Verification
+app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
+  const { password } = req.body || {};
+  if (typeof password === 'string' && password.trim().toLowerCase() === SITE_PASSCODE) {
+    const token = Buffer.from(`bigsuu_${Date.now()}_lebronisthegoat`).toString('base64');
+    return res.json({ success: true, token });
+  }
+  return res.status(401).json({ error: 'Incorrect passcode. Access denied.' });
+});
 
 // 1. Scoreboard (ESPN Real-time Scores, Leaders & Stream Availability)
 app.get('/api/basketball/scoreboard', async (req, res) => {
