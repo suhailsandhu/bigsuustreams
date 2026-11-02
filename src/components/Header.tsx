@@ -1,4 +1,5 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { NflLogo } from './NflLogo';
 
 interface HeaderProps {
@@ -56,12 +57,14 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Switch Sport Button Right Under Logo */}
+        {/* Switch Sport Button: Two arrows circling each other */}
         <button
           onClick={onToggleSport}
-          className="mt-2.5 inline-flex items-center space-x-1.5 px-4 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200/90 text-gray-800 text-xs sm:text-sm font-bold border border-gray-200/80 shadow-2xs transition active:scale-95 cursor-pointer"
+          className="mt-2 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-black border border-gray-200 shadow-2xs transition-all duration-300 active:scale-90 hover:rotate-180 cursor-pointer"
+          title={`Switch to ${currentSport === 'nba' ? 'NFL' : 'NBA'} Streams`}
+          aria-label="Switch Sport"
         >
-          <span>{currentSport === 'nba' ? 'Go to NFL Streams 🏈' : 'Go to NBA Streams 🏀'}</span>
+          <RefreshCw className="w-4 h-4 text-gray-700 hover:text-black transition-colors" />
         </button>
 
       </div>

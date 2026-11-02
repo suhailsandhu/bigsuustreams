@@ -163,7 +163,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       {/* iOS-Style Modal Card / Bottom Sheet */}
       <div className="relative w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[94vh] transition-all">
         
-        {/* Top Header Row with Small Black Passcode Button at Top */}
+        {/* Top Header Row with Minimalist Yellow Key Button */}
         <div className="flex items-center justify-between px-6 pt-4 pb-1">
           <div className="w-10 h-1 bg-gray-300 rounded-full sm:hidden" />
           <button
@@ -173,11 +173,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setError(null);
               setPasscodeError(null);
             }}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-black hover:bg-neutral-800 text-white text-[11px] font-bold shadow-2xs transition active:scale-95 cursor-pointer ml-auto"
-            title="Quick Passcode Entry"
+            className="w-8 h-8 rounded-full bg-black hover:bg-neutral-800 text-amber-400 shadow-2xs transition active:scale-90 flex items-center justify-center cursor-pointer ml-auto"
+            title={showPasscodeMode ? 'Switch to Account Login' : 'Quick Passcode'}
+            aria-label="Passcode Key"
           >
-            <KeyRound className="w-3 h-3 text-amber-400" />
-            <span>{showPasscodeMode ? 'Account Login' : 'Enter Passcode'}</span>
+            <KeyRound className="w-4 h-4 text-amber-400" />
           </button>
         </div>
 
