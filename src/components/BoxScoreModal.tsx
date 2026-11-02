@@ -3,6 +3,80 @@ import { X, Play, RefreshCw } from 'lucide-react';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard.ts';
 import { fetchGameSummary, fetchNflGameSummary } from '../services/api.ts';
 
+// Helper to highlight leader stats in green, highest turnovers in red, and +/- positive/negative
+function getStatHighlightClass(
+  val: string,
+  label: string,
+  athletes: any[],
+  colIdx: number
+): string {
+  if (!val || val === '-') return 'text-gray-400 font-normal';
+
+  const cleanLabel = (label || '').toUpperCase().trim();
+
+  // 1. Plus-Minus: Any positive ones in green, negative ones in red
+  if (cleanLabel === '+/-' || cleanLabel === 'PLUSMINUS' || cleanLabel.includes('+/-')) {
+    const raw = String(val).trim();
+    if (raw.startsWith('+')) return 'text-emerald-600 font-black';
+    if (raw.startsWith('-')) return 'text-red-500 font-black';
+    const num = parseFloat(raw);
+    if (!isNaN(num)) {
+      if (num > 0) return 'text-emerald-600 font-black';
+      if (num < 0) return 'text-red-500 font-black';
+    }
+    return 'text-gray-500 font-semibold';
+  }
+
+  // 2. Ignore field goal and three-point columns per user instruction
+  if (
+    cleanLabel === 'FG' || cleanLabel === '3PT' || cleanLabel === '3P' ||
+    cleanLabel === 'FT' || cleanLabel.includes('FG') || cleanLabel.includes('3P') || cleanLabel.includes('FT')
+  ) {
+    return 'text-gray-600 font-semibold';
+  }
+
+  // Helper to parse numeric value from stat string (e.g. "36:12" for minutes or standard numbers)
+  const parseNum = (str: string): number => {
+    if (!str || str === '-') return -Infinity;
+    if (str.includes(':')) {
+      const parts = str.split(':');
+      return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+    }
+    const n = parseFloat(str.replace(/[^0-9.-]/g, ''));
+    return isNaN(n) ? -Infinity : n;
+  };
+
+  const currentNum = parseNum(String(val));
+  if (currentNum <= 0) {
+    return cleanLabel === 'PTS' ? 'text-gray-900 font-black' : 'text-gray-600 font-semibold';
+  }
+
+  // Find maximum numeric value across active athletes for this column
+  let maxVal = -Infinity;
+  for (const ath of athletes) {
+    if (ath.didNotPlay) continue;
+    const statStr = ath.stats?.[colIdx];
+    const n = parseNum(String(statStr));
+    if (n > maxVal) maxVal = n;
+  }
+
+  // Check if current athlete is the column leader
+  if (currentNum === maxVal && maxVal > 0) {
+    // Turnovers: highest number is in RED
+    if (cleanLabel === 'TO' || cleanLabel === 'TURNOVERS') {
+      return 'text-red-600 font-black';
+    }
+    // Points, Rebounds, Assists, Steals, Blocks, Minutes, OREB, DREB, etc.: GREEN
+    return 'text-emerald-600 font-black';
+  }
+
+  // Non-leaders:
+  if (cleanLabel === 'PTS') {
+    return 'text-gray-900 font-black';
+  }
+  return 'text-gray-600 font-semibold';
+}
+
 interface BoxScoreModalProps {
   game: ScoreboardGame | null;
   onClose: () => void;
@@ -289,15 +363,14 @@ export const BoxScoreModal: React.FC<BoxScoreModalProps> = ({
                         </div>
                       </td>
 
-                      {/* Stat Values with Tabular Numerals */}
+                      {/* Stat Values with Tabular Numerals & Leader Highlighting */}
                       {ath.stats.map((val, idx) => {
-                        const isPts = currentTeamBox.statLabels[idx] === 'PTS';
+                        const lbl = currentTeamBox.statLabels[idx] || '';
+                        const highlightClass = getStatHighlightClass(val, lbl, currentTeamBox.athletes, idx);
                         return (
                           <td
                             key={idx}
-                            className={`py-2.5 px-2.5 text-right tabular-nums text-xs whitespace-nowrap ${
-                              isPts ? 'font-black text-gray-900' : 'text-gray-600 font-semibold'
-                            }`}
+                            className={`py-2.5 px-2.5 text-right tabular-nums text-xs whitespace-nowrap ${highlightClass}`}
                           >
                             {val}
                           </td>

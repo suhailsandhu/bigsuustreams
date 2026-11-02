@@ -45,10 +45,13 @@ async function getBasketballStreams(forceRefresh = false) {
     const { res } = await fetchWithFallback("/api/v1/streams?category=basketball");
     const data = await res.json();
     const streams = (data.streams || []).filter((s) => s.category?.toLowerCase() === "basketball");
+    const filter540 = (sources) => (sources || []).filter((s) => !s.quality?.toLowerCase().includes("540"));
     const processedStreams = streams.map((s) => {
       const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
       return {
         ...s,
+        sources: filter540(s.sources),
+        live_sources: filter540(s.live_sources),
         is_live: isLive,
         status: isLive ? "live" : s.match_timestamp * 1e3 > Date.now() ? "upcoming" : "ended"
       };
@@ -89,11 +92,14 @@ async function getFootballStreams(forceRefresh = false) {
     const streams = (data.streams || []).filter(
       (s) => s.category?.toLowerCase() === "football" || s.league?.toUpperCase() === "NFL"
     );
+    const filter540 = (sources) => (sources || []).filter((s) => !s.quality?.toLowerCase().includes("540"));
     const processedStreams = streams.map((s) => {
       const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
       return {
         ...s,
         league: "NFL",
+        sources: filter540(s.sources),
+        live_sources: filter540(s.live_sources),
         is_live: isLive,
         status: isLive ? "live" : s.match_timestamp * 1e3 > Date.now() ? "upcoming" : "ended"
       };
@@ -127,16 +133,46 @@ async function getStreamByKey(streamKey) {
   if (cached && now - cached.time < CACHE_TTL_SOURCES_MS) {
     return cached.data;
   }
-  const { res } = await fetchWithFallback(`/api/v1/streams/${encodeURIComponent(streamKey)}`);
-  const data = await res.json();
-  const isLive = Array.isArray(data.live_sources) && data.live_sources.length > 0;
-  const processed = {
-    ...data,
-    is_live: isLive,
-    status: isLive ? "live" : data.match_timestamp * 1e3 > Date.now() ? "upcoming" : "ended"
-  };
-  cache.singleStream.set(streamKey, { data: processed, time: now });
-  return processed;
+  try {
+    const { res } = await fetchWithFallback(`/api/v1/streams/${encodeURIComponent(streamKey)}`);
+    const data = await res.json();
+    const isLive = Array.isArray(data.live_sources) && data.live_sources.length > 0;
+    const filter540 = (sources) => (sources || []).filter((s) => !s.quality?.toLowerCase().includes("540"));
+    const processed = {
+      ...data,
+      sources: filter540(data.sources),
+      live_sources: filter540(data.live_sources),
+      is_live: isLive,
+      status: isLive ? "live" : data.match_timestamp * 1e3 > Date.now() ? "upcoming" : "ended"
+    };
+    cache.singleStream.set(streamKey, { data: processed, time: now });
+    return processed;
+  } catch {
+    const parts = streamKey.split("-vs-");
+    const team1Name = parts[0]?.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) || "Away Team";
+    const team2Name = parts[1]?.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) || "Home Team";
+    const fallback = {
+      id: streamKey,
+      name: `${team1Name} vs ${team2Name}`,
+      category: "basketball",
+      league: "NBA",
+      stream_key: streamKey,
+      match_timestamp: Math.floor(Date.now() / 1e3) + 3600,
+      viewers: 0,
+      is_external: false,
+      thumbnail_url: "",
+      sources: [
+        { quality: "1080p", url: `/api/basketball/hls/${streamKey}/1080p.m3u8` },
+        { quality: "720p", url: `/api/basketball/hls/${streamKey}/720p.m3u8` }
+      ],
+      live_sources: [],
+      team1: { name: team1Name, logo: "" },
+      team2: { name: team2Name, logo: "" },
+      is_live: false,
+      status: "upcoming"
+    };
+    return fallback;
+  }
 }
 async function getSourcesByKey(streamKey) {
   const now = Date.now();
@@ -169,7 +205,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
   let tokens = {};
   for (const mirror of mirrors) {
     try {
-      const candidateQualities = [quality, "1080p", "540p", "720p"];
+      const candidateQualities = [quality, "1080p", "720p", "2160p"];
       for (const q of candidateQualities) {
         const u = `${mirror}/embed/basketball/${streamKey}${q}`;
         const res = await fetch(u);
@@ -191,10 +227,10 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
   if (!embedRes || Object.keys(tokens).length === 0) {
     throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
   }
-  const availableQualities = Object.keys(tokens);
+  const availableQualities = Object.keys(tokens).filter((q) => !q.toLowerCase().includes("540"));
   let selectedQuality = quality;
   if (!tokens[selectedQuality]) {
-    selectedQuality = tokens["1080p"] ? "1080p" : tokens["720p"] ? "720p" : availableQualities[0];
+    selectedQuality = tokens["1080p"] ? "1080p" : tokens["720p"] ? "720p" : tokens["2160p"] ? "2160p" : availableQualities[0];
   }
   let keyData = {};
   for (const mirror of [successfulMirror, ...mirrors.filter((m) => m !== successfulMirror)]) {
@@ -323,6 +359,9 @@ var summaryCache = /* @__PURE__ */ new Map();
 var standingsCache = null;
 function normalizeName(str) {
   return (str || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function slugify(str) {
+  return (str || "").toLowerCase().trim().replace(/['’.]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 var leadersCache = /* @__PURE__ */ new Map();
 async function fetchGameLeadersForCard(eventId, isLiveOrPost, awayAbbr, homeAbbr) {
@@ -537,18 +576,37 @@ async function getScoreboard(dateStr) {
     const rawState = statusType.state || "pre";
     const isLive = rawState === "in" || isStreamLive && rawState !== "post";
     const state = isLive && rawState !== "post" ? "in" : rawState;
-    const streamInfo = matchedStream ? {
+    const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
+    const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
+    const streamInfo = {
       available: true,
       isLive: isStreamLive,
-      streamKey: matchedStream.stream_key,
-      qualities: ["1080p", "720p", "540p", "2160p"],
-      viewers: matchedStream.viewers || 0,
-      streamData: matchedStream
-    } : {
-      available: false,
-      isLive: false,
-      qualities: [],
-      viewers: 0
+      streamKey: effectiveStreamKey,
+      qualities: ["1080p", "720p", "2160p"],
+      viewers: matchedStream?.viewers || 0,
+      streamData: matchedStream || {
+        id: effectiveStreamKey,
+        name: `${awayTeam.displayName} at ${homeTeam.displayName}`,
+        category: "basketball",
+        league: "NBA",
+        stream_key: effectiveStreamKey,
+        match_timestamp: Math.floor(new Date(event.date).getTime() / 1e3),
+        viewers: 0,
+        is_external: false,
+        thumbnail_url: "",
+        sources: [
+          { quality: "1080p", url: `/api/basketball/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: "720p", url: `/api/basketball/hls/${effectiveStreamKey}/720p.m3u8` }
+        ],
+        live_sources: isStreamLive ? [
+          { quality: "1080p", url: `/api/basketball/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: "720p", url: `/api/basketball/hls/${effectiveStreamKey}/720p.m3u8` }
+        ] : [],
+        team1: { name: awayTeam.displayName, logo: awayTeam.logo },
+        team2: { name: homeTeam.displayName, logo: homeTeam.logo },
+        is_live: isStreamLive,
+        status: isLive ? "live" : state === "post" ? "ended" : "upcoming"
+      }
     };
     let displayDetail = statusType.detail || statusType.description || "";
     if (isLive) {
@@ -843,18 +901,37 @@ async function getNflScoreboard(dateStr) {
         displayDetail = statusType.shortDetail || "Upcoming";
       }
     }
-    const streamInfo = matchedStream ? {
+    const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
+    const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
+    const streamInfo = {
       available: true,
       isLive: isStreamLive,
-      streamKey: matchedStream.stream_key,
-      qualities: ["1080p", "720p", "540p", "2160p"],
-      viewers: matchedStream.viewers || 0,
-      streamData: matchedStream
-    } : {
-      available: false,
-      isLive: false,
-      qualities: [],
-      viewers: 0
+      streamKey: effectiveStreamKey,
+      qualities: ["1080p", "720p", "2160p"],
+      viewers: matchedStream?.viewers || 0,
+      streamData: matchedStream || {
+        id: effectiveStreamKey,
+        name: `${awayTeam.displayName} at ${homeTeam.displayName}`,
+        category: "football",
+        league: "NFL",
+        stream_key: effectiveStreamKey,
+        match_timestamp: Math.floor(new Date(event.date).getTime() / 1e3),
+        viewers: 0,
+        is_external: false,
+        thumbnail_url: "",
+        sources: [
+          { quality: "1080p", url: `/api/football/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: "720p", url: `/api/football/hls/${effectiveStreamKey}/720p.m3u8` }
+        ],
+        live_sources: isStreamLive ? [
+          { quality: "1080p", url: `/api/football/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: "720p", url: `/api/football/hls/${effectiveStreamKey}/720p.m3u8` }
+        ] : [],
+        team1: { name: awayTeam.displayName, logo: awayTeam.logo },
+        team2: { name: homeTeam.displayName, logo: homeTeam.logo },
+        is_live: isStreamLive,
+        status: isLive ? "live" : state === "post" ? "ended" : "upcoming"
+      }
     };
     return {
       id: event.id,
@@ -2092,6 +2169,19 @@ app.use((req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   res.sendFile(path3.join(distPath, "index.html"));
 });
+async function runAutoSync() {
+  try {
+    await Promise.allSettled([
+      getBasketballStreams(true),
+      getFootballStreams(true),
+      getScoreboard(),
+      getNflScoreboard()
+    ]);
+  } catch {
+  }
+}
+runAutoSync();
+setInterval(runAutoSync, 45e3);
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);
 });

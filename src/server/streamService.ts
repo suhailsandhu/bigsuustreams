@@ -58,11 +58,16 @@ export async function getBasketballStreams(forceRefresh = false): Promise<Stream
     // Filter strictly to basketball if any mixed results exist
     const streams: any[] = (data.streams || []).filter((s: any) => s.category?.toLowerCase() === 'basketball');
     
+    // Helper to purge 540p feeds per user instruction
+    const filter540 = (sources: any[]) => (sources || []).filter((s: any) => !s.quality?.toLowerCase().includes('540'));
+
     // Add computed live status flag
     const processedStreams: Stream[] = streams.map((s) => {
       const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
       return {
         ...s,
+        sources: filter540(s.sources),
+        live_sources: filter540(s.live_sources),
         is_live: isLive,
         status: isLive ? 'live' : (s.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
       };
@@ -113,11 +118,15 @@ export async function getFootballStreams(forceRefresh = false): Promise<StreamsR
       s.category?.toLowerCase() === 'football' || s.league?.toUpperCase() === 'NFL'
     );
     
+    const filter540 = (sources: any[]) => (sources || []).filter((s: any) => !s.quality?.toLowerCase().includes('540'));
+
     const processedStreams: Stream[] = streams.map((s) => {
       const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
       return {
         ...s,
         league: 'NFL',
+        sources: filter540(s.sources),
+        live_sources: filter540(s.live_sources),
         is_live: isLive,
         status: isLive ? 'live' : (s.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
       };
@@ -156,17 +165,48 @@ export async function getStreamByKey(streamKey: string): Promise<Stream> {
     return cached.data;
   }
 
-  const { res } = await fetchWithFallback(`/api/v1/streams/${encodeURIComponent(streamKey)}`);
-  const data: any = await res.json();
-  const isLive = Array.isArray(data.live_sources) && data.live_sources.length > 0;
-  const processed: Stream = {
-    ...data,
-    is_live: isLive,
-    status: isLive ? 'live' : (data.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
-  };
+  try {
+    const { res } = await fetchWithFallback(`/api/v1/streams/${encodeURIComponent(streamKey)}`);
+    const data: any = await res.json();
+    const isLive = Array.isArray(data.live_sources) && data.live_sources.length > 0;
+    const filter540 = (sources: any[]) => (sources || []).filter((s: any) => !s.quality?.toLowerCase().includes('540'));
+    const processed: Stream = {
+      ...data,
+      sources: filter540(data.sources),
+      live_sources: filter540(data.live_sources),
+      is_live: isLive,
+      status: isLive ? 'live' : (data.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
+    };
 
-  cache.singleStream.set(streamKey, { data: processed, time: now });
-  return processed;
+    cache.singleStream.set(streamKey, { data: processed, time: now });
+    return processed;
+  } catch {
+    // If upstream has not yet posted upcoming stream, synthesize an authorized upcoming stream object
+    const parts = streamKey.split('-vs-');
+    const team1Name = parts[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Away Team';
+    const team2Name = parts[1]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Home Team';
+    const fallback: Stream = {
+      id: streamKey,
+      name: `${team1Name} vs ${team2Name}`,
+      category: 'basketball',
+      league: 'NBA',
+      stream_key: streamKey,
+      match_timestamp: Math.floor(Date.now() / 1000) + 3600,
+      viewers: 0,
+      is_external: false,
+      thumbnail_url: '',
+      sources: [
+        { quality: '1080p', url: `/api/basketball/hls/${streamKey}/1080p.m3u8` },
+        { quality: '720p', url: `/api/basketball/hls/${streamKey}/720p.m3u8` }
+      ],
+      live_sources: [],
+      team1: { name: team1Name, logo: '' },
+      team2: { name: team2Name, logo: '' },
+      is_live: false,
+      status: 'upcoming'
+    };
+    return fallback;
+  }
 }
 
 export async function getSourcesByKey(streamKey: string): Promise<any> {
@@ -226,7 +266,7 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
 
   for (const mirror of mirrors) {
     try {
-      const candidateQualities = [quality, '1080p', '540p', '720p'];
+      const candidateQualities = [quality, '1080p', '720p', '2160p'];
       for (const q of candidateQualities) {
         const u = `${mirror}/embed/basketball/${streamKey}${q}`;
         const res = await fetch(u);
@@ -251,10 +291,11 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
   }
 
-  const availableQualities = Object.keys(tokens);
+  // Filter out 540p from available qualities
+  const availableQualities = Object.keys(tokens).filter(q => !q.toLowerCase().includes('540'));
   let selectedQuality = quality;
   if (!tokens[selectedQuality]) {
-    selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : availableQualities[0]);
+    selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : (tokens['2160p'] ? '2160p' : availableQualities[0]));
   }
 
   // 2. Query stream key metadata for server name

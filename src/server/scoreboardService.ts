@@ -19,6 +19,15 @@ function normalizeName(str: string): string {
   return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function slugify(str: string): string {
+  return (str || '')
+    .toLowerCase()
+    .trim()
+    .replace(/['’.]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export { getTodayDateString };
 
 // Quick cache for game leaders from summary
@@ -279,18 +288,38 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
     const isLive = rawState === 'in' || (isStreamLive && (rawState as string) !== 'post');
     const state: 'pre' | 'in' | 'post' = (isLive && (rawState as string) !== 'post') ? 'in' : rawState;
 
-    const streamInfo = matchedStream ? {
+    const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
+    const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
+
+    const streamInfo = {
       available: true,
       isLive: isStreamLive,
-      streamKey: matchedStream.stream_key,
-      qualities: ['1080p', '720p', '540p', '2160p'],
-      viewers: matchedStream.viewers || 0,
-      streamData: matchedStream
-    } : {
-      available: false,
-      isLive: false,
-      qualities: [],
-      viewers: 0
+      streamKey: effectiveStreamKey,
+      qualities: ['1080p', '720p', '2160p'],
+      viewers: matchedStream?.viewers || 0,
+      streamData: matchedStream || {
+        id: effectiveStreamKey,
+        name: `${awayTeam.displayName} at ${homeTeam.displayName}`,
+        category: 'basketball',
+        league: 'NBA',
+        stream_key: effectiveStreamKey,
+        match_timestamp: Math.floor(new Date(event.date).getTime() / 1000),
+        viewers: 0,
+        is_external: false,
+        thumbnail_url: '',
+        sources: [
+          { quality: '1080p', url: `/api/basketball/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: '720p', url: `/api/basketball/hls/${effectiveStreamKey}/720p.m3u8` }
+        ],
+        live_sources: isStreamLive ? [
+          { quality: '1080p', url: `/api/basketball/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: '720p', url: `/api/basketball/hls/${effectiveStreamKey}/720p.m3u8` }
+        ] : [],
+        team1: { name: awayTeam.displayName, logo: awayTeam.logo },
+        team2: { name: homeTeam.displayName, logo: homeTeam.logo },
+        is_live: isStreamLive,
+        status: isLive ? 'live' : (state === 'post' ? 'ended' : 'upcoming')
+      }
     };
 
     // Format tipoff time for center display (US Eastern fallback if server is UTC)
@@ -641,18 +670,38 @@ export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResp
       }
     }
 
-    const streamInfo = matchedStream ? {
+    const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
+    const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
+
+    const streamInfo = {
       available: true,
       isLive: isStreamLive,
-      streamKey: matchedStream.stream_key,
-      qualities: ['1080p', '720p', '540p', '2160p'],
-      viewers: matchedStream.viewers || 0,
-      streamData: matchedStream
-    } : {
-      available: false,
-      isLive: false,
-      qualities: [],
-      viewers: 0
+      streamKey: effectiveStreamKey,
+      qualities: ['1080p', '720p', '2160p'],
+      viewers: matchedStream?.viewers || 0,
+      streamData: matchedStream || {
+        id: effectiveStreamKey,
+        name: `${awayTeam.displayName} at ${homeTeam.displayName}`,
+        category: 'football',
+        league: 'NFL',
+        stream_key: effectiveStreamKey,
+        match_timestamp: Math.floor(new Date(event.date).getTime() / 1000),
+        viewers: 0,
+        is_external: false,
+        thumbnail_url: '',
+        sources: [
+          { quality: '1080p', url: `/api/football/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: '720p', url: `/api/football/hls/${effectiveStreamKey}/720p.m3u8` }
+        ],
+        live_sources: isStreamLive ? [
+          { quality: '1080p', url: `/api/football/hls/${effectiveStreamKey}/1080p.m3u8` },
+          { quality: '720p', url: `/api/football/hls/${effectiveStreamKey}/720p.m3u8` }
+        ] : [],
+        team1: { name: awayTeam.displayName, logo: awayTeam.logo },
+        team2: { name: homeTeam.displayName, logo: homeTeam.logo },
+        is_live: isStreamLive,
+        status: isLive ? 'live' : (state === 'post' ? 'ended' : 'upcoming')
+      }
     };
 
     return {

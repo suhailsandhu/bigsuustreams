@@ -546,6 +546,29 @@ app.use((req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+// ============================================================================
+// Automated Background Stream Pre-Warm & Sync Engine
+// Automatically polls upstream streams, syncs tomorrow's games, and pre-warms cache
+// ============================================================================
+async function runAutoSync() {
+  try {
+    await Promise.allSettled([
+      getBasketballStreams(true),
+      getFootballStreams(true),
+      getScoreboard(),
+      getNflScoreboard()
+    ]);
+  } catch {
+    // silent catch
+  }
+}
+
+// Initial sync on boot
+runAutoSync();
+
+// Continuous automatic sync every 45 seconds so all upcoming games are ready without manual intervention
+setInterval(runAutoSync, 45000);
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);
 });

@@ -163,7 +163,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       {/* iOS-Style Modal Card / Bottom Sheet */}
       <div className="relative w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[94vh] transition-all">
         
-        {/* Top Header Row with Minimalist Yellow Key Button */}
+        {/* Top Header Row with Minimalist Yellow Key Outline Button */}
         <div className="flex items-center justify-between px-6 pt-4 pb-1">
           <div className="w-10 h-1 bg-gray-300 rounded-full sm:hidden" />
           <button
@@ -173,11 +173,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setError(null);
               setPasscodeError(null);
             }}
-            className="w-8 h-8 rounded-full bg-black hover:bg-neutral-800 text-amber-400 shadow-2xs transition active:scale-90 flex items-center justify-center cursor-pointer ml-auto"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-transparent hover:bg-amber-50/50 border border-amber-400 hover:border-amber-500 text-amber-500 transition active:scale-90 flex items-center justify-center cursor-pointer ml-auto"
             title={showPasscodeMode ? 'Switch to Account Login' : 'Quick Passcode'}
             aria-label="Passcode Key"
           >
-            <KeyRound className="w-4 h-4 text-amber-400" />
+            <KeyRound className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 stroke-[2.2]" />
           </button>
         </div>
 
@@ -191,13 +191,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               className="h-16 sm:h-20 w-auto object-contain rounded-2xl filter drop-shadow-md mb-2 transition transform hover:scale-105"
             />
             <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight text-center">
-              {showPasscodeMode ? 'Quick Access' : mode === 'login' ? 'Welcome Back' : 'Create an Account'}
+              {showPasscodeMode ? 'Quick Access' : mode === 'login' ? 'Welcome' : 'Create an Account'}
             </h2>
             <p className="text-xs text-gray-400 font-medium text-center mt-1 max-w-xs">
               {showPasscodeMode
                 ? 'Enter authorized access passcode.'
                 : mode === 'login'
-                ? 'Sign in to access live 4K feeds, box scores, and multi-angle streams.'
+                ? 'Sign in to access live NBA and NFL streams.'
                 : 'Join BSS for unlimited free sports streaming.'}
             </p>
           </div>

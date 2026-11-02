@@ -112,8 +112,25 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const [showControls, setShowControls] = useState(false);
   const controlsTimeoutRef = useRef<any>(null);
 
-  // Available qualities in requested order: 540p, 720p, 1080p, 2160p
-  const availableQualities = ['540p', '720p', '1080p', '2160p'];
+  // Available qualities: 720p, 1080p, and 2160p (540p removed per user request)
+  const availableQualities = React.useMemo(() => {
+    const raw = stream.sources?.map((s) => s.quality) || [];
+    const normalized = raw
+      .map((q) => {
+        const lower = q.toLowerCase();
+        if (lower.includes('4k') || lower.includes('2160')) return '2160p';
+        if (lower.includes('1080') || lower.includes('fhd')) return '1080p';
+        if (lower.includes('720') || lower.includes('hd')) return '720p';
+        return q;
+      })
+      .filter((q) => !q.includes('540') && (q === '720p' || q === '1080p' || q === '2160p'));
+    const unique = Array.from(new Set(normalized));
+    if (unique.length > 0) {
+      const order = ['720p', '1080p', '2160p'];
+      return order.filter((o) => unique.includes(o));
+    }
+    return ['720p', '1080p'];
+  }, [stream.sources]);
 
   // Autohide controls on inactivity
   const handleMouseMove = () => {
@@ -144,12 +161,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     watchdogTimerRef.current = setTimeout(() => {
       if (video.paused && video.readyState < 2) {
         console.warn('Playback watchdog timeout fired for', stream.stream_key, selectedQuality);
-        if (selectedQuality === '1080p') {
+        if (selectedQuality === '1080p' && availableQualities.includes('720p')) {
           console.log('Watchdog attempting quality fallback to 720p...');
           onQualityChange('720p');
-        } else if (selectedQuality === '720p') {
-          console.log('Watchdog attempting quality fallback to 540p...');
-          onQualityChange('540p');
         } else {
           setIsLoading(false);
           setHasError(true);
