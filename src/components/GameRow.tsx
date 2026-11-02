@@ -58,64 +58,64 @@ export const GameRow: React.FC<GameRowProps> = ({
   return (
     <div
       onClick={handleRowClick}
-      className={`group relative overflow-hidden rounded-2xl bg-white border border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300 transition-all p-3.5 sm:p-5 select-none cursor-pointer ${
+      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white border border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300 transition-all p-2.5 sm:p-3.5 select-none cursor-pointer ${
         isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
       }`}
     >
       {/* Teams & Score / Matchup Row */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-6">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-4">
         
         {/* AWAY TEAM (Left Column) */}
         <div className="flex flex-col items-center text-center min-w-0">
-          {/* Pure Logo - Noticeably Bigger, No Gray Border / Box */}
-          <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+          {/* Pure Logo - Balanced & Crisp, No Gray Border */}
+          <div className="w-11 h-11 sm:w-13 sm:h-13 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
             {away.logo ? (
               <img
                 src={away.logo}
                 alt={away.displayName}
-                className="w-full h-full object-contain filter drop-shadow-sm"
+                className="w-full h-full object-contain filter drop-shadow-xs"
                 loading="lazy"
               />
             ) : (
-              <Trophy className="w-10 h-10 text-gray-400" />
+              <Trophy className="w-8 h-8 text-gray-400" />
             )}
           </div>
 
           {/* 1. Team Name Under Logo */}
-          <div className="text-xs sm:text-base font-extrabold text-gray-900 leading-tight truncate mt-1.5 max-w-full">
+          <div className="text-xs sm:text-sm font-extrabold text-gray-900 leading-tight truncate mt-1 max-w-full">
             {away.name || away.displayName}
           </div>
 
           {/* 2. Record Under Team Name */}
           {away.record && (
-            <div className="text-[10px] sm:text-xs text-gray-400 font-medium mt-0.5">
+            <div className="text-[10px] sm:text-[11px] text-gray-400 font-medium leading-none mt-0.5">
               {away.record}
             </div>
           )}
 
           {/* 3. AWAY Under Record */}
-          <div className="mt-1">
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+          <div className="mt-0.5">
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded leading-none">
               AWAY
             </span>
           </div>
         </div>
 
         {/* CENTER COLUMN (Score & Game Status / Tipoff) */}
-        <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-4 text-center">
+        <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-3 text-center">
           {isUpcoming ? (
             /* Upcoming Game: Scheduled Tip-off Time (No Circle Border, No 'at' word) */
             <div className="flex flex-col items-center">
-              <div className="text-sm sm:text-base font-extrabold text-gray-800 whitespace-nowrap">
+              <div className="text-xs sm:text-sm font-extrabold text-gray-800 whitespace-nowrap">
                 {formatTipoff(game.date, game.status.detail)}
               </div>
             </div>
           ) : (
             /* Live or Completed Game: Scores & Status */
-            <div className="flex items-center space-x-2.5 sm:space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-3.5">
               {/* Away Score */}
               <span
-                className={`text-xl sm:text-3xl font-black tabular-nums min-w-[28px] text-right ${
+                className={`text-lg sm:text-2xl font-black tabular-nums min-w-[24px] text-right ${
                   isFinal && away.winner ? 'text-gray-900' : isFinal ? 'text-gray-400 font-bold' : 'text-gray-900'
                 }`}
               >
@@ -125,12 +125,12 @@ export const GameRow: React.FC<GameRowProps> = ({
               {/* Status Badge */}
               <div className="shrink-0">
                 {isLive ? (
-                  <div className="flex items-center space-x-1.5 text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                    <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                  <div className="flex items-center space-x-1 text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] font-bold whitespace-nowrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
                     <span>{game.status.shortDetail || game.status.detail || 'LIVE'}</span>
                   </div>
                 ) : (
-                  <div className="text-[10px] sm:text-xs font-black text-gray-400 uppercase tracking-wider bg-gray-50 border border-gray-200/70 px-2 sm:px-2.5 py-0.5 rounded-full">
+                  <div className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-wider bg-gray-50 border border-gray-200/70 px-2 py-0.5 rounded-full">
                     FINAL
                   </div>
                 )}
@@ -138,7 +138,7 @@ export const GameRow: React.FC<GameRowProps> = ({
 
               {/* Home Score */}
               <span
-                className={`text-xl sm:text-3xl font-black tabular-nums min-w-[28px] text-left ${
+                className={`text-lg sm:text-2xl font-black tabular-nums min-w-[24px] text-left ${
                   isFinal && home.winner ? 'text-gray-900' : isFinal ? 'text-gray-400 font-bold' : 'text-gray-900'
                 }`}
               >
@@ -150,35 +150,35 @@ export const GameRow: React.FC<GameRowProps> = ({
 
         {/* HOME TEAM (Right Column) */}
         <div className="flex flex-col items-center text-center min-w-0">
-          {/* Pure Logo - Noticeably Bigger, No Gray Border / Box */}
-          <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+          {/* Pure Logo - Balanced & Crisp, No Gray Border */}
+          <div className="w-11 h-11 sm:w-13 sm:h-13 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
             {home.logo ? (
               <img
                 src={home.logo}
                 alt={home.displayName}
-                className="w-full h-full object-contain filter drop-shadow-sm"
+                className="w-full h-full object-contain filter drop-shadow-xs"
                 loading="lazy"
               />
             ) : (
-              <Trophy className="w-10 h-10 text-gray-400" />
+              <Trophy className="w-8 h-8 text-gray-400" />
             )}
           </div>
 
           {/* 1. Team Name Under Logo */}
-          <div className="text-xs sm:text-base font-extrabold text-gray-900 leading-tight truncate mt-1.5 max-w-full">
+          <div className="text-xs sm:text-sm font-extrabold text-gray-900 leading-tight truncate mt-1 max-w-full">
             {home.name || home.displayName}
           </div>
 
           {/* 2. Record Under Team Name */}
           {home.record && (
-            <div className="text-[10px] sm:text-xs text-gray-400 font-medium mt-0.5">
+            <div className="text-[10px] sm:text-[11px] text-gray-400 font-medium leading-none mt-0.5">
               {home.record}
             </div>
           )}
 
           {/* 3. HOME Under Record */}
-          <div className="mt-1">
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+          <div className="mt-0.5">
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded leading-none">
               HOME
             </span>
           </div>

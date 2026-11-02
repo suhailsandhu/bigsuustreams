@@ -38,21 +38,21 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col items-center justify-center">
         
-        {/* Noticeably Bigger Sport Logo */}
+        {/* Balanced, Clean Sport Logo */}
         <div
           onClick={onNavigateHome}
-          className="flex items-center justify-center cursor-pointer group py-1"
+          className="flex items-center justify-center cursor-pointer group py-0.5"
           title={`${currentSport === 'nba' ? 'NBA' : 'NFL'} Streams Home`}
         >
           {currentSport === 'nba' ? (
             <img
               src="/nba-logo.png"
               alt="NBA"
-              className="h-28 sm:h-36 md:h-40 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
+              className="h-16 sm:h-20 md:h-22 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
             />
           ) : (
             <div className="transition-transform group-hover:scale-105">
-              <NflLogo className="h-28 sm:h-36 md:h-40 w-auto" />
+              <NflLogo className="h-16 sm:h-20 md:h-22 w-auto" />
             </div>
           )}
         </div>
