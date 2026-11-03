@@ -177,6 +177,14 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
       if (res.ok) {
         const data = await res.json();
         setStats(data);
+        if (data.config) {
+          if (data.config.umamiWebsiteId && !umamiWebsiteId) {
+            setUmamiWebsiteId(data.config.umamiWebsiteId);
+          }
+          if (data.config.umamiHost && !umamiHost) {
+            setUmamiHost(data.config.umamiHost);
+          }
+        }
       } else if (res.status === 401) {
         setIsAuthorized(false);
         sessionStorage.removeItem('bigsuu_admin_authorized');
@@ -243,7 +251,8 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   };
 
   const handleSaveUmami = () => {
-    const success = setUmamiConfig(umamiWebsiteId, umamiHost);
+    const authPin = sessionStorage.getItem('bigsuu_admin_pin') || '2222';
+    const success = setUmamiConfig(umamiWebsiteId, umamiHost, authPin);
     if (success) {
       setUmamiSavedNotice(true);
       setTimeout(() => setUmamiSavedNotice(false), 3500);

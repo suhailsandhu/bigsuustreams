@@ -638,6 +638,32 @@ app.get('/api/analytics/stats', (req, res) => {
   res.json(analytics.getStats());
 });
 
+app.get('/api/analytics/config', (req, res) => {
+  try {
+    res.json(analytics.getConfig());
+  } catch {
+    res.json({ umamiWebsiteId: '', umamiHost: 'https://cloud.umami.is/script.js' });
+  }
+});
+
+app.post('/api/analytics/config', (req, res) => {
+  try {
+    const { pin, umamiWebsiteId, umamiHost, customGa4Id } = req.body || {};
+    const authPin = req.headers['x-admin-pin'] || pin;
+    if (authPin && !analytics.verifyPin(String(authPin))) {
+      return res.status(401).json({ error: 'Unauthorized. Invalid PIN.' });
+    }
+    const updated = analytics.updateConfig({
+      umamiWebsiteId: typeof umamiWebsiteId === 'string' ? umamiWebsiteId.trim() : undefined,
+      umamiHost: typeof umamiHost === 'string' ? umamiHost.trim() : undefined,
+      customGa4Id: typeof customGa4Id === 'string' ? customGa4Id.trim() : undefined
+    });
+    res.json({ ok: true, config: updated });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // 6. Autonomous Operations & Website Health Monitoring Endpoints
 app.get('/api/admin/health', (req, res) => {
   const pin = req.headers['x-admin-pin'] || req.query.pin;

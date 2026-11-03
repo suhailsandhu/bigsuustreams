@@ -15,6 +15,9 @@ dist-ssr
 *.exe
 cloudflared.exe
 
+# Data persistence (users, analytics state, visitors, configs)
+data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

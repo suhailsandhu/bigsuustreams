@@ -12,6 +12,8 @@ const EXCLUDED_EMAILS = [
 ].filter(Boolean);
 const DATA_DIR = path.join(process.cwd(), 'data');
 const VISITORS_FILE = path.join(DATA_DIR, 'visitors.json');
+const ANALYTICS_STATE_FILE = path.join(DATA_DIR, 'analytics_history.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'analytics_config.json');
 
 interface VisitorSession {
   lastPing: number;
@@ -87,21 +89,152 @@ class AnalyticsTracker {
   private recentActivity: ActivityEvent[] = [];
   private hourlyPageViews: number[] = new Array(24).fill(0);
   private adminPin = process.env.ADMIN_PIN || 'suhail7865';
+  private persistStateTimeout: any = null;
+  private analyticsConfig: {
+    umamiWebsiteId: string;
+    umamiHost: string;
+    customGa4Id: string;
+    updatedAt: string;
+  } = {
+    umamiWebsiteId: '',
+    umamiHost: 'https://cloud.umami.is/script.js',
+    customGa4Id: '',
+    updatedAt: new Date().toISOString()
+  };
 
   constructor() {
+    this.ensureDataDir();
     this.loadVisitorsStore();
+    this.loadAnalyticsState();
+    this.loadConfig();
 
-    // Baseline hourly curve
-    const currentHour = new Date().getHours();
-    for (let h = 0; h <= currentHour; h++) {
-      const base = h < 6 ? 1 : h < 12 ? 3 : h < 17 ? 8 : 16;
-      this.hourlyPageViews[h] = Math.max(1, Math.round(base + Math.random() * 4));
+    // Baseline hourly curve if no saved curve exists
+    if (!this.hourlyPageViews.some(v => v > 0)) {
+      const currentHour = new Date().getHours();
+      for (let h = 0; h <= currentHour; h++) {
+        const base = h < 6 ? 1 : h < 12 ? 3 : h < 17 ? 8 : 16;
+        this.hourlyPageViews[h] = Math.max(1, Math.round(base + Math.random() * 4));
+      }
     }
 
     // Cleanup inactive sessions every 30 seconds
     setInterval(() => {
       this.cleanup();
     }, 30000);
+  }
+
+  private ensureDataDir() {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private loadConfig() {
+    try {
+      if (fs.existsSync(CONFIG_FILE)) {
+        const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        this.analyticsConfig = {
+          umamiWebsiteId: parsed.umamiWebsiteId || '',
+          umamiHost: parsed.umamiHost || 'https://cloud.umami.is/script.js',
+          customGa4Id: parsed.customGa4Id || '',
+          updatedAt: parsed.updatedAt || new Date().toISOString()
+        };
+      }
+    } catch (e) {
+      console.warn('Could not read analytics config:', e);
+    }
+  }
+
+  public getConfig() {
+    return { ...this.analyticsConfig };
+  }
+
+  public updateConfig(updates: Partial<{ umamiWebsiteId: string; umamiHost: string; customGa4Id: string }>) {
+    this.ensureDataDir();
+    if (typeof updates.umamiWebsiteId === 'string') {
+      this.analyticsConfig.umamiWebsiteId = updates.umamiWebsiteId.trim();
+    }
+    if (typeof updates.umamiHost === 'string') {
+      this.analyticsConfig.umamiHost = updates.umamiHost.trim() || 'https://cloud.umami.is/script.js';
+    }
+    if (typeof updates.customGa4Id === 'string') {
+      this.analyticsConfig.customGa4Id = updates.customGa4Id.trim();
+    }
+    this.analyticsConfig.updatedAt = new Date().toISOString();
+
+    try {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.analyticsConfig, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('Could not persist analytics config:', e);
+    }
+    return this.getConfig();
+  }
+
+  private loadAnalyticsState() {
+    try {
+      if (fs.existsSync(ANALYTICS_STATE_FILE)) {
+        const raw = fs.readFileSync(ANALYTICS_STATE_FILE, 'utf-8');
+        const s = JSON.parse(raw);
+        if (s && s.todayStr === this.todayStr) {
+          if (Array.isArray(s.uniqueVisitorsToday)) {
+            this.uniqueVisitorsToday = new Set(s.uniqueVisitorsToday);
+          }
+          if (typeof s.totalPageViewsToday === 'number') {
+            this.totalPageViewsToday = s.totalPageViewsToday;
+          }
+          if (s.deviceCounts) {
+            this.deviceCounts = { ...this.deviceCounts, ...s.deviceCounts };
+          }
+          if (Array.isArray(s.deviceTagCounts)) {
+            this.deviceTagCounts = new Map(s.deviceTagCounts);
+          }
+          if (Array.isArray(s.streamStats)) {
+            this.streamStats = new Map(s.streamStats);
+          }
+          if (Array.isArray(s.recentActivity)) {
+            this.recentActivity = s.recentActivity;
+          }
+          if (Array.isArray(s.hourlyPageViews) && s.hourlyPageViews.length === 24) {
+            this.hourlyPageViews = s.hourlyPageViews;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load analytics state:', e);
+    }
+  }
+
+  public schedulePersistState() {
+    if (this.persistStateTimeout) return;
+    this.persistStateTimeout = setTimeout(() => {
+      this.persistStateTimeout = null;
+      this.persistAnalyticsState();
+    }, 2500);
+  }
+
+  private persistAnalyticsState() {
+    try {
+      this.ensureDataDir();
+      const payload = {
+        todayStr: this.todayStr,
+        totalPageViewsToday: this.totalPageViewsToday,
+        uniqueVisitorsToday: Array.from(this.uniqueVisitorsToday),
+        deviceCounts: this.deviceCounts,
+        deviceTagCounts: Array.from(this.deviceTagCounts.entries()),
+        streamStats: Array.from(this.streamStats.entries()),
+        recentActivity: this.recentActivity.slice(0, 50),
+        hourlyPageViews: this.hourlyPageViews,
+        savedAt: new Date().toISOString()
+      };
+      fs.writeFileSync(ANALYTICS_STATE_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('Could not persist analytics state:', e);
+    }
   }
 
   private loadVisitorsStore() {
@@ -272,6 +405,8 @@ class AnalyticsTracker {
       sessionDuration,
       quality
     });
+
+    this.schedulePersistState();
   }
 
   private addEvent(event: ActivityEvent) {
@@ -279,6 +414,7 @@ class AnalyticsTracker {
     if (this.recentActivity.length > 40) {
       this.recentActivity.pop();
     }
+    this.schedulePersistState();
   }
 
   public verifyPin(pin: string): boolean {
@@ -476,6 +612,7 @@ class AnalyticsTracker {
       activeSessions: activeSessionsList,
       geoDistribution: geoDistribution.length > 0 ? geoDistribution : [{ region: 'Eastern US (NY/FL)', count: 3 }, { region: 'Pacific US (CA/WA)', count: 2 }],
       trackerIntegrations,
+      config: this.getConfig(),
       avgSessionMinutes: 24.8,
       bounceRate: 11.2,
       recentActivity: this.recentActivity.slice(0, 30),

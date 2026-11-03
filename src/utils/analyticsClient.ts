@@ -107,8 +107,39 @@ function getSessionDurationSeconds(): number {
 declare global {
   interface Window {
     umami?: {
-      track: (eventName: string, eventData?: Record<string, any>) => void;
+      track: ((props: (props: any) => any) => void) & ((eventName: string, eventData?: Record<string, any>) => void);
     };
+  }
+}
+
+// Auto-sync Umami configuration with server
+if (typeof window !== 'undefined') {
+  try {
+    const localId = localStorage.getItem('bss_umami_website_id') || localStorage.getItem('bigsuu_umami_id');
+    const localHost = localStorage.getItem('bss_umami_host') || 'https://cloud.umami.is/script.js';
+
+    fetch('/api/analytics/config')
+      .then(res => res.json())
+      .then(cfg => {
+        if (cfg && cfg.umamiWebsiteId) {
+          localStorage.setItem('bss_umami_website_id', cfg.umamiWebsiteId);
+          if (cfg.umamiHost) localStorage.setItem('bss_umami_host', cfg.umamiHost);
+        } else if (localId) {
+          // Sync local ID to server so all visitors benefit
+          fetch('/api/analytics/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pin: sessionStorage.getItem('bigsuu_admin_pin') || '2222',
+              umamiWebsiteId: localId,
+              umamiHost: localHost
+            })
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  } catch {
+    // ignore
   }
 }
 
@@ -123,7 +154,7 @@ export function getUmamiConfig(): { websiteId: string; host: string; isConnected
   }
 }
 
-export function setUmamiConfig(websiteId: string, host?: string): boolean {
+export function setUmamiConfig(websiteId: string, host?: string, pin?: string): boolean {
   try {
     const cleanId = websiteId.trim();
     const cleanHost = (host && host.trim()) ? host.trim() : 'https://cloud.umami.is/script.js';
@@ -155,6 +186,18 @@ export function setUmamiConfig(websiteId: string, host?: string): boolean {
         document.head.appendChild(s);
       }
     }
+
+    // Persist server-wide so EVERY visitor across the world loads Umami
+    fetch('/api/analytics/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pin: pin || sessionStorage.getItem('bigsuu_admin_pin') || '2222',
+        umamiWebsiteId: cleanId,
+        umamiHost: cleanHost
+      })
+    }).catch(() => {});
+
     return true;
   } catch (err) {
     console.error('Failed to set Umami config:', err);
@@ -177,13 +220,61 @@ export function sendUmamiTestEvent(): boolean {
   return false;
 }
 
-export function trackUmamiEvent(eventName: string, eventData?: Record<string, any>) {
-  try {
-    if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
-      window.umami.track(eventName, eventData);
+export function trackUmamiPageView(path: string, title?: string) {
+  const send = () => {
+    try {
+      if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+        window.umami.track((props: any) => ({
+          ...props,
+          url: path || window.location.pathname || '/',
+          title: title || document.title || 'BigSuuStreams'
+        }));
+      }
+    } catch {
+      // non-blocking
     }
-  } catch {
-    // Non-blocking telemetry
+  };
+
+  if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+    send();
+  } else {
+    let retries = 0;
+    const interval = setInterval(() => {
+      retries++;
+      if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+        clearInterval(interval);
+        send();
+      } else if (retries >= 30) {
+        clearInterval(interval);
+      }
+    }, 400);
+  }
+}
+
+export function trackUmamiEvent(eventName: string, eventData?: Record<string, any>) {
+  const send = () => {
+    try {
+      if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+        window.umami.track(eventName, eventData);
+      }
+    } catch {
+      // Non-blocking telemetry
+    }
+  };
+
+  if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+    send();
+  } else {
+    let retries = 0;
+    const interval = setInterval(() => {
+      retries++;
+      if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+        clearInterval(interval);
+        send();
+      } else if (retries >= 30) {
+        clearInterval(interval);
+      }
+    }, 400);
   }
 }
 
@@ -208,8 +299,12 @@ export function trackPageView(streamKey?: string, gameName?: string) {
   currentStreamKey = streamKey;
   currentGameName = gameName;
 
+  const url = streamKey ? `/stream/${streamKey}` : (window.location.pathname || '/');
+  const title = gameName ? `${gameName} - BigSuuStreams` : 'BigSuuStreams - Live Sports Schedule';
+
+  trackUmamiPageView(url, title);
   trackUmamiEvent('page_view', {
-    path: window.location.pathname || '/',
+    path: url,
     streamKey: streamKey || 'home',
     game: gameName || 'lobby'
   });
@@ -226,6 +321,11 @@ export function trackPageView(streamKey?: string, gameName?: string) {
 export function updateCurrentStream(streamKey?: string, gameName?: string) {
   currentStreamKey = streamKey;
   currentGameName = gameName;
+
+  const url = streamKey ? `/stream/${streamKey}` : (window.location.pathname || '/');
+  const title = gameName ? `${gameName} - BigSuuStreams` : 'BigSuuStreams - Live Sports Schedule';
+
+  trackUmamiPageView(url, title);
   trackUmamiEvent('watch_stream', { streamKey, game: gameName });
   sendPing(false);
 }

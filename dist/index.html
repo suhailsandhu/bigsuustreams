@@ -31,23 +31,42 @@
     <script>
       (function() {
         try {
-          var umamiId = localStorage.getItem('bss_umami_website_id') || localStorage.getItem('bigsuu_umami_id');
-          var umamiHost = localStorage.getItem('bss_umami_host') || 'https://cloud.umami.is/script.js';
-          if (umamiId) {
+          function injectUmami(id, host) {
+            if (!id || document.querySelector('script[data-bss-umami="true"]')) return;
             var s = document.createElement('script');
             s.defer = true;
-            s.src = umamiHost;
-            s.setAttribute('data-website-id', umamiId);
+            s.src = host || 'https://cloud.umami.is/script.js';
+            s.setAttribute('data-website-id', id);
             s.setAttribute('data-auto-track', 'true');
             s.setAttribute('data-bss-umami', 'true');
             s.onerror = function() {};
             document.head.appendChild(s);
           }
+
+          var localId = localStorage.getItem('bss_umami_website_id') || localStorage.getItem('bigsuu_umami_id');
+          var localHost = localStorage.getItem('bss_umami_host') || 'https://cloud.umami.is/script.js';
+          if (localId) {
+            injectUmami(localId, localHost);
+          }
+
+          // Fetch server-wide configuration so EVERY visitor gets tracked
+          fetch('/api/analytics/config')
+            .then(function(res) { return res.json(); })
+            .then(function(cfg) {
+              if (cfg && cfg.umamiWebsiteId) {
+                try {
+                  localStorage.setItem('bss_umami_website_id', cfg.umamiWebsiteId);
+                  if (cfg.umamiHost) localStorage.setItem('bss_umami_host', cfg.umamiHost);
+                } catch(e) {}
+                injectUmami(cfg.umamiWebsiteId, cfg.umamiHost || localHost);
+              }
+            })
+            .catch(function() {});
         } catch(e) {}
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-B7kmjMwA.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DuolUfvN.css">
+    <script type="module" crossorigin src="/assets/index-pEvIbsfN.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Bupxk74G.css">
   </head>
   <body style="background-color: #f8fafc; color: #0f172a;">
     <div id="root">
