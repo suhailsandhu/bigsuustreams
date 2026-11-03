@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { Readable } from 'stream';
+import { Readable, Transform } from 'stream';
 import { fileURLToPath } from 'url';
 import { getBasketballStreams, getFootballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream, streamTargetMap } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings, getNflScoreboard, getNflGameSummary } from './src/server/scoreboardService.ts';
@@ -362,6 +362,49 @@ async function handleHls(req, res) {
   }
 }
 
+// Clean stream transformer: strips upstream 64-byte fake PNG image header disguise
+// to deliver 100% pure, standard MPEG-TS packets directly to the video player
+function createTsCleanStream() {
+  let headerChecked = false;
+  let buffered = Buffer.alloc(0);
+
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      if (!headerChecked) {
+        buffered = Buffer.concat([buffered, chunk]);
+        if (buffered.length >= 64) {
+          headerChecked = true;
+          // Check if starts with PNG signature: \x89PNG\r\n\x1a\n
+          if (buffered[0] === 0x89 && buffered[1] === 0x50 && buffered[2] === 0x4E && buffered[3] === 0x47) {
+            let syncOffset = 64;
+            if (buffered[64] !== 0x47) {
+              for (let i = 0; i < Math.min(buffered.length, 256); i++) {
+                if (buffered[i] === 0x47 && buffered[i + 188] === 0x47) {
+                  syncOffset = i;
+                  break;
+                }
+              }
+            }
+            this.push(buffered.subarray(syncOffset));
+          } else {
+            this.push(buffered);
+          }
+          buffered = null;
+        }
+        return callback();
+      }
+      this.push(chunk);
+      callback();
+    },
+    flush(callback) {
+      if (!headerChecked && buffered && buffered.length > 0) {
+        this.push(buffered);
+      }
+      callback();
+    }
+  });
+}
+
 // Protected Video Chunk Proxy Endpoint
 // Proxies all HLS .ts / .js chunks through server memory
 // Upstream provider domains are 100% invisible to browser network inspection
@@ -429,18 +472,19 @@ async function handleChunkProxy(req, res) {
       return res.status(upstreamRes ? upstreamRes.status : 502).send('Chunk fetch failed across all failover mirrors');
     }
 
-    res.setHeader('Content-Type', upstreamRes.headers.get('content-type') || 'video/mp2t');
-    const cl = upstreamRes.headers.get('content-length');
-    if (cl) res.setHeader('Content-Length', cl);
+    res.setHeader('Content-Type', 'video/mp2t');
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    // Low-latency streaming: immediately pipe chunk bytes to player without blocking on buffer
+    // Low-latency streaming: immediately pipe pure MPEG-TS bytes to player without blocking
     if (upstreamRes.body) {
-      return Readable.fromWeb(upstreamRes.body).pipe(res);
+      return Readable.fromWeb(upstreamRes.body).pipe(createTsCleanStream()).pipe(res);
     } else {
       const arrayBuf = await upstreamRes.arrayBuffer();
-      return res.send(Buffer.from(arrayBuf));
+      const rawBuf = Buffer.from(arrayBuf);
+      const isFakePng = rawBuf[0] === 0x89 && rawBuf[1] === 0x50 && rawBuf[2] === 0x4E && rawBuf[3] === 0x47;
+      const cleanBuf = isFakePng ? rawBuf.subarray(64) : rawBuf;
+      return res.send(cleanBuf);
     }
   } catch (err) {
     return res.status(502).send('Proxy error');

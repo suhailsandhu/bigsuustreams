@@ -14,7 +14,6 @@ import { AdminStatsModal } from './components/AdminStatsModal.tsx';
 import { AuthModal } from './components/AuthModal.tsx';
 import { LegalModal } from './components/LegalModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
-import { MultiStreamView } from './components/MultiStreamView.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { findTeamByQuery } from './data/nbaTeams.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
@@ -59,7 +58,6 @@ export const App: React.FC = () => {
 
   // Admin & PWA modal states
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const [showMultiStream, setShowMultiStream] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
@@ -413,7 +411,6 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenProfile={() => setShowProfileModal(true)}
-        onOpenMultiStream={() => setShowMultiStream(true)}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);
@@ -544,19 +541,6 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         onSettingsChange={() => setSettingsTick((t) => t + 1)}
       />
-
-      {/* Courtside Multi-Stream Quad-View Split Screen */}
-      {showMultiStream && (
-        <MultiStreamView
-          allGames={scoreboard?.games || []}
-          initialGame={selectedGame}
-          onClose={() => setShowMultiStream(false)}
-          onSelectSingleGame={(game) => {
-            setShowMultiStream(false);
-            handleWatchGame(game);
-          }}
-        />
-      )}
 
       {/* PWA Install Guide Modal */}
       <PwaInstallModal

@@ -332,12 +332,29 @@ export interface StreamTargetRecord {
 
 export const streamTargetMap = new Map<string, StreamTargetRecord>();
 
+interface StreamTokenCache {
+  tokens: Record<string, any>;
+  workingHost: string;
+  serverName: string;
+  pathPrefix: string;
+  isExternal?: boolean;
+  externalUrl?: string;
+  expires: number;
+}
+
+const tokenCacheMap = new Map<string, StreamTokenCache>();
+
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now();
     for (const [key, record] of streamTargetMap.entries()) {
       if (record.expires < now) {
         streamTargetMap.delete(key);
+      }
+    }
+    for (const [key, tokenRec] of tokenCacheMap.entries()) {
+      if (tokenRec.expires < now) {
+        tokenCacheMap.delete(key);
       }
     }
   }, 300000);
@@ -348,40 +365,107 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   if (!quality.endsWith('p')) quality += 'p';
 
   const mirrors = getSortedHealthyMirrors();
-  let successfulMirror = mirrors[0] || 'https://streamfree.top';
-  let embedRes: Response | null = null;
   let tokens: Record<string, any> = {};
+  let workingHost = '';
+  let serverName = 'origin';
+  let pathPrefix = '/live/';
+  let isExternal = false;
+  let externalUrl = '';
 
-  for (const mirror of mirrors) {
-    try {
-      const candidateQualities = [quality, '1080p', '720p', '2160p'];
-      for (const q of candidateQualities) {
-        const u = `${mirror}/embed/basketball/${streamKey}${q}`;
-        const res = await fetch(u, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-          }
-        });
-        if (res.ok) {
-          const text = await res.text();
-          const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
-          if (match) {
-            embedRes = res;
-            tokens = JSON.parse(match[1]);
-            successfulMirror = mirror;
-            recordMirrorSuccess(mirror, 100);
-            break;
+  const now = Date.now();
+  const cachedTarget = tokenCacheMap.get(streamKey);
+
+  if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
+    tokens = cachedTarget.tokens;
+    workingHost = cachedTarget.workingHost;
+    serverName = cachedTarget.serverName;
+    pathPrefix = cachedTarget.pathPrefix;
+    isExternal = Boolean(cachedTarget.isExternal);
+    externalUrl = cachedTarget.externalUrl || '';
+  } else {
+    // 1. Scrape tokens from embed page across mirrors
+    let embedRes: Response | null = null;
+    let successfulMirror = mirrors[0] || 'https://streamfree.top';
+
+    for (const mirror of mirrors) {
+      try {
+        const candidateQualities = [quality, '1080p', '720p', '2160p'];
+        for (const q of candidateQualities) {
+          const u = `${mirror}/embed/basketball/${streamKey}${q}`;
+          const res = await fetch(u, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+            }
+          });
+          if (res.ok) {
+            const text = await res.text();
+            const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
+            if (match) {
+              embedRes = res;
+              tokens = JSON.parse(match[1]);
+              successfulMirror = mirror;
+              recordMirrorSuccess(mirror, 100);
+              break;
+            }
           }
         }
+        if (embedRes && Object.keys(tokens).length > 0) break;
+      } catch {
+        recordMirrorFailure(mirror);
       }
-      if (embedRes && Object.keys(tokens).length > 0) break;
-    } catch {
-      recordMirrorFailure(mirror);
     }
+
+    if (!embedRes || Object.keys(tokens).length === 0) {
+      throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
+    }
+
+    // 2. Query stream key metadata
+    let keyData: any = {};
+    for (const mirror of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
+      try {
+        const res = await fetch(`${mirror}/get-stream-key/${streamKey}`);
+        if (res.ok) {
+          keyData = await res.json();
+          break;
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    if (keyData.is_external && keyData.external_url) {
+      isExternal = true;
+      externalUrl = keyData.external_url;
+    }
+
+    serverName = keyData.server_name || 'origin';
+    if (serverName === 'externalcdn') {
+      pathPrefix = '/live-externalcdn/';
+    } else if (serverName !== 'origin') {
+      pathPrefix = '/live-cdn/';
+    }
+    workingHost = successfulMirror;
+
+    tokenCacheMap.set(streamKey, {
+      tokens,
+      workingHost,
+      serverName,
+      pathPrefix,
+      isExternal,
+      externalUrl,
+      expires: now + 300000 // Cache tokens for 5 minutes
+    });
   }
 
-  if (!embedRes || Object.keys(tokens).length === 0) {
-    throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
+  if (isExternal && externalUrl) {
+    return {
+      isExternal: true,
+      externalUrl,
+      selectedQuality: quality,
+      availableQualities: ['1080p', '720p'],
+      m3u8Text: '',
+      upstreamUrl: externalUrl
+    };
   }
 
   const availableQualities = Object.keys(tokens).filter(q => !q.toLowerCase().includes('540'));
@@ -390,45 +474,12 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : (tokens['2160p'] ? '2160p' : availableQualities[0]));
   }
 
-  // Query stream key metadata
-  let keyData: any = {};
-  for (const mirror of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
-    try {
-      const res = await fetch(`${mirror}/get-stream-key/${streamKey}`);
-      if (res.ok) {
-        keyData = await res.json();
-        break;
-      }
-    } catch {
-      // continue
-    }
-  }
-
-  if (keyData.is_external && keyData.external_url) {
-    return {
-      isExternal: true,
-      externalUrl: keyData.external_url,
-      selectedQuality,
-      availableQualities,
-      m3u8Text: '',
-      upstreamUrl: keyData.external_url
-    };
-  }
-
-  const serverName = keyData.server_name || 'origin';
-  let pathPrefix = '/live/';
-  if (serverName === 'externalcdn') {
-    pathPrefix = '/live-externalcdn/';
-  } else if (serverName !== 'origin') {
-    pathPrefix = '/live-cdn/';
-  }
-
   async function attemptM3u8(q: string) {
     const p = tokens[q];
     const v = `${streamKey}${q}`;
     const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-    for (const host of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
+    for (const host of [workingHost, ...mirrors.filter(m => m !== workingHost)]) {
       try {
         const u = `${host}${pathPrefix}${v}/index.m3u8${qStr}`;
         const res = await fetch(u, {
@@ -444,28 +495,29 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
       }
     }
 
-    const fallbackUrl = `${successfulMirror}${pathPrefix}${v}/index.m3u8${qStr}`;
+    const fallbackUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
     const res = await fetch(fallbackUrl);
-    return { res, url: fallbackUrl, host: successfulMirror };
+    return { res, url: fallbackUrl, host: workingHost };
   }
 
-  let { res: m3u8Res, url: finalM3u8Url, host: workingHost } = await attemptM3u8(selectedQuality);
+  let { res: m3u8Res, url: finalM3u8Url, host: activeHost } = await attemptM3u8(selectedQuality);
   if (!m3u8Res.ok && selectedQuality !== '1080p' && tokens['1080p']) {
     selectedQuality = '1080p';
     const fallback = await attemptM3u8('1080p');
     m3u8Res = fallback.res;
     finalM3u8Url = fallback.url;
-    workingHost = fallback.host;
+    activeHost = fallback.host;
   }
   if (!m3u8Res.ok && selectedQuality !== '720p' && tokens['720p']) {
     selectedQuality = '720p';
     const fallback = await attemptM3u8('720p');
     m3u8Res = fallback.res;
     finalM3u8Url = fallback.url;
-    workingHost = fallback.host;
+    activeHost = fallback.host;
   }
 
   if (!m3u8Res.ok) {
+    tokenCacheMap.delete(streamKey);
     return {
       isExternal: false,
       selectedQuality,
@@ -480,13 +532,15 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   const p = tokens[selectedQuality];
   const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-  const streamHash = Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(4);
-  const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
-  const backupHosts = mirrors.filter(m => m !== workingHost);
+  // STABLE DETERMINISTIC STREAM HASH: Never changes between playlist polls!
+  const streamHash = Buffer.from(`${streamKey}-${selectedQuality}`).toString('hex').substring(0, 16);
+  const baseUrl = `${activeHost}${pathPrefix}${variant}/`;
+  const backupHosts = mirrors.filter(m => m !== activeHost);
   const backupBaseUrls = backupHosts.map(h => `${h}${pathPrefix}${variant}/`);
 
-  const segmentMap = new Map<string, string>();
-  let segmentIndex = 0;
+  // Retain existing segment map so in-flight chunks are never dropped
+  const existingRecord = streamTargetMap.get(streamHash);
+  const segmentMap = existingRecord?.segmentMap || new Map<string, string>();
 
   const m3u8Text = rawM3u8Text.split('\n').map(line => {
     const trimmed = line.trim();
@@ -503,10 +557,9 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
               fullUri = `${baseUrl}${uri}`;
             }
           }
-          segmentIndex++;
-          const segKey = `map_${segmentIndex}`;
-          segmentMap.set(segKey, fullUri);
-          return `URI="/api/stream/chunk/${streamHash}/${segKey}"`;
+          const mapKey = 'init.mp4';
+          segmentMap.set(mapKey, fullUri);
+          return `URI="/api/stream/chunk/${streamHash}/${mapKey}"`;
         });
       }
       return line;
@@ -515,15 +568,14 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     let fullSegmentUrl = trimmed;
     if (!fullSegmentUrl.startsWith('http://') && !fullSegmentUrl.startsWith('https://')) {
       if (fullSegmentUrl.startsWith('/')) {
-        fullSegmentUrl = `${workingHost}${fullSegmentUrl}`;
+        fullSegmentUrl = `${activeHost}${fullSegmentUrl}`;
       } else {
         fullSegmentUrl = `${baseUrl}${fullSegmentUrl}${qStr && !fullSegmentUrl.includes('?') ? qStr : ''}`;
       }
     }
 
-    segmentIndex++;
-    const segName = trimmed.split('?')[0].split('/').pop()?.replace(/[^a-zA-Z0-9_-]/g, '') || 'chunk';
-    const segKey = `s${segmentIndex}_${segName}`;
+    // STABLE SEGMENT IDENTIFIER: exact segment file/token name WITHOUT dynamic s1_/s2_ prefix!
+    const segKey = trimmed.split('?')[0].split('/').pop()?.replace(/[^a-zA-Z0-9_.-]/g, '') || 'chunk.ts';
     segmentMap.set(segKey, fullSegmentUrl);
 
     return `/api/stream/chunk/${streamHash}/${segKey}`;
@@ -532,7 +584,7 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   streamTargetMap.set(streamHash, {
     baseUrl,
     backupBaseUrls,
-    workingHost,
+    workingHost: activeHost,
     backupHosts,
     qStr,
     expires: Date.now() + 3600000, // 1 hour validity
