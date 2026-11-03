@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import { Readable } from 'stream';
 import { fileURLToPath } from 'url';
 import { getBasketballStreams, getFootballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream, streamTargetMap } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings, getNflScoreboard, getNflGameSummary } from './src/server/scoreboardService.ts';
@@ -40,8 +41,13 @@ const apiLimiter = createRateLimiter({
   message: 'High request volume detected. Please try again in a moment.'
 });
 
-// Apply general rate limiter across API
-app.use('/api', apiLimiter);
+// Apply general rate limiter across API metadata (bypass chunk & media streaming for ultra-low latency)
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/stream/chunk/') || req.path.includes('/hls/')) {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+});
 
 // 0. Account Authentication Endpoints (iOS-style Clean Setup)
 app.post('/api/auth/register', siteAuthLimiter, (req, res) => {
@@ -423,12 +429,19 @@ async function handleChunkProxy(req, res) {
       return res.status(upstreamRes ? upstreamRes.status : 502).send('Chunk fetch failed across all failover mirrors');
     }
 
-    res.setHeader('Content-Type', 'video/mp2t');
-    res.setHeader('Cache-Control', 'public, max-age=120');
+    res.setHeader('Content-Type', upstreamRes.headers.get('content-type') || 'video/mp2t');
+    const cl = upstreamRes.headers.get('content-length');
+    if (cl) res.setHeader('Content-Length', cl);
+    res.setHeader('Cache-Control', 'public, max-age=300');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    const arrayBuf = await upstreamRes.arrayBuffer();
-    return res.send(Buffer.from(arrayBuf));
+    // Low-latency streaming: immediately pipe chunk bytes to player without blocking on buffer
+    if (upstreamRes.body) {
+      return Readable.fromWeb(upstreamRes.body).pipe(res);
+    } else {
+      const arrayBuf = await upstreamRes.arrayBuffer();
+      return res.send(Buffer.from(arrayBuf));
+    }
   } catch (err) {
     return res.status(502).send('Proxy error');
   }

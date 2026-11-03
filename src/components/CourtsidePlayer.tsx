@@ -246,12 +246,16 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: ultraLow,
-        backBufferLength: ultraLow ? 15 : 30,
-        liveSyncDurationCount: ultraLow ? 2 : 3,
-        liveMaxLatencyDurationCount: ultraLow ? 4 : 6,
-        fragLoadingMaxRetry: 5,
-        manifestLoadingMaxRetry: 5,
-        levelLoadingMaxRetry: 5,
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 8,
+        fragLoadingMaxRetry: 6,
+        manifestLoadingMaxRetry: 6,
+        levelLoadingMaxRetry: 6,
+        fragLoadingTimeOut: 20000,
+        manifestLoadingTimeOut: 15000,
         xhrSetup: (xhr) => {
           if (token) {
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import type { Stream } from './types/stream.ts';
 import type { ScoreboardGame, ScoreboardResponse } from './types/scoreboard.ts';
 import { fetchScoreboard, fetchNflScoreboard, fetchStreamDetails } from './services/api.ts';
@@ -216,6 +216,11 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const allGamesRef = useRef(allGames);
+  allGamesRef.current = allGames;
+  const selectedStreamRef = useRef(selectedStream);
+  selectedStreamRef.current = selectedStream;
+
   // Direct admin routing via URL /admin or hash #/admin
   const checkAdminRoute = useCallback(() => {
     const p = window.location.pathname;
@@ -236,17 +241,22 @@ export const App: React.FC = () => {
       const key = hash.replace('#/game/', '');
       if (key.startsWith('highlight-')) {
         const gameId = key.replace('highlight-', '');
-        const matched = allGames.find((g) => g.id === gameId);
+        const matched = allGamesRef.current.find((g: ScoreboardGame) => g.id === gameId);
         if (matched) {
           handleWatchHighlights(matched);
           return;
         }
       }
 
+      // If already playing this stream, do not re-fetch or re-mount video player!
+      if (selectedStreamRef.current && (selectedStreamRef.current.stream_key === key || selectedStreamRef.current.id === key)) {
+        return;
+      }
+
       try {
         const fetched = await fetchStreamDetails(key);
         setSelectedStream(fetched);
-        const matched = allGames.find((g) => g.stream?.streamKey === key);
+        const matched = allGamesRef.current.find((g: ScoreboardGame) => g.stream?.streamKey === key);
         if (matched) setSelectedGame(matched);
       } catch (e) {
         console.warn('Game in hash not found:', e);
@@ -255,7 +265,7 @@ export const App: React.FC = () => {
       setSelectedStream(null);
       setSelectedGame(null);
     }
-  }, [allGames, handleWatchHighlights, checkAdminRoute]);
+  }, [handleWatchHighlights, checkAdminRoute]);
 
   useEffect(() => {
     checkAdminRoute();

@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import path3 from "path";
 import fs3 from "fs";
+import { Readable } from "stream";
 import { fileURLToPath } from "url";
 
 // src/server/streamService.ts
@@ -2074,7 +2075,12 @@ var apiLimiter = createRateLimiter({
   max: 120,
   message: "High request volume detected. Please try again in a moment."
 });
-app.use("/api", apiLimiter);
+app.use("/api", (req, res, next) => {
+  if (req.path.startsWith("/stream/chunk/") || req.path.includes("/hls/")) {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+});
 app.post("/api/auth/register", siteAuthLimiter, (req, res) => {
   try {
     const { username, email, password } = req.body || {};
@@ -2367,11 +2373,17 @@ async function handleChunkProxy(req, res) {
     if (!upstreamRes || !upstreamRes.ok) {
       return res.status(upstreamRes ? upstreamRes.status : 502).send("Chunk fetch failed across all failover mirrors");
     }
-    res.setHeader("Content-Type", "video/mp2t");
-    res.setHeader("Cache-Control", "public, max-age=120");
+    res.setHeader("Content-Type", upstreamRes.headers.get("content-type") || "video/mp2t");
+    const cl = upstreamRes.headers.get("content-length");
+    if (cl) res.setHeader("Content-Length", cl);
+    res.setHeader("Cache-Control", "public, max-age=300");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    const arrayBuf = await upstreamRes.arrayBuffer();
-    return res.send(Buffer.from(arrayBuf));
+    if (upstreamRes.body) {
+      return Readable.fromWeb(upstreamRes.body).pipe(res);
+    } else {
+      const arrayBuf = await upstreamRes.arrayBuffer();
+      return res.send(Buffer.from(arrayBuf));
+    }
   } catch (err) {
     return res.status(502).send("Proxy error");
   }

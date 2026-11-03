@@ -555,10 +555,10 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
 
       </div>
 
-      {/* Advanced NBA Visualizations: Interactive Shot Chart & Win Probability */}
+      {/* Advanced NBA Visualizations: Interactive Shot Chart */}
       <ShotChartVisualizer
         shotChart={summary?.shotChart}
-        winProbability={summary?.winProbability}
+        boxscore={summary?.boxscore}
         awayTeamName={team1.name || team1.displayName}
         homeTeamName={team2.name || team2.displayName}
         awayTeamLogo={team1.logo}
