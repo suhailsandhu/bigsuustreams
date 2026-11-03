@@ -189,6 +189,19 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/auth/sync', (req, res) => {
+  try {
+    const { user } = req.body || {};
+    if (user && (user.username || user.email)) {
+      const synced = authService.syncExistingUser(user);
+      return res.json({ success: true, user: synced });
+    }
+    res.json({ success: false });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // User Preferences & Favorites (SQLite-backed)
 app.get('/api/user/preferences', (req, res) => {
   const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;

@@ -2189,6 +2189,29 @@ var AuthService = class {
   removeSession(token) {
     this.sessions.delete(token);
   }
+  syncExistingUser(user) {
+    const id = user.id || `u_${Date.now()}`;
+    const existing = this.users.get(id);
+    if (existing) return existing;
+    for (const u of this.users.values()) {
+      if (user.email && u.email.toLowerCase() === user.email.toLowerCase()) return u;
+      if (user.username && u.username.toLowerCase() === user.username.toLowerCase()) return u;
+    }
+    const restored = {
+      id,
+      username: user.username || "Member",
+      email: user.email || `${user.username || "user"}@bigsuustreams.com`,
+      displayName: user.displayName || user.username || "Member",
+      provider: user.provider || "local",
+      createdAt: user.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+      lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+      favoriteTeams: Array.isArray(user.favoriteTeams) ? user.favoriteTeams : [],
+      spoilerFree: Boolean(user.spoilerFree)
+    };
+    this.users.set(id, restored);
+    this.persistUsers();
+    return restored;
+  }
   updatePreferences(userId, favoriteTeams, spoilerFree) {
     const user = this.users.get(userId);
     if (user) {
@@ -2674,6 +2697,18 @@ app.post("/api/auth/logout", (req, res) => {
     authService.removeSession(String(token));
   }
   res.json({ success: true });
+});
+app.post("/api/auth/sync", (req, res) => {
+  try {
+    const { user } = req.body || {};
+    if (user && (user.username || user.email)) {
+      const synced = authService.syncExistingUser(user);
+      return res.json({ success: true, user: synced });
+    }
+    res.json({ success: false });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 app.get("/api/user/preferences", (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "") || req.query.token;

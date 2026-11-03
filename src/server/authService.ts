@@ -240,6 +240,32 @@ class AuthService {
     this.sessions.delete(token);
   }
 
+  public syncExistingUser(user: Partial<UserAccount>): UserAccount {
+    const id = user.id || `u_${Date.now()}`;
+    const existing = this.users.get(id);
+    if (existing) return existing;
+
+    for (const u of this.users.values()) {
+      if (user.email && u.email.toLowerCase() === user.email.toLowerCase()) return u;
+      if (user.username && u.username.toLowerCase() === user.username.toLowerCase()) return u;
+    }
+
+    const restored: UserAccount = {
+      id,
+      username: user.username || 'Member',
+      email: user.email || `${user.username || 'user'}@bigsuustreams.com`,
+      displayName: user.displayName || user.username || 'Member',
+      provider: user.provider || 'local',
+      createdAt: user.createdAt || new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      favoriteTeams: Array.isArray(user.favoriteTeams) ? user.favoriteTeams : [],
+      spoilerFree: Boolean(user.spoilerFree)
+    };
+    this.users.set(id, restored);
+    this.persistUsers();
+    return restored;
+  }
+
   public updatePreferences(userId: string, favoriteTeams?: string[], spoilerFree?: boolean) {
     const user = this.users.get(userId);
     if (user) {

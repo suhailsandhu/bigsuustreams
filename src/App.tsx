@@ -43,6 +43,17 @@ export const App: React.FC = () => {
     setCurrentUser(null);
   };
 
+  // Self-healing account sync: ensures registered member accounts are persisted permanently on server
+  useEffect(() => {
+    if (currentUser && (currentUser.username || currentUser.email)) {
+      fetch('/api/auth/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: currentUser })
+      }).catch(() => {});
+    }
+  }, [currentUser]);
+
   // Legal modal state
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [legalTab, setLegalTab] = useState<'dmca' | 'disclaimer' | 'terms' | 'privacy'>('dmca');
