@@ -14,6 +14,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const VISITORS_FILE = path.join(DATA_DIR, 'visitors.json');
 const ANALYTICS_STATE_FILE = path.join(DATA_DIR, 'analytics_history.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'analytics_config.json');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
 interface VisitorSession {
   lastPing: number;
@@ -121,6 +122,31 @@ class AnalyticsTracker {
     setInterval(() => {
       this.cleanup();
     }, 30000);
+
+    // Initial automated backup & recurring 6-hour backup cycle
+    setTimeout(() => {
+      this.createAutomatedBackup();
+    }, 5000);
+    setInterval(() => {
+      this.createAutomatedBackup();
+    }, 6 * 60 * 60 * 1000);
+  }
+
+  public createAutomatedBackup() {
+    try {
+      if (!fs.existsSync(BACKUP_DIR)) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      }
+      const files = [VISITORS_FILE, ANALYTICS_STATE_FILE, CONFIG_FILE, path.join(DATA_DIR, 'users.json')];
+      for (const f of files) {
+        if (fs.existsSync(f)) {
+          const base = path.basename(f);
+          fs.copyFileSync(f, path.join(BACKUP_DIR, `latest_${base}`));
+        }
+      }
+    } catch (err) {
+      console.warn('Automated data backup notice:', err);
+    }
   }
 
   private ensureDataDir() {

@@ -1337,6 +1337,7 @@ var DATA_DIR = path.join(process.cwd(), "data");
 var VISITORS_FILE = path.join(DATA_DIR, "visitors.json");
 var ANALYTICS_STATE_FILE = path.join(DATA_DIR, "analytics_history.json");
 var CONFIG_FILE = path.join(DATA_DIR, "analytics_config.json");
+var BACKUP_DIR = path.join(DATA_DIR, "backups");
 function resolveRegion(tz) {
   if (!tz) return "North America";
   const clean = tz.replace(/_/g, " ");
@@ -1398,6 +1399,28 @@ var AnalyticsTracker = class {
     setInterval(() => {
       this.cleanup();
     }, 3e4);
+    setTimeout(() => {
+      this.createAutomatedBackup();
+    }, 5e3);
+    setInterval(() => {
+      this.createAutomatedBackup();
+    }, 6 * 60 * 60 * 1e3);
+  }
+  createAutomatedBackup() {
+    try {
+      if (!fs.existsSync(BACKUP_DIR)) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      }
+      const files = [VISITORS_FILE, ANALYTICS_STATE_FILE, CONFIG_FILE, path.join(DATA_DIR, "users.json")];
+      for (const f of files) {
+        if (fs.existsSync(f)) {
+          const base = path.basename(f);
+          fs.copyFileSync(f, path.join(BACKUP_DIR, `latest_${base}`));
+        }
+      }
+    } catch (err) {
+      console.warn("Automated data backup notice:", err);
+    }
   }
   ensureDataDir() {
     try {

@@ -113,21 +113,29 @@ declare global {
   }
 }
 
+export function getCurrentViewerName(): string {
+  try {
+    const user = getLoggedInUser();
+    if (user && (user.username || user.email)) {
+      return user.username || (user.email ? user.email.split('@')[0] : 'Member');
+    }
+    const devId = getDeviceId();
+    const shortId = devId.slice(-4).toUpperCase();
+    const { category } = detectDetailedDevice();
+    return `Viewer-${shortId} (${category})`;
+  } catch {
+    return 'Guest';
+  }
+}
+
 export function identifyUmamiUser(customData?: Record<string, any>) {
   const send = () => {
     try {
       if (typeof window !== 'undefined' && window.umami && typeof window.umami.identify === 'function') {
         const user = getLoggedInUser();
         const devId = getDeviceId();
-        const shortId = devId.slice(-4).toUpperCase();
-        const { category, tag } = detectDetailedDevice();
-
-        let name = '';
-        if (user && (user.username || user.email)) {
-          name = user.username || (user.email ? user.email.split('@')[0] : 'Member');
-        } else {
-          name = `Viewer-${shortId} (${category})`;
-        }
+        const name = getCurrentViewerName();
+        const { tag } = detectDetailedDevice();
 
         window.umami.identify({
           userId: user?.email || devId,
@@ -268,13 +276,15 @@ export function sendUmamiTestEvent(): boolean {
 }
 
 export function trackUmamiPageView(path: string, title?: string) {
+  const viewer = getCurrentViewerName();
   const send = () => {
     try {
       if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
         window.umami.track((props: any) => ({
           ...props,
           url: path || window.location.pathname || '/',
-          title: title || document.title || 'BigSuuStreams'
+          title: title ? `${viewer} • ${title}` : `${viewer} • BigSuuStreams`,
+          user: viewer
         }));
       }
     } catch {
@@ -299,10 +309,14 @@ export function trackUmamiPageView(path: string, title?: string) {
 }
 
 export function trackUmamiEvent(eventName: string, eventData?: Record<string, any>) {
+  const viewer = getCurrentViewerName();
   const send = () => {
     try {
       if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
-        window.umami.track(eventName, eventData);
+        window.umami.track(eventName, {
+          user: viewer,
+          ...eventData
+        });
       }
     } catch {
       // Non-blocking telemetry
