@@ -108,7 +108,54 @@ declare global {
   interface Window {
     umami?: {
       track: ((props: (props: any) => any) => void) & ((eventName: string, eventData?: Record<string, any>) => void);
+      identify: (sessionData: Record<string, any>) => void;
     };
+  }
+}
+
+export function identifyUmamiUser(customData?: Record<string, any>) {
+  const send = () => {
+    try {
+      if (typeof window !== 'undefined' && window.umami && typeof window.umami.identify === 'function') {
+        const user = getLoggedInUser();
+        const devId = getDeviceId();
+        const shortId = devId.slice(-4).toUpperCase();
+        const { category, tag } = detectDetailedDevice();
+
+        let name = '';
+        if (user && (user.username || user.email)) {
+          name = user.username || (user.email ? user.email.split('@')[0] : 'Member');
+        } else {
+          name = `Viewer-${shortId} (${category})`;
+        }
+
+        window.umami.identify({
+          userId: user?.email || devId,
+          userName: name,
+          name: name,
+          device: tag,
+          favoriteTeam: localStorage.getItem('bss_favorite_team') || undefined,
+          ...customData
+        });
+      }
+    } catch {
+      // non-blocking
+    }
+  };
+
+  if (typeof window !== 'undefined' && window.umami && typeof window.umami.identify === 'function') {
+    send();
+  } else {
+    let retries = 0;
+    const interval = setInterval(() => {
+      retries++;
+      if (typeof window !== 'undefined' && window.umami && typeof window.umami.identify === 'function') {
+        clearInterval(interval);
+        send();
+      } else if (retries >= 30) {
+        clearInterval(interval);
+      }
+    }, 400);
   }
 }
 
@@ -303,6 +350,7 @@ export function trackPageView(streamKey?: string, gameName?: string) {
   const title = gameName ? `${gameName} - BigSuuStreams` : 'BigSuuStreams - Live Sports Schedule';
 
   trackUmamiPageView(url, title);
+  identifyUmamiUser({ lastStream: streamKey || 'lobby' });
   trackUmamiEvent('page_view', {
     path: url,
     streamKey: streamKey || 'home',
@@ -326,6 +374,7 @@ export function updateCurrentStream(streamKey?: string, gameName?: string) {
   const title = gameName ? `${gameName} - BigSuuStreams` : 'BigSuuStreams - Live Sports Schedule';
 
   trackUmamiPageView(url, title);
+  identifyUmamiUser({ lastStream: streamKey, game: gameName });
   trackUmamiEvent('watch_stream', { streamKey, game: gameName });
   sendPing(false);
 }
