@@ -1,9 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
+import { db } from './db.ts';
 
 export interface UserAccount {
   id: string;
@@ -15,6 +11,8 @@ export interface UserAccount {
   provider: 'local' | 'google';
   googleId?: string;
   avatarUrl?: string;
+  favoriteTeams?: string[];
+  spoilerFree?: boolean;
   createdAt: string;
   lastLogin: string;
 }
@@ -25,58 +23,39 @@ export interface SessionData {
   username: string;
   displayName: string;
   avatarUrl?: string;
+  favoriteTeams?: string[];
+  spoilerFree?: boolean;
   expiresAt: number;
 }
 
 class AuthService {
-  private users: Map<string, UserAccount> = new Map();
-  private sessions: Map<string, SessionData> = new Map();
-
-  constructor() {
-    this.ensureDataStore();
-    this.loadUsers();
-  }
-
-  private ensureDataStore() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      if (!fs.existsSync(USERS_FILE)) {
-        fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), 'utf-8');
-      }
-    } catch (err) {
-      console.warn('Could not initialize users data directory:', err);
-    }
-  }
-
-  private loadUsers() {
-    try {
-      if (fs.existsSync(USERS_FILE)) {
-        const raw = fs.readFileSync(USERS_FILE, 'utf-8');
-        const list: UserAccount[] = JSON.parse(raw);
-        this.users.clear();
-        for (const u of list) {
-          this.users.set(u.id, u);
-        }
-      }
-    } catch (err) {
-      console.warn('Error reading users store:', err);
-    }
-  }
-
-  private persistUsers() {
-    try {
-      this.ensureDataStore();
-      const list = Array.from(this.users.values());
-      fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), 'utf-8');
-    } catch (err) {
-      console.warn('Error saving users store:', err);
-    }
-  }
-
   private hashPassword(password: string, salt: string): string {
     return crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  }
+
+  private mapDbUser(row: any): UserAccount {
+    let favoriteTeams: string[] = [];
+    try {
+      favoriteTeams = JSON.parse(row.favorite_teams || '[]');
+    } catch {
+      favoriteTeams = [];
+    }
+
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      displayName: row.display_name || row.username,
+      passwordHash: row.password_hash || undefined,
+      salt: row.salt || undefined,
+      provider: (row.provider as 'local' | 'google') || 'local',
+      googleId: row.google_id || undefined,
+      avatarUrl: row.avatar_url || undefined,
+      favoriteTeams,
+      spoilerFree: Boolean(row.spoiler_free),
+      createdAt: row.created_at,
+      lastLogin: row.last_login
+    };
   }
 
   public register(username: string, email: string, password: string): { user: UserAccount; session: SessionData } {
@@ -94,11 +73,12 @@ class AuthService {
     }
 
     // Check existing
-    for (const u of this.users.values()) {
-      if (u.username === cleanUsername) {
+    const existing = db.prepare('SELECT id, username, email FROM users WHERE username = ? OR email = ?').get(cleanUsername, cleanEmail) as any;
+    if (existing) {
+      if (existing.username === cleanUsername) {
         throw new Error('This username is already taken. Please choose another.');
       }
-      if (u.email === cleanEmail) {
+      if (existing.email === cleanEmail) {
         throw new Error('An account with this email already exists. Please log in.');
       }
     }
@@ -108,6 +88,16 @@ class AuthService {
     const id = `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const now = new Date().toISOString();
 
+    const insertStmt = db.prepare(`
+      INSERT INTO users (
+        id, username, email, display_name, password_hash, salt, provider, avatar_url, favorite_teams, spoiler_free, created_at, last_login
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, 'local', null, '[]', 0, ?, ?
+      )
+    `);
+
+    insertStmt.run(id, cleanUsername, cleanEmail, username.trim(), passwordHash, salt, now, now);
+
     const user: UserAccount = {
       id,
       username: cleanUsername,
@@ -116,12 +106,11 @@ class AuthService {
       passwordHash,
       salt,
       provider: 'local',
+      favoriteTeams: [],
+      spoilerFree: false,
       createdAt: now,
       lastLogin: now
     };
-
-    this.users.set(id, user);
-    this.persistUsers();
 
     const session = this.createSession(user);
     return { user, session };
@@ -129,47 +118,45 @@ class AuthService {
 
   public login(identifier: string, password: string): { user: UserAccount; session: SessionData } {
     const clean = identifier.trim().toLowerCase();
-    let foundUser: UserAccount | undefined;
+    const row = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(clean, clean) as any;
 
-    for (const u of this.users.values()) {
-      if (u.username === clean || u.email === clean) {
-        foundUser = u;
-        break;
-      }
-    }
-
-    if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
+    if (!row || !row.password_hash || !row.salt) {
       throw new Error('Invalid username/email or password');
     }
 
-    const inputHash = this.hashPassword(password, foundUser.salt);
-    if (inputHash !== foundUser.passwordHash) {
+    const inputHash = this.hashPassword(password, row.salt);
+    if (inputHash !== row.password_hash) {
       throw new Error('Invalid username/email or password');
     }
 
-    foundUser.lastLogin = new Date().toISOString();
-    this.persistUsers();
+    const now = new Date().toISOString();
+    db.prepare('UPDATE users SET last_login = ? WHERE id = ?').run(now, row.id);
+    row.last_login = now;
 
-    const session = this.createSession(foundUser);
-    return { user: foundUser, session };
+    const user = this.mapDbUser(row);
+    const session = this.createSession(user);
+    return { user, session };
   }
 
   public loginWithGoogle(email: string, displayName: string, avatarUrl?: string): { user: UserAccount; session: SessionData } {
     const cleanEmail = email.trim().toLowerCase();
-    let user: UserAccount | undefined;
-
-    for (const u of this.users.values()) {
-      if (u.email === cleanEmail) {
-        user = u;
-        break;
-      }
-    }
-
+    const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail) as any;
     const now = new Date().toISOString();
 
-    if (!user) {
+    let user: UserAccount;
+
+    if (!existing) {
       const generatedUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9]/g, '').slice(0, 15) || `user${Date.now() % 10000}`;
       const id = `google_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      
+      db.prepare(`
+        INSERT INTO users (
+          id, username, email, display_name, provider, avatar_url, favorite_teams, spoiler_free, created_at, last_login
+        ) VALUES (
+          ?, ?, ?, ?, 'google', ?, '[]', 0, ?, ?
+        )
+      `).run(id, generatedUsername, cleanEmail, displayName || cleanEmail.split('@')[0], avatarUrl || null, now, now);
+
       user = {
         id,
         username: generatedUsername,
@@ -177,16 +164,18 @@ class AuthService {
         displayName: displayName || cleanEmail.split('@')[0],
         provider: 'google',
         avatarUrl,
+        favoriteTeams: [],
+        spoilerFree: false,
         createdAt: now,
         lastLogin: now
       };
-      this.users.set(id, user);
     } else {
-      user.lastLogin = now;
-      if (avatarUrl) user.avatarUrl = avatarUrl;
+      db.prepare('UPDATE users SET last_login = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?').run(now, avatarUrl || null, existing.id);
+      existing.last_login = now;
+      if (avatarUrl) existing.avatar_url = avatarUrl;
+      user = this.mapDbUser(existing);
     }
 
-    this.persistUsers();
     const session = this.createSession(user);
     return { user, session };
   }
@@ -195,34 +184,88 @@ class AuthService {
     const token = `sess_${crypto.randomBytes(32).toString('hex')}`;
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    const session: SessionData = {
+    db.prepare(`
+      INSERT INTO sessions (token, user_id, username, display_name, avatar_url, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(token, user.id, user.username, user.displayName, user.avatarUrl || null, expiresAt);
+
+    return {
       token,
       userId: user.id,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      favoriteTeams: user.favoriteTeams,
+      spoilerFree: user.spoilerFree,
       expiresAt
     };
-
-    this.sessions.set(token, session);
-    return session;
   }
 
   public verifySession(token: string): SessionData | null {
     if (!token) return null;
-    const session = this.sessions.get(token);
-    if (!session) return null;
+    const row = db.prepare(`
+      SELECT s.*, u.favorite_teams, u.spoiler_free
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.token = ?
+    `).get(token) as any;
 
-    if (Date.now() > session.expiresAt) {
-      this.sessions.delete(token);
+    if (!row) return null;
+
+    if (Date.now() > row.expires_at) {
+      db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
       return null;
     }
 
-    return session;
+    let favoriteTeams: string[] = [];
+    try {
+      favoriteTeams = JSON.parse(row.favorite_teams || '[]');
+    } catch {
+      favoriteTeams = [];
+    }
+
+    return {
+      token: row.token,
+      userId: row.user_id,
+      username: row.username,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_url || undefined,
+      favoriteTeams,
+      spoilerFree: Boolean(row.spoiler_free),
+      expiresAt: row.expires_at
+    };
   }
 
   public removeSession(token: string) {
-    this.sessions.delete(token);
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  }
+
+  public updatePreferences(userId: string, favoriteTeams?: string[], spoilerFree?: boolean) {
+    if (favoriteTeams !== undefined && spoilerFree !== undefined) {
+      db.prepare('UPDATE users SET favorite_teams = ?, spoiler_free = ? WHERE id = ?')
+        .run(JSON.stringify(favoriteTeams), spoilerFree ? 1 : 0, userId);
+    } else if (favoriteTeams !== undefined) {
+      db.prepare('UPDATE users SET favorite_teams = ? WHERE id = ?')
+        .run(JSON.stringify(favoriteTeams), userId);
+    } else if (spoilerFree !== undefined) {
+      db.prepare('UPDATE users SET spoiler_free = ? WHERE id = ?')
+        .run(spoilerFree ? 1 : 0, userId);
+    }
+  }
+
+  public recordWatchHistory(userId: string, gameId: string, streamKey: string, gameName: string) {
+    try {
+      db.prepare(`
+        INSERT INTO watch_history (user_id, game_id, stream_key, game_name, watched_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(userId, gameId, streamKey, gameName, new Date().toISOString());
+    } catch (e) {
+      // Ignore non-fatal watch history errors
+    }
+  }
+
+  public getWatchHistory(userId: string, limit = 10) {
+    return db.prepare('SELECT * FROM watch_history WHERE user_id = ? ORDER BY id DESC LIMIT ?').all(userId, limit);
   }
 }
 

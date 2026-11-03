@@ -3,6 +3,7 @@ import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
 import { CourtsidePlayer } from './CourtsidePlayer';
+import { ShotChartVisualizer } from './ShotChartVisualizer';
 import { formatTipoffTime, fetchGameSummary } from '../services/api';
 
 // Helper to highlight leader stats in green, highest turnovers in red, and +/- positive/negative
@@ -553,6 +554,16 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
         )}
 
       </div>
+
+      {/* Advanced NBA Visualizations: Interactive Shot Chart & Win Probability */}
+      <ShotChartVisualizer
+        shotChart={summary?.shotChart}
+        winProbability={summary?.winProbability}
+        awayTeamName={team1.name || team1.displayName}
+        homeTeamName={team2.name || team2.displayName}
+        awayTeamLogo={team1.logo}
+        homeTeamLogo={team2.logo}
+      />
     </div>
   );
 };

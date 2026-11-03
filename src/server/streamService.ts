@@ -1,9 +1,75 @@
-// StreamFree Basketball API & HLS Stream Resolver
-// Reverse engineered from strmfree.st / streamfree.top
+// StreamFree Basketball API & Multi-Source HLS Stream Resolver
+// Multi-Source Failover Architecture with Circuit Breaking & Resilient Mirror Routing
 
 import type { Stream, StreamsResponse } from '../types/stream.js';
 
-const MIRRORS = ['https://strmfree.st', 'https://streamfree.top'];
+interface MirrorState {
+  url: string;
+  healthy: boolean;
+  failCount: number;
+  lastFailure: number;
+  latencyMs: number;
+}
+
+const MIRROR_URLS = [
+  'https://streamfree.top',
+  'https://strmfree.st',
+  'https://strmfree.to'
+];
+
+// Active health monitoring and circuit breaker for upstream mirrors
+const mirrorRegistry: Map<string, MirrorState> = new Map(
+  MIRROR_URLS.map(url => [
+    url,
+    { url, healthy: true, failCount: 0, lastFailure: 0, latencyMs: 0 }
+  ])
+);
+
+const COOLDOWN_PERIOD_MS = 45000; // 45s cooldown after failure
+
+function getSortedHealthyMirrors(): string[] {
+  const now = Date.now();
+  const mirrors = Array.from(mirrorRegistry.values());
+
+  // Reset healthy state if cooldown expired
+  for (const m of mirrors) {
+    if (!m.healthy && now - m.lastFailure > COOLDOWN_PERIOD_MS) {
+      m.healthy = true;
+      m.failCount = 0;
+    }
+  }
+
+  // Sort: healthy first, then lowest failure count, then lowest latency
+  return mirrors
+    .sort((a, b) => {
+      if (a.healthy && !b.healthy) return -1;
+      if (!a.healthy && b.healthy) return 1;
+      if (a.failCount !== b.failCount) return a.failCount - b.failCount;
+      return a.latencyMs - b.latencyMs;
+    })
+    .map(m => m.url);
+}
+
+function recordMirrorSuccess(url: string, durationMs: number) {
+  const m = mirrorRegistry.get(url);
+  if (m) {
+    m.healthy = true;
+    m.failCount = 0;
+    m.latencyMs = durationMs;
+  }
+}
+
+function recordMirrorFailure(url: string) {
+  const m = mirrorRegistry.get(url);
+  if (m) {
+    m.failCount += 1;
+    m.lastFailure = Date.now();
+    if (m.failCount >= 3) {
+      m.healthy = false;
+      console.warn(`[MultiSource Failover] Mirror marked degraded: ${url} (fails: ${m.failCount})`);
+    }
+  }
+}
 
 interface CacheData {
   streams: StreamsResponse | null;
@@ -25,24 +91,40 @@ const CACHE_TTL_STREAMS_MS = 30000; // 30s cache
 const CACHE_TTL_SOURCES_MS = 15000; // 15s cache
 
 async function fetchWithFallback(path: string, headers: Record<string, string> = {}) {
+  const mirrors = getSortedHealthyMirrors();
   let lastErr: any = null;
-  for (const mirror of MIRRORS) {
+
+  for (const mirror of mirrors) {
+    const start = Date.now();
     try {
       const url = `${mirror}${path}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s network timeout
+
       const res = await fetch(url, {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
           ...headers,
         },
       });
+
+      clearTimeout(timeoutId);
+
       if (res.ok) {
+        recordMirrorSuccess(mirror, Date.now() - start);
         return { res, mirror };
+      } else {
+        recordMirrorFailure(mirror);
       }
     } catch (e) {
+      recordMirrorFailure(mirror);
       lastErr = e;
     }
   }
-  throw lastErr || new Error(`Failed to fetch ${path} from all mirrors`);
+
+  throw lastErr || new Error(`Failed to fetch ${path} from all multi-source mirrors`);
 }
 
 export async function getBasketballStreams(forceRefresh = false): Promise<StreamsResponse> {
@@ -58,16 +140,20 @@ export async function getBasketballStreams(forceRefresh = false): Promise<Stream
     // Filter strictly to basketball if any mixed results exist
     const streams: any[] = (data.streams || []).filter((s: any) => s.category?.toLowerCase() === 'basketball');
     
-    // Helper to purge 540p feeds per user instruction
+    // Helper to purge 540p feeds
     const filter540 = (sources: any[]) => (sources || []).filter((s: any) => !s.quality?.toLowerCase().includes('540'));
 
     // Add computed live status flag
     const processedStreams: Stream[] = streams.map((s) => {
-      const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
+      const liveSourcesFromSources = (s.sources || []).filter((src: any) => src.live === true || src.is_live === true);
+      const combinedLiveSources = (Array.isArray(s.live_sources) && s.live_sources.length > 0)
+        ? s.live_sources
+        : liveSourcesFromSources;
+      const isLive = combinedLiveSources.length > 0 || Boolean(s.is_live) || (typeof s.viewers === 'number' && s.viewers > 10);
       return {
         ...s,
         sources: filter540(s.sources),
-        live_sources: filter540(s.live_sources),
+        live_sources: filter540(combinedLiveSources),
         is_live: isLive,
         status: isLive ? 'live' : (s.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
       };
@@ -94,7 +180,7 @@ export async function getBasketballStreams(forceRefresh = false): Promise<Stream
     return result;
   } catch (err: any) {
     if (cache.streams) {
-      console.warn('API fetch failed, serving stale cache:', err.message);
+      console.warn('[MultiSource Failover] Serving cached basketball streams:', err.message);
       return { ...cache.streams, fromCache: true };
     }
     throw err;
@@ -121,12 +207,16 @@ export async function getFootballStreams(forceRefresh = false): Promise<StreamsR
     const filter540 = (sources: any[]) => (sources || []).filter((s: any) => !s.quality?.toLowerCase().includes('540'));
 
     const processedStreams: Stream[] = streams.map((s) => {
-      const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
+      const liveSourcesFromSources = (s.sources || []).filter((src: any) => src.live === true || src.is_live === true);
+      const combinedLiveSources = (Array.isArray(s.live_sources) && s.live_sources.length > 0)
+        ? s.live_sources
+        : liveSourcesFromSources;
+      const isLive = combinedLiveSources.length > 0 || Boolean(s.is_live) || (typeof s.viewers === 'number' && s.viewers > 10);
       return {
         ...s,
         league: 'NFL',
         sources: filter540(s.sources),
-        live_sources: filter540(s.live_sources),
+        live_sources: filter540(combinedLiveSources),
         is_live: isLive,
         status: isLive ? 'live' : (s.match_timestamp * 1000 > Date.now() ? 'upcoming' : 'ended')
       };
@@ -150,7 +240,7 @@ export async function getFootballStreams(forceRefresh = false): Promise<StreamsR
     footballStreamsCache = { data: result, time: now };
     return result;
   } catch (err: any) {
-    console.error('getFootballStreams error:', err.message);
+    console.error('[MultiSource Failover] getFootballStreams error:', err.message);
     if (footballStreamsCache) {
       return { ...footballStreamsCache.data, fromCache: true };
     }
@@ -181,7 +271,6 @@ export async function getStreamByKey(streamKey: string): Promise<Stream> {
     cache.singleStream.set(streamKey, { data: processed, time: now });
     return processed;
   } catch {
-    // If upstream has not yet posted upcoming stream, synthesize an authorized upcoming stream object
     const parts = streamKey.split('-vs-');
     const team1Name = parts[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Away Team';
     const team2Name = parts[1]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Home Team';
@@ -233,13 +322,14 @@ export interface ResolvedHls {
 
 export interface StreamTargetRecord {
   baseUrl: string;
+  backupBaseUrls: string[];
   workingHost: string;
+  backupHosts: string[];
   qStr: string;
   expires: number;
+  segmentMap?: Map<string, string>;
 }
 
-// In-memory mapping of opaque stream hashes -> upstream chunk endpoints
-// Prevents any reverse-engineering of upstream provider domains or stream locations
 export const streamTargetMap = new Map<string, StreamTargetRecord>();
 
 if (typeof setInterval !== 'undefined') {
@@ -254,13 +344,11 @@ if (typeof setInterval !== 'undefined') {
 }
 
 export async function resolveHlsStream(streamKey: string, requestedQuality = '1080p'): Promise<ResolvedHls> {
-  // Normalize quality
   let quality = requestedQuality;
   if (!quality.endsWith('p')) quality += 'p';
 
-  // Candidate mirrors (streamfree.top does not block datacenter cloud IPs, strmfree.st is fallback)
-  const mirrors = ['https://streamfree.top', 'https://strmfree.st'];
-  let successfulMirror = 'https://streamfree.top';
+  const mirrors = getSortedHealthyMirrors();
+  let successfulMirror = mirrors[0] || 'https://streamfree.top';
   let embedRes: Response | null = null;
   let tokens: Record<string, any> = {};
 
@@ -269,7 +357,11 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
       const candidateQualities = [quality, '1080p', '720p', '2160p'];
       for (const q of candidateQualities) {
         const u = `${mirror}/embed/basketball/${streamKey}${q}`;
-        const res = await fetch(u);
+        const res = await fetch(u, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          }
+        });
         if (res.ok) {
           const text = await res.text();
           const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
@@ -277,13 +369,14 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
             embedRes = res;
             tokens = JSON.parse(match[1]);
             successfulMirror = mirror;
+            recordMirrorSuccess(mirror, 100);
             break;
           }
         }
       }
       if (embedRes && Object.keys(tokens).length > 0) break;
-    } catch (e) {
-      // try next mirror
+    } catch {
+      recordMirrorFailure(mirror);
     }
   }
 
@@ -291,14 +384,13 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
   }
 
-  // Filter out 540p from available qualities
   const availableQualities = Object.keys(tokens).filter(q => !q.toLowerCase().includes('540'));
   let selectedQuality = quality;
   if (!tokens[selectedQuality]) {
     selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : (tokens['2160p'] ? '2160p' : availableQualities[0]));
   }
 
-  // 2. Query stream key metadata for server name
+  // Query stream key metadata
   let keyData: any = {};
   for (const mirror of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
     try {
@@ -307,7 +399,7 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
         keyData = await res.json();
         break;
       }
-    } catch (e) {
+    } catch {
       // continue
     }
   }
@@ -331,7 +423,6 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     pathPrefix = '/live-cdn/';
   }
 
-  // Helper to attempt m3u8 fetch with mirror and quality fallback
   async function attemptM3u8(q: string) {
     const p = tokens[q];
     const v = `${streamKey}${q}`;
@@ -340,11 +431,15 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     for (const host of [successfulMirror, ...mirrors.filter(m => m !== successfulMirror)]) {
       try {
         const u = `${host}${pathPrefix}${v}/index.m3u8${qStr}`;
-        const res = await fetch(u);
+        const res = await fetch(u, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          }
+        });
         if (res.ok) {
           return { res, url: u, host };
         }
-      } catch (err) {
+      } catch {
         // continue
       }
     }
@@ -362,17 +457,15 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     finalM3u8Url = fallback.url;
     workingHost = fallback.host;
   }
-  if (!m3u8Res.ok && selectedQuality !== '540p' && tokens['540p']) {
-    selectedQuality = '540p';
-    const fallback = await attemptM3u8('540p');
+  if (!m3u8Res.ok && selectedQuality !== '720p' && tokens['720p']) {
+    selectedQuality = '720p';
+    const fallback = await attemptM3u8('720p');
     m3u8Res = fallback.res;
     finalM3u8Url = fallback.url;
     workingHost = fallback.host;
   }
 
   if (!m3u8Res.ok) {
-    // If the server IP is restricted by upstream CDN (e.g. datacenter 403 on cloud hosts),
-    // provide the direct upstream URL so the client browser on residential/cellular IP streams directly
     return {
       isExternal: false,
       selectedQuality,
@@ -387,27 +480,64 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
   const p = tokens[selectedQuality];
   const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-  // Generate an opaque, random secure hash for this stream session
-  // Completely eliminates any upstream provider domains or mirrors from client playlists
   const streamHash = Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(4);
   const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
-  streamTargetMap.set(streamHash, {
-    baseUrl,
-    workingHost,
-    qStr,
-    expires: Date.now() + 3600000 // 1 hour validity
-  });
+  const backupHosts = mirrors.filter(m => m !== workingHost);
+  const backupBaseUrls = backupHosts.map(h => `${h}${pathPrefix}${variant}/`);
 
-  // Rewrite all segment URLs to point strictly to our internal proxy endpoint
+  const segmentMap = new Map<string, string>();
+  let segmentIndex = 0;
+
   const m3u8Text = rawM3u8Text.split('\n').map(line => {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) return line;
-    
-    // Extract segment name (e.g. 1263.js or segment.ts)
-    const segmentName = trimmed.includes('/') ? trimmed.split('/').pop() || trimmed : trimmed;
-    // Return internal proxy URL with streamHash
-    return `/api/stream/chunk/${streamHash}/${segmentName}`;
+    if (!trimmed) return line;
+
+    if (trimmed.startsWith('#')) {
+      if (trimmed.startsWith('#EXT-X-MAP:')) {
+        return trimmed.replace(/URI="([^"]+)"/, (_, uri) => {
+          let fullUri = uri;
+          if (!fullUri.startsWith('http://') && !fullUri.startsWith('https://')) {
+            try {
+              fullUri = new URL(uri, baseUrl).toString();
+            } catch {
+              fullUri = `${baseUrl}${uri}`;
+            }
+          }
+          segmentIndex++;
+          const segKey = `map_${segmentIndex}`;
+          segmentMap.set(segKey, fullUri);
+          return `URI="/api/stream/chunk/${streamHash}/${segKey}"`;
+        });
+      }
+      return line;
+    }
+
+    let fullSegmentUrl = trimmed;
+    if (!fullSegmentUrl.startsWith('http://') && !fullSegmentUrl.startsWith('https://')) {
+      if (fullSegmentUrl.startsWith('/')) {
+        fullSegmentUrl = `${workingHost}${fullSegmentUrl}`;
+      } else {
+        fullSegmentUrl = `${baseUrl}${fullSegmentUrl}${qStr && !fullSegmentUrl.includes('?') ? qStr : ''}`;
+      }
+    }
+
+    segmentIndex++;
+    const segName = trimmed.split('?')[0].split('/').pop()?.replace(/[^a-zA-Z0-9_-]/g, '') || 'chunk';
+    const segKey = `s${segmentIndex}_${segName}`;
+    segmentMap.set(segKey, fullSegmentUrl);
+
+    return `/api/stream/chunk/${streamHash}/${segKey}`;
   }).join('\n');
+
+  streamTargetMap.set(streamHash, {
+    baseUrl,
+    backupBaseUrls,
+    workingHost,
+    backupHosts,
+    qStr,
+    expires: Date.now() + 3600000, // 1 hour validity
+    segmentMap
+  });
 
   return {
     isExternal: false,

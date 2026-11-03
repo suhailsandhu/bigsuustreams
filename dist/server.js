@@ -6,7 +6,53 @@ import fs3 from "fs";
 import { fileURLToPath } from "url";
 
 // src/server/streamService.ts
-var MIRRORS = ["https://strmfree.st", "https://streamfree.top"];
+var MIRROR_URLS = [
+  "https://streamfree.top",
+  "https://strmfree.st",
+  "https://strmfree.to"
+];
+var mirrorRegistry = new Map(
+  MIRROR_URLS.map((url) => [
+    url,
+    { url, healthy: true, failCount: 0, lastFailure: 0, latencyMs: 0 }
+  ])
+);
+var COOLDOWN_PERIOD_MS = 45e3;
+function getSortedHealthyMirrors() {
+  const now = Date.now();
+  const mirrors = Array.from(mirrorRegistry.values());
+  for (const m of mirrors) {
+    if (!m.healthy && now - m.lastFailure > COOLDOWN_PERIOD_MS) {
+      m.healthy = true;
+      m.failCount = 0;
+    }
+  }
+  return mirrors.sort((a, b) => {
+    if (a.healthy && !b.healthy) return -1;
+    if (!a.healthy && b.healthy) return 1;
+    if (a.failCount !== b.failCount) return a.failCount - b.failCount;
+    return a.latencyMs - b.latencyMs;
+  }).map((m) => m.url);
+}
+function recordMirrorSuccess(url, durationMs) {
+  const m = mirrorRegistry.get(url);
+  if (m) {
+    m.healthy = true;
+    m.failCount = 0;
+    m.latencyMs = durationMs;
+  }
+}
+function recordMirrorFailure(url) {
+  const m = mirrorRegistry.get(url);
+  if (m) {
+    m.failCount += 1;
+    m.lastFailure = Date.now();
+    if (m.failCount >= 3) {
+      m.healthy = false;
+      console.warn(`[MultiSource Failover] Mirror marked degraded: ${url} (fails: ${m.failCount})`);
+    }
+  }
+}
 var cache = {
   streams: null,
   streamsTime: 0,
@@ -17,24 +63,35 @@ var cache = {
 var CACHE_TTL_STREAMS_MS = 3e4;
 var CACHE_TTL_SOURCES_MS = 15e3;
 async function fetchWithFallback(path4, headers = {}) {
+  const mirrors = getSortedHealthyMirrors();
   let lastErr = null;
-  for (const mirror of MIRRORS) {
+  for (const mirror of mirrors) {
+    const start = Date.now();
     try {
       const url = `${mirror}${path4}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6e3);
       const res = await fetch(url, {
+        signal: controller.signal,
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
           ...headers
         }
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
+        recordMirrorSuccess(mirror, Date.now() - start);
         return { res, mirror };
+      } else {
+        recordMirrorFailure(mirror);
       }
     } catch (e) {
+      recordMirrorFailure(mirror);
       lastErr = e;
     }
   }
-  throw lastErr || new Error(`Failed to fetch ${path4} from all mirrors`);
+  throw lastErr || new Error(`Failed to fetch ${path4} from all multi-source mirrors`);
 }
 async function getBasketballStreams(forceRefresh = false) {
   const now = Date.now();
@@ -47,11 +104,13 @@ async function getBasketballStreams(forceRefresh = false) {
     const streams = (data.streams || []).filter((s) => s.category?.toLowerCase() === "basketball");
     const filter540 = (sources) => (sources || []).filter((s) => !s.quality?.toLowerCase().includes("540"));
     const processedStreams = streams.map((s) => {
-      const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
+      const liveSourcesFromSources = (s.sources || []).filter((src) => src.live === true || src.is_live === true);
+      const combinedLiveSources = Array.isArray(s.live_sources) && s.live_sources.length > 0 ? s.live_sources : liveSourcesFromSources;
+      const isLive = combinedLiveSources.length > 0 || Boolean(s.is_live) || typeof s.viewers === "number" && s.viewers > 10;
       return {
         ...s,
         sources: filter540(s.sources),
-        live_sources: filter540(s.live_sources),
+        live_sources: filter540(combinedLiveSources),
         is_live: isLive,
         status: isLive ? "live" : s.match_timestamp * 1e3 > Date.now() ? "upcoming" : "ended"
       };
@@ -74,7 +133,7 @@ async function getBasketballStreams(forceRefresh = false) {
     return result;
   } catch (err) {
     if (cache.streams) {
-      console.warn("API fetch failed, serving stale cache:", err.message);
+      console.warn("[MultiSource Failover] Serving cached basketball streams:", err.message);
       return { ...cache.streams, fromCache: true };
     }
     throw err;
@@ -94,12 +153,14 @@ async function getFootballStreams(forceRefresh = false) {
     );
     const filter540 = (sources) => (sources || []).filter((s) => !s.quality?.toLowerCase().includes("540"));
     const processedStreams = streams.map((s) => {
-      const isLive = Array.isArray(s.live_sources) && s.live_sources.length > 0;
+      const liveSourcesFromSources = (s.sources || []).filter((src) => src.live === true || src.is_live === true);
+      const combinedLiveSources = Array.isArray(s.live_sources) && s.live_sources.length > 0 ? s.live_sources : liveSourcesFromSources;
+      const isLive = combinedLiveSources.length > 0 || Boolean(s.is_live) || typeof s.viewers === "number" && s.viewers > 10;
       return {
         ...s,
         league: "NFL",
         sources: filter540(s.sources),
-        live_sources: filter540(s.live_sources),
+        live_sources: filter540(combinedLiveSources),
         is_live: isLive,
         status: isLive ? "live" : s.match_timestamp * 1e3 > Date.now() ? "upcoming" : "ended"
       };
@@ -120,7 +181,7 @@ async function getFootballStreams(forceRefresh = false) {
     footballStreamsCache = { data: result, time: now };
     return result;
   } catch (err) {
-    console.error("getFootballStreams error:", err.message);
+    console.error("[MultiSource Failover] getFootballStreams error:", err.message);
     if (footballStreamsCache) {
       return { ...footballStreamsCache.data, fromCache: true };
     }
@@ -199,8 +260,8 @@ if (typeof setInterval !== "undefined") {
 async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
   let quality = requestedQuality;
   if (!quality.endsWith("p")) quality += "p";
-  const mirrors = ["https://streamfree.top", "https://strmfree.st"];
-  let successfulMirror = "https://streamfree.top";
+  const mirrors = getSortedHealthyMirrors();
+  let successfulMirror = mirrors[0] || "https://streamfree.top";
   let embedRes = null;
   let tokens = {};
   for (const mirror of mirrors) {
@@ -208,7 +269,11 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
       const candidateQualities = [quality, "1080p", "720p", "2160p"];
       for (const q of candidateQualities) {
         const u = `${mirror}/embed/basketball/${streamKey}${q}`;
-        const res = await fetch(u);
+        const res = await fetch(u, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          }
+        });
         if (res.ok) {
           const text = await res.text();
           const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
@@ -216,12 +281,14 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
             embedRes = res;
             tokens = JSON.parse(match[1]);
             successfulMirror = mirror;
+            recordMirrorSuccess(mirror, 100);
             break;
           }
         }
       }
       if (embedRes && Object.keys(tokens).length > 0) break;
-    } catch (e) {
+    } catch {
+      recordMirrorFailure(mirror);
     }
   }
   if (!embedRes || Object.keys(tokens).length === 0) {
@@ -240,7 +307,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
         keyData = await res.json();
         break;
       }
-    } catch (e) {
+    } catch {
     }
   }
   if (keyData.is_external && keyData.external_url) {
@@ -267,11 +334,15 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
     for (const host of [successfulMirror, ...mirrors.filter((m) => m !== successfulMirror)]) {
       try {
         const u = `${host}${pathPrefix}${v}/index.m3u8${qStr2}`;
-        const res2 = await fetch(u);
+        const res2 = await fetch(u, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          }
+        });
         if (res2.ok) {
           return { res: res2, url: u, host };
         }
-      } catch (err) {
+      } catch {
       }
     }
     const fallbackUrl = `${successfulMirror}${pathPrefix}${v}/index.m3u8${qStr2}`;
@@ -286,9 +357,9 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
     finalM3u8Url = fallback.url;
     workingHost = fallback.host;
   }
-  if (!m3u8Res.ok && selectedQuality !== "540p" && tokens["540p"]) {
-    selectedQuality = "540p";
-    const fallback = await attemptM3u8("540p");
+  if (!m3u8Res.ok && selectedQuality !== "720p" && tokens["720p"]) {
+    selectedQuality = "720p";
+    const fallback = await attemptM3u8("720p");
     m3u8Res = fallback.res;
     finalM3u8Url = fallback.url;
     workingHost = fallback.host;
@@ -308,19 +379,56 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p") {
   const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : "";
   const streamHash = Math.random().toString(36).substring(2, 10) + Date.now().toString(36).substring(4);
   const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
-  streamTargetMap.set(streamHash, {
-    baseUrl,
-    workingHost,
-    qStr,
-    expires: Date.now() + 36e5
-    // 1 hour validity
-  });
+  const backupHosts = mirrors.filter((m) => m !== workingHost);
+  const backupBaseUrls = backupHosts.map((h) => `${h}${pathPrefix}${variant}/`);
+  const segmentMap = /* @__PURE__ */ new Map();
+  let segmentIndex = 0;
   const m3u8Text = rawM3u8Text.split("\n").map((line) => {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) return line;
-    const segmentName = trimmed.includes("/") ? trimmed.split("/").pop() || trimmed : trimmed;
-    return `/api/stream/chunk/${streamHash}/${segmentName}`;
+    if (!trimmed) return line;
+    if (trimmed.startsWith("#")) {
+      if (trimmed.startsWith("#EXT-X-MAP:")) {
+        return trimmed.replace(/URI="([^"]+)"/, (_, uri) => {
+          let fullUri = uri;
+          if (!fullUri.startsWith("http://") && !fullUri.startsWith("https://")) {
+            try {
+              fullUri = new URL(uri, baseUrl).toString();
+            } catch {
+              fullUri = `${baseUrl}${uri}`;
+            }
+          }
+          segmentIndex++;
+          const segKey2 = `map_${segmentIndex}`;
+          segmentMap.set(segKey2, fullUri);
+          return `URI="/api/stream/chunk/${streamHash}/${segKey2}"`;
+        });
+      }
+      return line;
+    }
+    let fullSegmentUrl = trimmed;
+    if (!fullSegmentUrl.startsWith("http://") && !fullSegmentUrl.startsWith("https://")) {
+      if (fullSegmentUrl.startsWith("/")) {
+        fullSegmentUrl = `${workingHost}${fullSegmentUrl}`;
+      } else {
+        fullSegmentUrl = `${baseUrl}${fullSegmentUrl}${qStr && !fullSegmentUrl.includes("?") ? qStr : ""}`;
+      }
+    }
+    segmentIndex++;
+    const segName = trimmed.split("?")[0].split("/").pop()?.replace(/[^a-zA-Z0-9_-]/g, "") || "chunk";
+    const segKey = `s${segmentIndex}_${segName}`;
+    segmentMap.set(segKey, fullSegmentUrl);
+    return `/api/stream/chunk/${streamHash}/${segKey}`;
   }).join("\n");
+  streamTargetMap.set(streamHash, {
+    baseUrl,
+    backupBaseUrls,
+    workingHost,
+    backupHosts,
+    qStr,
+    expires: Date.now() + 36e5,
+    // 1 hour validity
+    segmentMap
+  });
   return {
     isExternal: false,
     selectedQuality,
@@ -571,11 +679,15 @@ async function getScoreboard(dateStr) {
       const matchAway = streamKeyNorm.includes(awayNorm) || awayShort.length > 3 && streamKeyNorm.includes(awayShort);
       return matchHome && matchAway;
     });
-    const isStreamLive = !!(matchedStream?.is_live || Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0);
+    const isStreamLive = Boolean(
+      matchedStream?.is_live || Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0 || Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src) => src.live === true || src.is_live === true) || typeof matchedStream?.viewers === "number" && matchedStream.viewers > 10
+    );
     const statusType = event.status?.type || {};
     const rawState = statusType.state || "pre";
-    const isLive = rawState === "in" || isStreamLive && rawState !== "post";
-    const state = isLive && rawState !== "post" ? "in" : rawState;
+    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
+    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+    const isLive = rawState === "in" || isStreamLive && rawState !== "post" || isPastScheduledTime && rawState !== "post" && Boolean(matchedStream);
+    const state = rawState === "post" ? "post" : isLive ? "in" : rawState;
     const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
     const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
     const streamInfo = {
@@ -741,11 +853,83 @@ async function getGameSummary(eventId) {
       away: parseTeamBox(awayComp, awayTeamPlayers)
     };
   }
+  let shotChart;
+  if (Array.isArray(data.plays) && data.plays.length > 0) {
+    const rawShots = data.plays.filter((p) => p.shootingPlay && p.coordinate && Math.abs(p.coordinate.x) < 500);
+    if (rawShots.length > 0) {
+      const shots = rawShots.map((p) => {
+        const ath = p.participants?.find((part) => part.athlete)?.athlete;
+        const athleteName = ath?.displayName || p.text.split(" makes ")[0]?.split(" misses ")[0] || "Player";
+        return {
+          id: p.id || String(p.sequenceNumber),
+          athleteId: ath?.id || "",
+          athleteName,
+          teamId: p.team?.id || "",
+          period: p.period?.number || 1,
+          periodDisplay: p.period?.displayValue || "Quarter",
+          clock: p.clock?.displayValue || "0:00",
+          text: p.text || "",
+          scoringPlay: Boolean(p.scoringPlay),
+          scoreValue: p.scoreValue || (p.scoringPlay ? p.pointsAttempted || 2 : 0),
+          pointsAttempted: p.pointsAttempted || (p.text?.includes("three") || p.text?.includes("3PT") ? 3 : 2),
+          x: p.coordinate.x,
+          y: p.coordinate.y
+        };
+      });
+      const homeId = homeComp?.team?.id;
+      const awayId = awayComp?.team?.id;
+      const homeShots = shots.filter((s) => s.teamId === homeId);
+      const awayShots = shots.filter((s) => s.teamId === awayId);
+      const homeMade = homeShots.filter((s) => s.scoringPlay).length;
+      const homeAtt = homeShots.length;
+      const awayMade = awayShots.filter((s) => s.scoringPlay).length;
+      const awayAtt = awayShots.length;
+      shotChart = {
+        shots,
+        homeStats: {
+          made: homeMade,
+          attempted: homeAtt,
+          pct: homeAtt > 0 ? (homeMade / homeAtt * 100).toFixed(1) + "%" : "0.0%"
+        },
+        awayStats: {
+          made: awayMade,
+          attempted: awayAtt,
+          pct: awayAtt > 0 ? (awayMade / awayAtt * 100).toFixed(1) + "%" : "0.0%"
+        }
+      };
+    }
+  }
+  let winProbability;
+  if (Array.isArray(data.winprobability) && data.winprobability.length > 0) {
+    const playMap = /* @__PURE__ */ new Map();
+    if (Array.isArray(data.plays)) {
+      for (const p of data.plays) {
+        if (p.id) playMap.set(p.id, p);
+      }
+    }
+    const rawPoints = data.winprobability;
+    const step = Math.max(1, Math.floor(rawPoints.length / 50));
+    const sampled = rawPoints.filter((_, idx) => idx % step === 0 || idx === rawPoints.length - 1);
+    winProbability = sampled.map((wp) => {
+      const play = playMap.get(wp.playId);
+      const homePct = Math.round((wp.homeWinPercentage || 0.5) * 1e3) / 10;
+      return {
+        homeWinPercentage: homePct,
+        awayWinPercentage: Math.round((100 - homePct) * 10) / 10,
+        homeScore: play?.awayScore !== void 0 && play?.homeScore !== void 0 ? play.homeScore : 0,
+        awayScore: play?.awayScore !== void 0 && play?.homeScore !== void 0 ? play.awayScore : 0,
+        clock: play?.clock?.displayValue || "",
+        periodDisplay: play?.period?.displayValue || ""
+      };
+    });
+  }
   const response = {
     id: eventId,
     name: header.gameNote || `${awayComp?.team?.displayName} at ${homeComp?.team?.displayName}`,
     status: comp.status?.type?.detail || comp.status?.type?.description || "",
-    boxscore
+    boxscore,
+    shotChart,
+    winProbability
   };
   summaryCache.set(eventId, { data: response, timestamp: now });
   return response;
@@ -880,11 +1064,15 @@ async function getNflScoreboard(dateStr) {
       const matchAway = streamKeyNorm.includes(awayNorm) || awayShort.length > 3 && streamKeyNorm.includes(awayShort);
       return matchHome && matchAway || streamKeyNorm.includes("redzone");
     });
-    const isStreamLive = !!(matchedStream?.is_live || Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0);
+    const isStreamLive = Boolean(
+      matchedStream?.is_live || Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0 || Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src) => src.live === true || src.is_live === true) || typeof matchedStream?.viewers === "number" && matchedStream.viewers > 10
+    );
     const statusType = event.status?.type || {};
     const rawState = statusType.state || "pre";
-    const isLive = rawState === "in" || isStreamLive && rawState !== "post";
-    const state = isLive && rawState !== "post" ? "in" : rawState;
+    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
+    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+    const isLive = rawState === "in" || isStreamLive && rawState !== "post" || isPastScheduledTime && rawState !== "post" && Boolean(matchedStream);
+    const state = rawState === "post" ? "post" : isLive ? "in" : rawState;
     let displayDetail = statusType.detail || statusType.description || "";
     if (isLive) {
       displayDetail = statusType.shortDetail || "LIVE";
@@ -1411,11 +1599,11 @@ var AnalyticsTracker = class {
       },
       {
         id: "umami",
-        name: "Umami Analytics",
-        status: "ready",
-        type: "Self-Hosted Privacy Engine",
-        description: "Open-source privacy analytics that can run directly on your DigitalOcean droplet.",
-        features: ["100% Self-Hosted", "Zero Third-Party Leaks", "Custom Events", "Database Persistence"]
+        name: "Umami Cloud & Open Source Analytics",
+        status: "active",
+        type: "Privacy-Preserving Telemetry & Cloud Dashboard",
+        description: "Open-source GitHub engine connected. Tracks live pageviews, custom watch events, and telemetry without cookies.",
+        features: ["Umami Cloud Integrated", "Custom Event Telemetry", "Zero Third-Party Leaks", "GDPR Compliant"]
       },
       {
         id: "ga4",
@@ -1658,55 +1846,127 @@ function applySecurityHeaders(_req, res, next) {
 }
 
 // src/server/authService.ts
-import fs2 from "fs";
-import path2 from "path";
 import crypto from "crypto";
+
+// src/server/db.ts
+import { DatabaseSync } from "node:sqlite";
+import path2 from "path";
+import fs2 from "fs";
 var DATA_DIR2 = path2.join(process.cwd(), "data");
-var USERS_FILE = path2.join(DATA_DIR2, "users.json");
+var DB_PATH = path2.join(DATA_DIR2, "courtside.db");
+var OLD_USERS_FILE = path2.join(DATA_DIR2, "users.json");
+if (!fs2.existsSync(DATA_DIR2)) {
+  fs2.mkdirSync(DATA_DIR2, { recursive: true });
+}
+var db = new DatabaseSync(DB_PATH);
+db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA foreign_keys = ON;");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    display_name TEXT,
+    password_hash TEXT,
+    salt TEXT,
+    provider TEXT NOT NULL DEFAULT 'local',
+    google_id TEXT,
+    avatar_url TEXT,
+    favorite_teams TEXT DEFAULT '[]',
+    spoiler_free INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    last_login TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    username TEXT NOT NULL,
+    display_name TEXT,
+    avatar_url TEXT,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS watch_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    stream_key TEXT NOT NULL,
+    game_name TEXT NOT NULL,
+    watched_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+  CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+  CREATE INDEX IF NOT EXISTS idx_watch_history_user ON watch_history(user_id);
+`);
+try {
+  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get();
+  if (userCount.count === 0 && fs2.existsSync(OLD_USERS_FILE)) {
+    const raw = fs2.readFileSync(OLD_USERS_FILE, "utf-8");
+    const legacyUsers = JSON.parse(raw);
+    if (Array.isArray(legacyUsers) && legacyUsers.length > 0) {
+      const insertStmt = db.prepare(`
+        INSERT OR IGNORE INTO users (
+          id, username, email, display_name, password_hash, salt, provider, google_id, avatar_url, favorite_teams, spoiler_free, created_at, last_login
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+      `);
+      for (const u of legacyUsers) {
+        insertStmt.run(
+          u.id,
+          u.username,
+          u.email,
+          u.displayName || u.username,
+          u.passwordHash || null,
+          u.salt || null,
+          u.provider || "local",
+          u.googleId || null,
+          u.avatarUrl || null,
+          JSON.stringify(u.favoriteTeams || []),
+          u.spoilerFree ? 1 : 0,
+          u.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+          u.lastLogin || (/* @__PURE__ */ new Date()).toISOString()
+        );
+      }
+      console.log(`[SQLite] Migrated ${legacyUsers.length} legacy users from users.json`);
+    }
+  }
+} catch (err) {
+  console.warn("[SQLite] Notice during legacy user migration:", err);
+}
+
+// src/server/authService.ts
 var AuthService = class {
-  users = /* @__PURE__ */ new Map();
-  sessions = /* @__PURE__ */ new Map();
-  constructor() {
-    this.ensureDataStore();
-    this.loadUsers();
-  }
-  ensureDataStore() {
-    try {
-      if (!fs2.existsSync(DATA_DIR2)) {
-        fs2.mkdirSync(DATA_DIR2, { recursive: true });
-      }
-      if (!fs2.existsSync(USERS_FILE)) {
-        fs2.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf-8");
-      }
-    } catch (err) {
-      console.warn("Could not initialize users data directory:", err);
-    }
-  }
-  loadUsers() {
-    try {
-      if (fs2.existsSync(USERS_FILE)) {
-        const raw = fs2.readFileSync(USERS_FILE, "utf-8");
-        const list = JSON.parse(raw);
-        this.users.clear();
-        for (const u of list) {
-          this.users.set(u.id, u);
-        }
-      }
-    } catch (err) {
-      console.warn("Error reading users store:", err);
-    }
-  }
-  persistUsers() {
-    try {
-      this.ensureDataStore();
-      const list = Array.from(this.users.values());
-      fs2.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
-    } catch (err) {
-      console.warn("Error saving users store:", err);
-    }
-  }
   hashPassword(password, salt) {
     return crypto.pbkdf2Sync(password, salt, 1e4, 64, "sha512").toString("hex");
+  }
+  mapDbUser(row) {
+    let favoriteTeams = [];
+    try {
+      favoriteTeams = JSON.parse(row.favorite_teams || "[]");
+    } catch {
+      favoriteTeams = [];
+    }
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      displayName: row.display_name || row.username,
+      passwordHash: row.password_hash || void 0,
+      salt: row.salt || void 0,
+      provider: row.provider || "local",
+      googleId: row.google_id || void 0,
+      avatarUrl: row.avatar_url || void 0,
+      favoriteTeams,
+      spoilerFree: Boolean(row.spoiler_free),
+      createdAt: row.created_at,
+      lastLogin: row.last_login
+    };
   }
   register(username, email, password) {
     const cleanUsername = username.trim().toLowerCase();
@@ -1720,11 +1980,12 @@ var AuthService = class {
     if (!password || password.length < 6) {
       throw new Error("Password must be at least 6 characters long");
     }
-    for (const u of this.users.values()) {
-      if (u.username === cleanUsername) {
+    const existing = db.prepare("SELECT id, username, email FROM users WHERE username = ? OR email = ?").get(cleanUsername, cleanEmail);
+    if (existing) {
+      if (existing.username === cleanUsername) {
         throw new Error("This username is already taken. Please choose another.");
       }
-      if (u.email === cleanEmail) {
+      if (existing.email === cleanEmail) {
         throw new Error("An account with this email already exists. Please log in.");
       }
     }
@@ -1732,6 +1993,14 @@ var AuthService = class {
     const passwordHash = this.hashPassword(password, salt);
     const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const now = (/* @__PURE__ */ new Date()).toISOString();
+    const insertStmt = db.prepare(`
+      INSERT INTO users (
+        id, username, email, display_name, password_hash, salt, provider, avatar_url, favorite_teams, spoiler_free, created_at, last_login
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, 'local', null, '[]', 0, ?, ?
+      )
+    `);
+    insertStmt.run(id, cleanUsername, cleanEmail, username.trim(), passwordHash, salt, now, now);
     const user = {
       id,
       username: cleanUsername,
@@ -1740,48 +2009,46 @@ var AuthService = class {
       passwordHash,
       salt,
       provider: "local",
+      favoriteTeams: [],
+      spoilerFree: false,
       createdAt: now,
       lastLogin: now
     };
-    this.users.set(id, user);
-    this.persistUsers();
     const session = this.createSession(user);
     return { user, session };
   }
   login(identifier, password) {
     const clean = identifier.trim().toLowerCase();
-    let foundUser;
-    for (const u of this.users.values()) {
-      if (u.username === clean || u.email === clean) {
-        foundUser = u;
-        break;
-      }
-    }
-    if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
+    const row = db.prepare("SELECT * FROM users WHERE username = ? OR email = ?").get(clean, clean);
+    if (!row || !row.password_hash || !row.salt) {
       throw new Error("Invalid username/email or password");
     }
-    const inputHash = this.hashPassword(password, foundUser.salt);
-    if (inputHash !== foundUser.passwordHash) {
+    const inputHash = this.hashPassword(password, row.salt);
+    if (inputHash !== row.password_hash) {
       throw new Error("Invalid username/email or password");
     }
-    foundUser.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
-    this.persistUsers();
-    const session = this.createSession(foundUser);
-    return { user: foundUser, session };
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    db.prepare("UPDATE users SET last_login = ? WHERE id = ?").run(now, row.id);
+    row.last_login = now;
+    const user = this.mapDbUser(row);
+    const session = this.createSession(user);
+    return { user, session };
   }
   loginWithGoogle(email, displayName, avatarUrl) {
     const cleanEmail = email.trim().toLowerCase();
-    let user;
-    for (const u of this.users.values()) {
-      if (u.email === cleanEmail) {
-        user = u;
-        break;
-      }
-    }
+    const existing = db.prepare("SELECT * FROM users WHERE email = ?").get(cleanEmail);
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    if (!user) {
+    let user;
+    if (!existing) {
       const generatedUsername = cleanEmail.split("@")[0].replace(/[^a-z0-9]/g, "").slice(0, 15) || `user${Date.now() % 1e4}`;
       const id = `google_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      db.prepare(`
+        INSERT INTO users (
+          id, username, email, display_name, provider, avatar_url, favorite_teams, spoiler_free, created_at, last_login
+        ) VALUES (
+          ?, ?, ?, ?, 'google', ?, '[]', 0, ?, ?
+        )
+      `).run(id, generatedUsername, cleanEmail, displayName || cleanEmail.split("@")[0], avatarUrl || null, now, now);
       user = {
         id,
         username: generatedUsername,
@@ -1789,44 +2056,91 @@ var AuthService = class {
         displayName: displayName || cleanEmail.split("@")[0],
         provider: "google",
         avatarUrl,
+        favoriteTeams: [],
+        spoilerFree: false,
         createdAt: now,
         lastLogin: now
       };
-      this.users.set(id, user);
     } else {
-      user.lastLogin = now;
-      if (avatarUrl) user.avatarUrl = avatarUrl;
+      db.prepare("UPDATE users SET last_login = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?").run(now, avatarUrl || null, existing.id);
+      existing.last_login = now;
+      if (avatarUrl) existing.avatar_url = avatarUrl;
+      user = this.mapDbUser(existing);
     }
-    this.persistUsers();
     const session = this.createSession(user);
     return { user, session };
   }
   createSession(user) {
     const token = `sess_${crypto.randomBytes(32).toString("hex")}`;
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1e3;
-    const session = {
+    db.prepare(`
+      INSERT INTO sessions (token, user_id, username, display_name, avatar_url, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(token, user.id, user.username, user.displayName, user.avatarUrl || null, expiresAt);
+    return {
       token,
       userId: user.id,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
+      favoriteTeams: user.favoriteTeams,
+      spoilerFree: user.spoilerFree,
       expiresAt
     };
-    this.sessions.set(token, session);
-    return session;
   }
   verifySession(token) {
     if (!token) return null;
-    const session = this.sessions.get(token);
-    if (!session) return null;
-    if (Date.now() > session.expiresAt) {
-      this.sessions.delete(token);
+    const row = db.prepare(`
+      SELECT s.*, u.favorite_teams, u.spoiler_free
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.token = ?
+    `).get(token);
+    if (!row) return null;
+    if (Date.now() > row.expires_at) {
+      db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
       return null;
     }
-    return session;
+    let favoriteTeams = [];
+    try {
+      favoriteTeams = JSON.parse(row.favorite_teams || "[]");
+    } catch {
+      favoriteTeams = [];
+    }
+    return {
+      token: row.token,
+      userId: row.user_id,
+      username: row.username,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_url || void 0,
+      favoriteTeams,
+      spoilerFree: Boolean(row.spoiler_free),
+      expiresAt: row.expires_at
+    };
   }
   removeSession(token) {
-    this.sessions.delete(token);
+    db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+  }
+  updatePreferences(userId, favoriteTeams, spoilerFree) {
+    if (favoriteTeams !== void 0 && spoilerFree !== void 0) {
+      db.prepare("UPDATE users SET favorite_teams = ?, spoiler_free = ? WHERE id = ?").run(JSON.stringify(favoriteTeams), spoilerFree ? 1 : 0, userId);
+    } else if (favoriteTeams !== void 0) {
+      db.prepare("UPDATE users SET favorite_teams = ? WHERE id = ?").run(JSON.stringify(favoriteTeams), userId);
+    } else if (spoilerFree !== void 0) {
+      db.prepare("UPDATE users SET spoiler_free = ? WHERE id = ?").run(spoilerFree ? 1 : 0, userId);
+    }
+  }
+  recordWatchHistory(userId, gameId, streamKey, gameName) {
+    try {
+      db.prepare(`
+        INSERT INTO watch_history (user_id, game_id, stream_key, game_name, watched_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(userId, gameId, streamKey, gameName, (/* @__PURE__ */ new Date()).toISOString());
+    } catch (e) {
+    }
+  }
+  getWatchHistory(userId, limit = 10) {
+    return db.prepare("SELECT * FROM watch_history WHERE user_id = ? ORDER BY id DESC LIMIT ?").all(userId, limit);
   }
 };
 var authService = new AuthService();
@@ -1979,6 +2293,26 @@ app.post("/api/auth/logout", (req, res) => {
   }
   res.json({ success: true });
 });
+app.get("/api/user/preferences", (req, res) => {
+  const token = req.headers.authorization?.replace("Bearer ", "") || req.query.token;
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  const session = authService.verifySession(String(token));
+  if (!session) return res.status(401).json({ error: "Session expired" });
+  res.json({
+    success: true,
+    favoriteTeams: session.favoriteTeams || [],
+    spoilerFree: Boolean(session.spoilerFree)
+  });
+});
+app.post("/api/user/preferences", (req, res) => {
+  const token = req.headers.authorization?.replace("Bearer ", "") || req.body?.token;
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  const session = authService.verifySession(String(token));
+  if (!session) return res.status(401).json({ error: "Session expired" });
+  const { favoriteTeams, spoilerFree } = req.body || {};
+  authService.updatePreferences(session.userId, favoriteTeams, spoilerFree);
+  res.json({ success: true });
+});
 app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
   const clean = typeof password === "string" ? password.trim().toLowerCase() : "";
@@ -2095,17 +2429,52 @@ async function handleChunkProxy(req, res) {
     if (!record || record.expires < Date.now()) {
       return res.status(404).send("Segment expired");
     }
-    const cleanSegment = path3.basename(segment);
-    const targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes("?") ? record.qStr : ""}`;
-    const upstreamRes = await fetch(targetUrl, {
-      headers: {
-        "Referer": record.workingHost,
-        "Origin": record.workingHost,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    let targetUrl = record.segmentMap?.get(segment);
+    if (!targetUrl) {
+      const cleanSegment = path3.basename(segment);
+      targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes("?") ? record.qStr : ""}`;
+    }
+    let upstreamRes = null;
+    try {
+      const parsed = new URL(targetUrl);
+      const hostOrigin = parsed.origin;
+      const r = await fetch(targetUrl, {
+        headers: {
+          "Referer": hostOrigin,
+          "Origin": hostOrigin,
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+      });
+      if (r.ok) {
+        upstreamRes = r;
       }
-    });
-    if (!upstreamRes.ok) {
-      return res.status(upstreamRes.status).send("Chunk fetch failed");
+    } catch {
+    }
+    if (!upstreamRes || !upstreamRes.ok) {
+      const cleanSegment = path3.basename(segment);
+      const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
+        url: `${bUrl}${cleanSegment}${record.qStr && !cleanSegment.includes("?") ? record.qStr : ""}`,
+        host: record.backupHosts && record.backupHosts[idx] || record.workingHost
+      }));
+      for (const cand of candidateUrls) {
+        try {
+          const r = await fetch(cand.url, {
+            headers: {
+              "Referer": cand.host,
+              "Origin": cand.host,
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            }
+          });
+          if (r.ok) {
+            upstreamRes = r;
+            break;
+          }
+        } catch {
+        }
+      }
+    }
+    if (!upstreamRes || !upstreamRes.ok) {
+      return res.status(upstreamRes ? upstreamRes.status : 502).send("Chunk fetch failed across all failover mirrors");
     }
     res.setHeader("Content-Type", "video/mp2t");
     res.setHeader("Cache-Control", "public, max-age=120");
@@ -2116,7 +2485,7 @@ async function handleChunkProxy(req, res) {
     return res.status(502).send("Proxy error");
   }
 }
-app.get("/api/stream/chunk/:hash/:segment", requireSiteAccess, handleChunkProxy);
+app.get("/api/stream/chunk/:hash/:segment", handleChunkProxy);
 app.get("/api/football/scoreboard", async (req, res) => {
   try {
     const dateStr = req.query.date ? String(req.query.date) : void 0;

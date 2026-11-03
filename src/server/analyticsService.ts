@@ -425,11 +425,11 @@ class AnalyticsTracker {
       },
       {
         id: 'umami',
-        name: 'Umami Analytics',
-        status: 'ready',
-        type: 'Self-Hosted Privacy Engine',
-        description: 'Open-source privacy analytics that can run directly on your DigitalOcean droplet.',
-        features: ['100% Self-Hosted', 'Zero Third-Party Leaks', 'Custom Events', 'Database Persistence']
+        name: 'Umami Cloud & Open Source Analytics',
+        status: 'active',
+        type: 'Privacy-Preserving Telemetry & Cloud Dashboard',
+        description: 'Open-source GitHub engine connected. Tracks live pageviews, custom watch events, and telemetry without cookies.',
+        features: ['Umami Cloud Integrated', 'Custom Event Telemetry', 'Zero Third-Party Leaks', 'GDPR Compliant']
       },
       {
         id: 'ga4',

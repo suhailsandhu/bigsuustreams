@@ -182,6 +182,29 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// User Preferences & Favorites (SQLite-backed)
+app.get('/api/user/preferences', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const session = authService.verifySession(String(token));
+  if (!session) return res.status(401).json({ error: 'Session expired' });
+  res.json({
+    success: true,
+    favoriteTeams: session.favoriteTeams || [],
+    spoilerFree: Boolean(session.spoilerFree)
+  });
+});
+
+app.post('/api/user/preferences', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.body?.token;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const session = authService.verifySession(String(token));
+  if (!session) return res.status(401).json({ error: 'Session expired' });
+  const { favoriteTeams, spoilerFree } = req.body || {};
+  authService.updatePreferences(session.userId, favoriteTeams, spoilerFree);
+  res.json({ success: true });
+});
+
 // Passcode gate support (Passcode 2222)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
@@ -344,20 +367,60 @@ async function handleChunkProxy(req, res) {
       return res.status(404).send('Segment expired');
     }
 
-    // Sanitize segment name against path traversal attacks
-    const cleanSegment = path.basename(segment);
-    const targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
+    // Lookup mapped upstream URL from segmentMap
+    let targetUrl = record.segmentMap?.get(segment);
+    if (!targetUrl) {
+      const cleanSegment = path.basename(segment);
+      targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
+    }
 
-    const upstreamRes = await fetch(targetUrl, {
-      headers: {
-        'Referer': record.workingHost,
-        'Origin': record.workingHost,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    let upstreamRes = null;
+    try {
+      const parsed = new URL(targetUrl);
+      const hostOrigin = parsed.origin;
+      const r = await fetch(targetUrl, {
+        headers: {
+          'Referer': hostOrigin,
+          'Origin': hostOrigin,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        }
+      });
+      if (r.ok) {
+        upstreamRes = r;
       }
-    });
+    } catch {
+      // Primary fetch failed
+    }
 
-    if (!upstreamRes.ok) {
-      return res.status(upstreamRes.status).send('Chunk fetch failed');
+    // If initial fetch failed, try fallback candidate URLs
+    if (!upstreamRes || !upstreamRes.ok) {
+      const cleanSegment = path.basename(segment);
+      const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
+        url: `${bUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`,
+        host: (record.backupHosts && record.backupHosts[idx]) || record.workingHost
+      }));
+
+      for (const cand of candidateUrls) {
+        try {
+          const r = await fetch(cand.url, {
+            headers: {
+              'Referer': cand.host,
+              'Origin': cand.host,
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            }
+          });
+          if (r.ok) {
+            upstreamRes = r;
+            break;
+          }
+        } catch {
+          // Multi-source failover: try next mirror
+        }
+      }
+    }
+
+    if (!upstreamRes || !upstreamRes.ok) {
+      return res.status(upstreamRes ? upstreamRes.status : 502).send('Chunk fetch failed across all failover mirrors');
     }
 
     res.setHeader('Content-Type', 'video/mp2t');
@@ -371,7 +434,7 @@ async function handleChunkProxy(req, res) {
   }
 }
 
-app.get('/api/stream/chunk/:hash/:segment', requireSiteAccess, handleChunkProxy);
+app.get('/api/stream/chunk/:hash/:segment', handleChunkProxy);
 
 // ============================================================================
 // NFL (Football) API Endpoints

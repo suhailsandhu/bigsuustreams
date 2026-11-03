@@ -1,5 +1,3 @@
-import type { Stream } from './stream.js';
-
 export interface CompetitorTeam {
   id: string;
   name: string;
@@ -64,11 +62,11 @@ export interface TeamLeaderSummary {
 
 export interface ScoreboardGame {
   id: string;
-  espnId?: string;
+  espnId: string;
   date: string;
   name: string;
   shortName: string;
-  league: 'NBA' | 'NCAA' | 'BASKETBALL' | 'NFL';
+  league?: 'NBA' | 'NFL' | string;
   status: {
     state: 'pre' | 'in' | 'post';
     detail: string;
@@ -77,28 +75,35 @@ export interface ScoreboardGame {
     period: number;
     clock: string;
   };
-  homeTeam: CompetitorTeam;
   awayTeam: CompetitorTeam;
+  homeTeam: CompetitorTeam;
   displayLeaders?: GameLeadersDisplay;
-  leaders?: {
-    home?: TeamLeaderSummary;
+  leaders?: any;
+  teamLeaders?: {
     away?: TeamLeaderSummary;
+    home?: TeamLeaderSummary;
   };
   stream?: {
     available: boolean;
-    isLive: boolean;
     streamKey?: string;
-    qualities: string[];
-    viewers: number;
-    streamData?: Stream;
+    isLive: boolean;
+    viewers?: number;
+    sourcesCount?: number;
+    qualities?: string[];
+    streamData?: any;
   };
+  youtubeVideoId?: string;
+  hasHighlights?: boolean;
+  isNfl?: boolean;
 }
 
 export interface ScoreboardResponse {
   date: string;
-  formattedDate: string;
+  formattedDate?: string;
+  count?: number;
+  liveCount?: number;
   games: ScoreboardGame[];
-  liveCount: number;
+  updated_at?: string;
   fromCache?: boolean;
 }
 
@@ -113,7 +118,7 @@ export interface AthleteBoxscoreStat {
   starter?: boolean;
   didNotPlay?: boolean;
   reason?: string;
-  stats: string[]; // MIN, PTS, REB, AST, FG, 3PT, FT, etc.
+  stats: string[];
 }
 
 export interface TeamBoxscore {
@@ -129,6 +134,37 @@ export interface TeamBoxscore {
   athletes: AthleteBoxscoreStat[];
 }
 
+export interface ShotItem {
+  id: string;
+  athleteId: string;
+  athleteName: string;
+  teamId: string;
+  period: number;
+  periodDisplay: string;
+  clock: string;
+  text: string;
+  scoringPlay: boolean;
+  scoreValue: number;
+  pointsAttempted: number;
+  x: number; // 0 to 50
+  y: number; // 0 to 47
+}
+
+export interface ShotChartData {
+  shots: ShotItem[];
+  homeStats: { made: number; attempted: number; pct: string };
+  awayStats: { made: number; attempted: number; pct: string };
+}
+
+export interface WinProbabilityPoint {
+  homeWinPercentage: number;
+  awayWinPercentage: number;
+  homeScore: number;
+  awayScore: number;
+  clock: string;
+  periodDisplay: string;
+}
+
 export interface GameSummaryResponse {
   id: string;
   name?: string;
@@ -138,6 +174,8 @@ export interface GameSummaryResponse {
     away: TeamBoxscore;
   };
   leaders?: ScoreboardGame['leaders'];
+  shotChart?: ShotChartData;
+  winProbability?: WinProbabilityPoint[];
 }
 
 export interface StandingsTeam {

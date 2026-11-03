@@ -46,8 +46,7 @@ function getMinutesUntilStart(dateStr?: string): number {
     const gameTime = new Date(dateStr).getTime();
     if (isNaN(gameTime)) return 0;
     const diffMs = gameTime - Date.now();
-    const diffMinutes = Math.ceil(diffMs / 60000);
-    return Math.max(1, diffMinutes);
+    return Math.ceil(diffMs / 60000);
   } catch {
     return 0;
   }
@@ -104,8 +103,11 @@ export const GameRow: React.FC<GameRowProps> = ({
       }
     : {};
 
+  // Live stream status: active if ESPN says isLive, backend attached live stream, or scheduled tip-off has arrived
+  const isStreamLiveNow = !isFinal && (isLive || Boolean(game.stream?.isLive) || (isUpcoming && minutesUntilStart <= 0));
+
   const handleRowClick = () => {
-    if (isLive) {
+    if (isStreamLiveNow) {
       onWatchGame(game);
     } else if (isFinal) {
       if (onWatchHighlights) {
@@ -254,8 +256,8 @@ export const GameRow: React.FC<GameRowProps> = ({
 
       </div>
 
-      {/* For Upcoming Games: Gray Button indicating when stream starts (active 1 hour before earliest game of the day) */}
-      {isUpcoming && isCountdownActive && (
+      {/* For Upcoming Games: Gray Button indicating when stream starts (only when > 0 minutes left) */}
+      {isUpcoming && !isStreamLiveNow && isCountdownActive && minutesUntilStart > 0 && (
         <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
           <button
             type="button"
@@ -273,8 +275,8 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
       )}
 
-      {/* For Live Games: Single 'Watch Live' Action Button */}
-      {isLive && (
+      {/* For Live Games: Single 'Watch Live' Action Button (or Stream Live when time has arrived) */}
+      {isStreamLiveNow && !isFinal && (
         <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
           <button
             onClick={(e) => {
@@ -283,6 +285,7 @@ export const GameRow: React.FC<GameRowProps> = ({
             }}
             className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
           >
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Watch Live</span>
           </button>

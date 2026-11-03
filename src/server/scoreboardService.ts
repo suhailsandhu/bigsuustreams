@@ -1,7 +1,7 @@
 import type { 
   ScoreboardGame, ScoreboardResponse, GameSummaryResponse, CompetitorTeam, 
   TeamLeaderSummary, AthleteBoxscoreStat, GameLeadersDisplay, LeaderStatLine,
-  ConferenceStandings, StandingsTeam
+  ConferenceStandings, StandingsTeam, ShotItem, ShotChartData, WinProbabilityPoint
 } from '../types/scoreboard.ts';
 import { getBasketballStreams, getFootballStreams } from './streamService.ts';
 import { getTodayDateString } from '../utils/date.ts';
@@ -281,12 +281,23 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
       return matchHome && matchAway;
     });
 
-    const isStreamLive = !!(matchedStream?.is_live || (Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0));
+    const isStreamLive = Boolean(
+      matchedStream?.is_live || 
+      (Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0) ||
+      (Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src: any) => src.live === true || src.is_live === true)) ||
+      (typeof matchedStream?.viewers === 'number' && matchedStream.viewers > 10)
+    );
 
     const statusType = event.status?.type || {};
     const rawState = (statusType.state || 'pre') as 'pre' | 'in' | 'post';
-    const isLive = rawState === 'in' || (isStreamLive && (rawState as string) !== 'post');
-    const state: 'pre' | 'in' | 'post' = (isLive && (rawState as string) !== 'post') ? 'in' : rawState;
+    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
+    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+
+    const isLive = rawState === 'in' || 
+      (isStreamLive && (rawState as string) !== 'post') || 
+      (isPastScheduledTime && (rawState as string) !== 'post' && Boolean(matchedStream));
+
+    const state: 'pre' | 'in' | 'post' = (rawState as string) === 'post' ? 'post' : (isLive ? 'in' : rawState);
 
     const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
     const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
@@ -478,11 +489,93 @@ export async function getGameSummary(eventId: string): Promise<GameSummaryRespon
     };
   }
 
+  // Parse Shot Chart data from ESPN plays
+  let shotChart: ShotChartData | undefined;
+  if (Array.isArray(data.plays) && data.plays.length > 0) {
+    const rawShots = data.plays.filter((p: any) => p.shootingPlay && p.coordinate && Math.abs(p.coordinate.x) < 500);
+    if (rawShots.length > 0) {
+      const shots: ShotItem[] = rawShots.map((p: any) => {
+        const ath = p.participants?.find((part: any) => part.athlete)?.athlete;
+        const athleteName = ath?.displayName || p.text.split(' makes ')[0]?.split(' misses ')[0] || 'Player';
+        return {
+          id: p.id || String(p.sequenceNumber),
+          athleteId: ath?.id || '',
+          athleteName,
+          teamId: p.team?.id || '',
+          period: p.period?.number || 1,
+          periodDisplay: p.period?.displayValue || 'Quarter',
+          clock: p.clock?.displayValue || '0:00',
+          text: p.text || '',
+          scoringPlay: Boolean(p.scoringPlay),
+          scoreValue: p.scoreValue || (p.scoringPlay ? (p.pointsAttempted || 2) : 0),
+          pointsAttempted: p.pointsAttempted || (p.text?.includes('three') || p.text?.includes('3PT') ? 3 : 2),
+          x: p.coordinate.x,
+          y: p.coordinate.y
+        };
+      });
+
+      const homeId = homeComp?.team?.id;
+      const awayId = awayComp?.team?.id;
+
+      const homeShots = shots.filter(s => s.teamId === homeId);
+      const awayShots = shots.filter(s => s.teamId === awayId);
+
+      const homeMade = homeShots.filter(s => s.scoringPlay).length;
+      const homeAtt = homeShots.length;
+      const awayMade = awayShots.filter(s => s.scoringPlay).length;
+      const awayAtt = awayShots.length;
+
+      shotChart = {
+        shots,
+        homeStats: {
+          made: homeMade,
+          attempted: homeAtt,
+          pct: homeAtt > 0 ? ((homeMade / homeAtt) * 100).toFixed(1) + '%' : '0.0%'
+        },
+        awayStats: {
+          made: awayMade,
+          attempted: awayAtt,
+          pct: awayAtt > 0 ? ((awayMade / awayAtt) * 100).toFixed(1) + '%' : '0.0%'
+        }
+      };
+    }
+  }
+
+  // Parse Win Probability trajectory
+  let winProbability: WinProbabilityPoint[] | undefined;
+  if (Array.isArray(data.winprobability) && data.winprobability.length > 0) {
+    const playMap = new Map<string, any>();
+    if (Array.isArray(data.plays)) {
+      for (const p of data.plays) {
+        if (p.id) playMap.set(p.id, p);
+      }
+    }
+
+    const rawPoints = data.winprobability;
+    const step = Math.max(1, Math.floor(rawPoints.length / 50));
+    const sampled = rawPoints.filter((_: any, idx: number) => idx % step === 0 || idx === rawPoints.length - 1);
+
+    winProbability = sampled.map((wp: any) => {
+      const play = playMap.get(wp.playId);
+      const homePct = Math.round((wp.homeWinPercentage || 0.5) * 1000) / 10;
+      return {
+        homeWinPercentage: homePct,
+        awayWinPercentage: Math.round((100 - homePct) * 10) / 10,
+        homeScore: play?.awayScore !== undefined && play?.homeScore !== undefined ? play.homeScore : 0,
+        awayScore: play?.awayScore !== undefined && play?.homeScore !== undefined ? play.awayScore : 0,
+        clock: play?.clock?.displayValue || '',
+        periodDisplay: play?.period?.displayValue || ''
+      };
+    });
+  }
+
   const response: GameSummaryResponse = {
     id: eventId,
     name: header.gameNote || `${awayComp?.team?.displayName} at ${homeComp?.team?.displayName}`,
     status: comp.status?.type?.detail || comp.status?.type?.description || '',
-    boxscore
+    boxscore,
+    shotChart,
+    winProbability
   };
 
   summaryCache.set(eventId, { data: response, timestamp: now });
@@ -647,11 +740,20 @@ export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResp
       return (matchHome && matchAway) || streamKeyNorm.includes('redzone');
     });
 
-    const isStreamLive = !!(matchedStream?.is_live || (Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0));
+    const isStreamLive = Boolean(
+      matchedStream?.is_live || 
+      (Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0) ||
+      (Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src: any) => src.live === true || src.is_live === true)) ||
+      (typeof matchedStream?.viewers === 'number' && matchedStream.viewers > 10)
+    );
     const statusType = event.status?.type || {};
     const rawState = (statusType.state || 'pre') as 'pre' | 'in' | 'post';
-    const isLive = rawState === 'in' || (isStreamLive && (rawState as string) !== 'post');
-    const state: 'pre' | 'in' | 'post' = (isLive && (rawState as string) !== 'post') ? 'in' : rawState;
+    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
+    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+    const isLive = rawState === 'in' || 
+      (isStreamLive && (rawState as string) !== 'post') ||
+      (isPastScheduledTime && (rawState as string) !== 'post' && Boolean(matchedStream));
+    const state: 'pre' | 'in' | 'post' = (rawState as string) === 'post' ? 'post' : (isLive ? 'in' : rawState);
 
     let displayDetail = statusType.detail || statusType.description || '';
     if (isLive) {

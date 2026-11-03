@@ -104,9 +104,33 @@ function getSessionDurationSeconds(): number {
   return Math.max(0, Math.floor((Date.now() - sessionStartTime) / 1000));
 }
 
+declare global {
+  interface Window {
+    umami?: {
+      track: (eventName: string, eventData?: Record<string, any>) => void;
+    };
+  }
+}
+
+export function trackUmamiEvent(eventName: string, eventData?: Record<string, any>) {
+  try {
+    if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+      window.umami.track(eventName, eventData);
+    }
+  } catch {
+    // Non-blocking telemetry
+  }
+}
+
 export function trackPageView(streamKey?: string, gameName?: string) {
   currentStreamKey = streamKey;
   currentGameName = gameName;
+
+  trackUmamiEvent('page_view', {
+    path: window.location.pathname || '/',
+    streamKey: streamKey || 'home',
+    game: gameName || 'lobby'
+  });
 
   sendPing(true);
 
@@ -120,6 +144,7 @@ export function trackPageView(streamKey?: string, gameName?: string) {
 export function updateCurrentStream(streamKey?: string, gameName?: string) {
   currentStreamKey = streamKey;
   currentGameName = gameName;
+  trackUmamiEvent('watch_stream', { streamKey, game: gameName });
   sendPing(false);
 }
 

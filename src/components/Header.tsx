@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Columns2 } from 'lucide-react';
 import { NflLogo } from './NflLogo';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   currentUser?: any;
   onLogout?: () => void;
   onOpenProfile?: () => void;
+  onOpenMultiStream?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,7 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   currentSport,
   onToggleSport,
   currentUser,
-  onOpenProfile
+  onOpenProfile,
+  onOpenMultiStream
 }) => {
   const isVip = Boolean(
     currentUser?.isVip === true ||
@@ -31,6 +33,20 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-2xs select-none relative">
+      {/* Multi-Stream Quad-View Button in Top Left */}
+      {onOpenMultiStream && (
+        <div className="absolute left-3 sm:left-6 top-3 sm:top-4 flex items-center space-x-2 z-20">
+          <button
+            onClick={onOpenMultiStream}
+            className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-50 hover:bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
+            title="Watch Multiple Games Simultaneously"
+          >
+            <Columns2 className="w-3.5 h-3.5 text-red-600" />
+            <span className="hidden xs:inline">Multi-View</span>
+          </button>
+        </div>
+      )}
+
       {/* Account / Membership Status Button in Top Right */}
       {currentUser && onOpenProfile && (
         <div className="absolute right-3 sm:right-6 top-3 sm:top-4 flex items-center space-x-2 z-20">

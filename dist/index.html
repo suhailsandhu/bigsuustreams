@@ -26,8 +26,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index-oYiUa_lD.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D8xGA9Cr.css">
+
+    <!-- Open-Source Privacy Analytics (Umami Cloud / Self-Hosted) -->
+    <script>
+      (function() {
+        try {
+          var umamiId = localStorage.getItem('bigsuu_umami_id') || 'courtside-stream-app';
+          var s = document.createElement('script');
+          s.defer = true;
+          s.src = 'https://cloud.umami.is/script.js';
+          s.setAttribute('data-website-id', umamiId);
+          s.setAttribute('data-auto-track', 'true');
+          s.onerror = function() {};
+          document.head.appendChild(s);
+        } catch(e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BoBLOtaH.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Cj1l6hR7.css">
   </head>
   <body style="background-color: #f8fafc; color: #0f172a;">
     <div id="root">
