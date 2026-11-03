@@ -212,9 +212,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     // Clear watchdog timer
     if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
 
-    // Watchdog: If playback does not start within 12 seconds, try quality fallback or alert
+    // Watchdog: If playback does not start within 14 seconds, try quality fallback or alert
     watchdogTimerRef.current = setTimeout(() => {
-      if (video.paused && video.readyState < 2) {
+      if (video.paused && video.readyState === 0) {
         console.warn('Playback watchdog timeout fired for', stream.stream_key, selectedQuality);
         if (selectedQuality === '1080p' && availableQualities.includes('720p')) {
           console.log('Watchdog attempting quality fallback to 720p...');
@@ -224,8 +224,10 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           setHasError(true);
           setErrorMessage('Stream feed is connecting. Tap Retry Feed to reconnect.');
         }
+      } else {
+        setIsLoading(false);
       }
-    }, 12000);
+    }, 14000);
 
     // Destroy existing Hls instance
     if (hlsRef.current) {
@@ -272,7 +274,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         }).catch(() => {
           video.muted = true;
           setIsMuted(true);
-          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+          video.play().then(() => {
+            setIsPlaying(true);
+            retryCountRef.current = 0;
+          }).catch(() => {
+            setIsPlaying(false);
+            setIsLoading(false);
+          });
         });
       });
 
@@ -305,14 +313,32 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     // 2. Native HLS support (Safari on iPhone / iPad / Mac)
     else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = targetUrl;
-      video.addEventListener('loadedmetadata', () => {
+
+      const markReady = () => {
         setIsLoading(false);
         setIsVerified(true);
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
-        video.play().then(() => setIsPlaying(true)).catch(() => {
-          video.muted = true;
-          setIsMuted(true);
-          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      };
+
+      video.addEventListener('loadedmetadata', markReady, { once: true });
+      video.addEventListener('loadeddata', markReady, { once: true });
+      video.addEventListener('canplay', markReady, { once: true });
+      video.addEventListener('playing', () => {
+        markReady();
+        setIsPlaying(true);
+      });
+      video.addEventListener('pause', () => setIsPlaying(false));
+
+      video.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        video.muted = true;
+        setIsMuted(true);
+        video.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {
+          markReady();
+          setIsPlaying(false);
         });
       });
 
@@ -498,10 +524,12 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         <video
           ref={videoRef}
           playsInline
+          autoPlay
+          muted={isMuted}
           // @ts-ignore
           webkit-playsinline="true"
           x-webkit-airplay="allow"
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain cursor-pointer"
           onClick={togglePlay}
         />
 

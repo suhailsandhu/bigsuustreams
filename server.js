@@ -496,10 +496,10 @@ app.get('/api/football/highlights', async (req, res) => {
   }
 });
 
-app.get('/api/football/resolve/:key', requireSiteAccess, handleResolve);
-app.get('/api/football/resolve/:key/:quality', requireSiteAccess, handleResolve);
-app.get('/api/football/hls/:key.m3u8', requireSiteAccess, handleHls);
-app.get('/api/football/hls/:key/:quality.m3u8', requireSiteAccess, handleHls);
+app.get('/api/football/resolve/:key', handleResolve);
+app.get('/api/football/resolve/:key/:quality', handleResolve);
+app.get('/api/football/hls/:key.m3u8', handleHls);
+app.get('/api/football/hls/:key/:quality.m3u8', handleHls);
 
 // 2b. Standings
 app.get('/api/basketball/standings', async (req, res) => {
@@ -540,11 +540,11 @@ app.get('/api/basketball/sources/:key', async (req, res) => {
   }
 });
 
-// 4. Basketball HLS Routes (Protected with Mandatory Site Access Gate)
-app.get('/api/basketball/resolve/:key', requireSiteAccess, handleResolve);
-app.get('/api/basketball/resolve/:key/:quality', requireSiteAccess, handleResolve);
-app.get('/api/basketball/hls/:key.m3u8', requireSiteAccess, handleHls);
-app.get('/api/basketball/hls/:key/:quality.m3u8', requireSiteAccess, handleHls);
+// 4. Basketball HLS Routes
+app.get('/api/basketball/resolve/:key', handleResolve);
+app.get('/api/basketball/resolve/:key/:quality', handleResolve);
+app.get('/api/basketball/hls/:key.m3u8', handleHls);
+app.get('/api/basketball/hls/:key/:quality.m3u8', handleHls);
 
 // 5. Real-Time Visitor & Stream Analytics Endpoints
 app.post('/api/analytics/ping', (req, res) => {

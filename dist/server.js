@@ -2264,22 +2264,6 @@ app.get("/api/basketball/highlights", async (req, res) => {
     res.status(500).json({ error: err && err.message || "Failed to fetch highlights" });
   }
 });
-function requireSiteAccess(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const rawToken = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null) || req.query.token || req.query.t || req.headers["x-access-token"];
-  if (!rawToken || typeof rawToken !== "string") {
-    return res.status(401).json({ error: "Access denied. Account login or access passcode required." });
-  }
-  const token = rawToken.trim();
-  if (token.includes("2222") || token.includes("lebronisthegoat") || token.startsWith("bigsuu_") || token.startsWith("verified_") || token.startsWith("local_token_") || token.startsWith("google_token_") || token.startsWith("token_2222")) {
-    return next();
-  }
-  const session = authService.verifySession(token);
-  if (session) {
-    return next();
-  }
-  return res.status(401).json({ error: "Session expired or invalid. Please sign in." });
-}
 app.use("/api", (req, res, next) => {
   const ua = (req.get("user-agent") || "").toLowerCase();
   const isBot = /curl|python-requests|wget|httpclient|scrapy|aiohttp|urllib/i.test(ua);
@@ -2444,10 +2428,10 @@ app.get("/api/football/highlights", async (req, res) => {
     res.status(500).json({ error: err && err.message || "Failed to fetch NFL highlights" });
   }
 });
-app.get("/api/football/resolve/:key", requireSiteAccess, handleResolve);
-app.get("/api/football/resolve/:key/:quality", requireSiteAccess, handleResolve);
-app.get("/api/football/hls/:key.m3u8", requireSiteAccess, handleHls);
-app.get("/api/football/hls/:key/:quality.m3u8", requireSiteAccess, handleHls);
+app.get("/api/football/resolve/:key", handleResolve);
+app.get("/api/football/resolve/:key/:quality", handleResolve);
+app.get("/api/football/hls/:key.m3u8", handleHls);
+app.get("/api/football/hls/:key/:quality.m3u8", handleHls);
 app.get("/api/basketball/standings", async (req, res) => {
   try {
     const data = await getStandings();
@@ -2481,10 +2465,10 @@ app.get("/api/basketball/sources/:key", async (req, res) => {
     res.status(404).json({ error: "Sources not found" });
   }
 });
-app.get("/api/basketball/resolve/:key", requireSiteAccess, handleResolve);
-app.get("/api/basketball/resolve/:key/:quality", requireSiteAccess, handleResolve);
-app.get("/api/basketball/hls/:key.m3u8", requireSiteAccess, handleHls);
-app.get("/api/basketball/hls/:key/:quality.m3u8", requireSiteAccess, handleHls);
+app.get("/api/basketball/resolve/:key", handleResolve);
+app.get("/api/basketball/resolve/:key/:quality", handleResolve);
+app.get("/api/basketball/hls/:key.m3u8", handleHls);
+app.get("/api/basketball/hls/:key/:quality.m3u8", handleHls);
 app.post("/api/analytics/ping", (req, res) => {
   try {
     const { sessionId } = req.body || {};
