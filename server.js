@@ -10,6 +10,7 @@ import { analytics } from './src/server/analyticsService.ts';
 import { getGameHighlights, getNflGameHighlights } from './src/server/highlightsService.ts';
 import { applySecurityHeaders, createRateLimiter } from './src/server/securityMiddleware.ts';
 import { authService } from './src/server/authService.ts';
+import { autonomousWatchdog } from './src/server/autonomousWatchdog.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -323,11 +324,13 @@ async function handleResolve(req, res) {
   try {
     const key = req.params.key;
     const quality = req.params.quality || req.query.quality || '1080p';
-    const hls = await resolveHlsStream(key, quality);
+    const isFootball = (req.baseUrl || req.path || req.originalUrl || '').includes('football');
+    const category = isFootball ? 'football' : 'basketball';
+    const hls = await resolveHlsStream(key, quality, category);
     // Never leak upstream provider URL in JSON responses!
     const token = req.query.token || req.query.t || '';
     const tokenParam = token ? `?t=${encodeURIComponent(String(token))}` : '';
-    const safeProxyUrl = `/api/basketball/hls/${key}/${hls.selectedQuality}.m3u8${tokenParam}`;
+    const safeProxyUrl = `/api/${category}/hls/${key}/${hls.selectedQuality}.m3u8${tokenParam}`;
 
     res.json({
       success: true,
@@ -345,8 +348,10 @@ async function handleResolve(req, res) {
 async function handleHls(req, res) {
   const key = req.params.key;
   const quality = req.params.quality || req.query.quality || '1080p';
+  const isFootball = (req.baseUrl || req.path || req.originalUrl || '').includes('football');
+  const category = isFootball ? 'football' : 'basketball';
   try {
-    const hls = await resolveHlsStream(key, quality);
+    const hls = await resolveHlsStream(key, quality, category);
     if (!hls.m3u8Text) {
       return res.status(503).json({ error: 'Stream temporarily initializing. Please retry in a moment.' });
     }
@@ -633,6 +638,28 @@ app.get('/api/analytics/stats', (req, res) => {
   res.json(analytics.getStats());
 });
 
+// 6. Autonomous Operations & Website Health Monitoring Endpoints
+app.get('/api/admin/health', (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: 'Unauthorized. PIN required.' });
+  }
+  res.json(autonomousWatchdog.getHealthSummary());
+});
+
+app.post('/api/admin/health/audit', async (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: 'Unauthorized. PIN required.' });
+  }
+  try {
+    const summary = await autonomousWatchdog.runFullCycle();
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: (err && err.message) || 'Health audit failed' });
+  }
+});
+
 // Detect dist directory whether running from root or dist/
 let distPath = path.join(__dirname, 'dist');
 if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html'))) {
@@ -688,6 +715,9 @@ runAutoSync();
 
 // Continuous automatic sync every 45 seconds so all upcoming games are ready without manual intervention
 setInterval(runAutoSync, 45000);
+
+// Start autonomous background watchdog (pregame stream preparation & health monitor)
+autonomousWatchdog.start();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);

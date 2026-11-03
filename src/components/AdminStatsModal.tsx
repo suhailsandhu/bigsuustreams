@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   X, RefreshCw, Users, Tv,
   ShieldAlert, Sparkles, TrendingUp, CheckCircle2, UserCheck,
-  Search, Download, Globe, Activity, Sliders, ShieldCheck
+  Search, Download, Globe, Activity, Sliders, ShieldCheck,
+  Clock, Shield
 } from 'lucide-react';
 
 interface AdminStatsModalProps {
@@ -112,10 +113,12 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Navigation & Search State
-  const [activeTab, setActiveTab] = useState<'overview' | 'live' | 'users' | 'trackers'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'live' | 'users' | 'trackers' | 'health'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [customGa4Id, setCustomGa4Id] = useState(() => localStorage.getItem('bss_custom_ga4_id') || '');
   const [ga4SavedNotice, setGa4SavedNotice] = useState(false);
+  const [healthData, setHealthData] = useState<any>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
 
   // Authenticate Admin PIN
   const handleAuth = async (e?: React.FormEvent) => {
@@ -148,14 +151,18 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
     }
   };
 
-  // Fetch full stats payload
+  // Fetch full stats payload and autonomous health summary
   const fetchStats = useCallback(async (customPin?: string) => {
     const authPin = customPin || sessionStorage.getItem('bigsuu_admin_pin') || '';
     if (!authPin) return;
 
     setIsRefreshing(true);
     try {
-      const res = await fetch(`/api/analytics/stats?pin=${encodeURIComponent(authPin)}`);
+      const [res, healthRes] = await Promise.all([
+        fetch(`/api/analytics/stats?pin=${encodeURIComponent(authPin)}`),
+        fetch(`/api/admin/health?pin=${encodeURIComponent(authPin)}`)
+      ]);
+
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -163,12 +170,38 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         setIsAuthorized(false);
         sessionStorage.removeItem('bigsuu_admin_authorized');
       }
+
+      if (healthRes.ok) {
+        const hData = await healthRes.json();
+        setHealthData(hData);
+      }
     } catch {
       // silent
     } finally {
       setIsRefreshing(false);
     }
   }, []);
+
+  // Trigger manual on-demand health & pregame audit
+  const handleTriggerAudit = async () => {
+    const authPin = sessionStorage.getItem('bigsuu_admin_pin') || '';
+    if (!authPin || isAuditing) return;
+
+    setIsAuditing(true);
+    try {
+      const res = await fetch(`/api/admin/health/audit?pin=${encodeURIComponent(authPin)}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setHealthData(updated);
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsAuditing(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && isAuthorized) {
@@ -404,6 +437,18 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                 >
                   <Sliders className="w-3 h-3 text-indigo-500" />
                   <span>Tracker Hub</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('health')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                    activeTab === 'health' ? 'bg-white text-gray-950 shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Activity className="w-3 h-3 text-emerald-600" />
+                  <span>Autonomous Monitor</span>
+                  {healthData?.status === 'degraded' && (
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  )}
                 </button>
               </div>
             </div>
@@ -792,6 +837,285 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                       Most sports stream viewers use aggressive adblockers (uBlock Origin, Brave) which block Google Analytics and external trackers by default. BSS's native backend engine routes pings through your own server domain, ensuring 100% accurate live viewer counts and zero adblocker drop-off.
                     </p>
                   </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 5: AUTONOMOUS OPERATIONS & SYSTEM HEALTH MONITOR */}
+            {activeTab === 'health' && (
+              <div className="p-4 sm:p-6 space-y-6">
+                
+                {/* 1. Autonomous Watchdog Status Banner */}
+                <div className="bg-neutral-900 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-neutral-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center space-x-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                        <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block ring-2 ring-emerald-400/30" />
+                          <h4 className="text-sm sm:text-base font-black text-white">
+                            Autonomous Operations Watchdog
+                          </h4>
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            {healthData?.status === 'degraded' ? 'Degraded / Failover' : '100% Operational'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Autonomous pregame preparation, feed verification, and self-healing active in background.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleTriggerAudit}
+                      disabled={isAuditing}
+                      className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-white text-gray-950 font-bold text-xs hover:bg-gray-100 transition shadow-2xs active:scale-95 cursor-pointer shrink-0 disabled:opacity-60"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isAuditing ? 'animate-spin text-emerald-600' : ''}`} />
+                      <span>{isAuditing ? 'Auditing Services...' : 'Run Full Health Audit'}</span>
+                    </button>
+                  </div>
+
+                  {/* Operational Metrics Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-neutral-800 text-center">
+                    <div className="bg-neutral-800/60 p-3 rounded-2xl">
+                      <div className="text-[10px] uppercase font-bold text-gray-400">Pre-Warmed Feeds</div>
+                      <div className="text-lg font-black text-emerald-400 mt-0.5">
+                        {healthData?.stats?.prewarmedCountToday || 0}
+                      </div>
+                      <div className="text-[10px] text-gray-400">Pregame ready</div>
+                    </div>
+                    <div className="bg-neutral-800/60 p-3 rounded-2xl">
+                      <div className="text-[10px] uppercase font-bold text-gray-400">Auto-Recoveries</div>
+                      <div className="text-lg font-black text-amber-400 mt-0.5">
+                        {healthData?.stats?.recoveriesAttemptedToday || 0}
+                      </div>
+                      <div className="text-[10px] text-gray-400">Self-healed</div>
+                    </div>
+                    <div className="bg-neutral-800/60 p-3 rounded-2xl">
+                      <div className="text-[10px] uppercase font-bold text-gray-400">Active Live Games</div>
+                      <div className="text-lg font-black text-white mt-0.5">
+                        {healthData?.stats?.activeLiveGamesCount || 0}
+                      </div>
+                      <div className="text-[10px] text-gray-400">Under surveillance</div>
+                    </div>
+                    <div className="bg-neutral-800/60 p-3 rounded-2xl">
+                      <div className="text-[10px] uppercase font-bold text-gray-400">Watchdog Uptime</div>
+                      <div className="text-lg font-black text-white mt-0.5">
+                        {Math.floor((healthData?.uptimeSeconds || 0) / 60)}m
+                      </div>
+                      <div className="text-[10px] text-gray-400">Node background worker</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Pregame Stream Preparation Watchlist */}
+                <div className="bg-white rounded-3xl p-5 border border-gray-200/90 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-gray-900 flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-emerald-600" />
+                        <span>Pregame Stream Preparation Watchlist</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Autonomous checks 5–10 minutes before kickoff/tipoff ensure feeds are pre-cached and primed for instant playback.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                      {healthData?.pregameWatchlist?.length || 0} Games
+                    </span>
+                  </div>
+
+                  {(!healthData?.pregameWatchlist || healthData.pregameWatchlist.length === 0) ? (
+                    <div className="p-8 text-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-2xl">
+                      No games scheduled in the immediate watch window (next 30 minutes). Watchdog will auto-populate as game times approach.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {healthData.pregameWatchlist.map((item: any) => {
+                        const isReady = item.status === 'ready';
+                        const isPending = item.status === 'stream_pending' || item.status === 'scheduled';
+                        const statusBadge = isReady ? (
+                          <span className="flex items-center space-x-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                            <span>Stream Ready (Pre-warmed)</span>
+                          </span>
+                        ) : isPending ? (
+                          <span className="flex items-center space-x-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block animate-ping" />
+                            <span>Feed Expected Soon</span>
+                          </span>
+                        ) : (
+                          <span className="flex items-center space-x-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+                            <span>Feed Delayed (Auto-Retrying)</span>
+                          </span>
+                        );
+
+                        return (
+                          <div
+                            key={item.streamKey}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl border border-gray-200 hover:border-gray-300 transition-all gap-3 bg-gray-50/60"
+                          >
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                item.sport === 'nfl' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {item.sport.toUpperCase()}
+                              </span>
+                              <div className="truncate">
+                                <div className="text-xs sm:text-sm font-black text-gray-900 truncate">
+                                  {item.name}
+                                </div>
+                                <div className="text-[11px] text-gray-500 flex items-center space-x-2 mt-0.5">
+                                  <span>{item.minutesUntilStart > 0 ? `Starts in ${item.minutesUntilStart}m` : 'In Progress / Live'}</span>
+                                  {item.availableQualities?.length > 0 && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="font-semibold text-gray-700">{item.availableQualities.join(', ')}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-3 shrink-0">
+                              {statusBadge}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Core Infrastructure Health Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Service 1: NBA Scoreboard API */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-black uppercase tracking-wider text-gray-800">
+                        NBA Scoreboard API
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {healthData?.services?.nbaScoreboard?.status === 'ok' ? 'Online' : 'Degraded'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 font-medium">
+                      ESPN Live Ingest • Latency: {healthData?.services?.nbaScoreboard?.latencyMs || 0}ms
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {healthData?.services?.nbaScoreboard?.message || 'Operational'}
+                    </div>
+                  </div>
+
+                  {/* Service 2: NFL Scoreboard API */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-black uppercase tracking-wider text-gray-800">
+                        NFL Scoreboard API
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {healthData?.services?.nflScoreboard?.status === 'ok' ? 'Online' : 'Degraded'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 font-medium">
+                      ESPN NFL Ingest • Latency: {healthData?.services?.nflScoreboard?.latencyMs || 0}ms
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {healthData?.services?.nflScoreboard?.message || 'Operational'}
+                    </div>
+                  </div>
+
+                  {/* Service 3: Upstream Stream Mirrors */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-black uppercase tracking-wider text-gray-800">
+                        Stream Provider Mirrors
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {healthData?.services?.streamMirrors?.status === 'ok' ? 'Healthy' : 'Failover'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 font-medium">
+                      Latency: {healthData?.services?.streamMirrors?.latencyMs || 0}ms
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1 truncate">
+                      {healthData?.services?.streamMirrors?.message || 'Multi-source failover active'}
+                    </div>
+                  </div>
+
+                  {/* Service 4: Video Chunk Pipeline */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-black uppercase tracking-wider text-gray-800">
+                        HLS Video Chunk Pipeline
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Pure MPEG-TS
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 font-medium">
+                      Sync byte verification active • Zero fake PNG headers
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1 truncate">
+                      {healthData?.services?.chunkPipeline?.message || 'Direct stream piping active'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Autonomous Operations & Recovery Ledger */}
+                <div className="bg-white rounded-3xl p-5 border border-gray-200/90 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-gray-900 flex items-center space-x-2">
+                        <Shield className="w-4 h-4 text-emerald-600" />
+                        <span>Autonomous Operations & Auto-Recovery Ledger</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Timestamped log of automated checks, pregame preparations, and self-healing actions.
+                      </p>
+                    </div>
+                  </div>
+
+                  {(!healthData?.recentEvents || healthData.recentEvents.length === 0) ? (
+                    <div className="p-6 text-center text-xs text-gray-400 border border-dashed border-gray-200 rounded-2xl">
+                      No automated events recorded yet. Watchdog logs entries as cycles complete.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                      {healthData.recentEvents.map((evt: any) => {
+                        const levelBg =
+                          evt.level === 'success'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : evt.level === 'recovery'
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : evt.level === 'warning'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-gray-50 text-gray-600 border-gray-200';
+
+                        return (
+                          <div
+                            key={evt.id}
+                            className="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition text-xs"
+                          >
+                            <div className="flex items-center space-x-2.5 min-w-0">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${levelBg}`}>
+                                {evt.category}
+                              </span>
+                              <span className="text-gray-900 font-medium truncate">{evt.message}</span>
+                            </div>
+                            <span className="text-[10px] text-gray-400 shrink-0 pl-2">
+                              {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
               </div>

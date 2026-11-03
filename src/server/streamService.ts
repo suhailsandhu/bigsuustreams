@@ -27,7 +27,7 @@ const mirrorRegistry: Map<string, MirrorState> = new Map(
 
 const COOLDOWN_PERIOD_MS = 45000; // 45s cooldown after failure
 
-function getSortedHealthyMirrors(): string[] {
+export function getSortedHealthyMirrors(): string[] {
   const now = Date.now();
   const mirrors = Array.from(mirrorRegistry.values());
 
@@ -50,7 +50,7 @@ function getSortedHealthyMirrors(): string[] {
     .map(m => m.url);
 }
 
-function recordMirrorSuccess(url: string, durationMs: number) {
+export function recordMirrorSuccess(url: string, durationMs: number) {
   const m = mirrorRegistry.get(url);
   if (m) {
     m.healthy = true;
@@ -59,7 +59,7 @@ function recordMirrorSuccess(url: string, durationMs: number) {
   }
 }
 
-function recordMirrorFailure(url: string) {
+export function recordMirrorFailure(url: string) {
   const m = mirrorRegistry.get(url);
   if (m) {
     m.failCount += 1;
@@ -360,7 +360,11 @@ if (typeof setInterval !== 'undefined') {
   }, 300000);
 }
 
-export async function resolveHlsStream(streamKey: string, requestedQuality = '1080p'): Promise<ResolvedHls> {
+export async function resolveHlsStream(
+  streamKey: string,
+  requestedQuality = '1080p',
+  sportCategory: 'basketball' | 'football' = 'basketball'
+): Promise<ResolvedHls> {
   let quality = requestedQuality;
   if (!quality.endsWith('p')) quality += 'p';
 
@@ -383,31 +387,37 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     isExternal = Boolean(cachedTarget.isExternal);
     externalUrl = cachedTarget.externalUrl || '';
   } else {
-    // 1. Scrape tokens from embed page across mirrors
+    // 1. Scrape tokens from embed page across mirrors (auto-fallback across sport categories)
     let embedRes: Response | null = null;
     let successfulMirror = mirrors[0] || 'https://streamfree.top';
+
+    const sportCandidates: ('basketball' | 'football')[] =
+      sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
 
     for (const mirror of mirrors) {
       try {
         const candidateQualities = [quality, '1080p', '720p', '2160p'];
-        for (const q of candidateQualities) {
-          const u = `${mirror}/embed/basketball/${streamKey}${q}`;
-          const res = await fetch(u, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-            }
-          });
-          if (res.ok) {
-            const text = await res.text();
-            const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
-            if (match) {
-              embedRes = res;
-              tokens = JSON.parse(match[1]);
-              successfulMirror = mirror;
-              recordMirrorSuccess(mirror, 100);
-              break;
+        for (const cat of sportCandidates) {
+          for (const q of candidateQualities) {
+            const u = `${mirror}/embed/${cat}/${streamKey}${q}`;
+            const res = await fetch(u, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+              }
+            });
+            if (res.ok) {
+              const text = await res.text();
+              const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
+              if (match) {
+                embedRes = res;
+                tokens = JSON.parse(match[1]);
+                successfulMirror = mirror;
+                recordMirrorSuccess(mirror, 100);
+                break;
+              }
             }
           }
+          if (embedRes && Object.keys(tokens).length > 0) break;
         }
         if (embedRes && Object.keys(tokens).length > 0) break;
       } catch {
@@ -596,6 +606,6 @@ export async function resolveHlsStream(streamKey: string, requestedQuality = '10
     selectedQuality,
     availableQualities,
     m3u8Text,
-    upstreamUrl: `/api/basketball/hls/${streamKey}/${selectedQuality}.m3u8`
+    upstreamUrl: `/api/${sportCategory}/hls/${streamKey}/${selectedQuality}.m3u8`
   };
 }
