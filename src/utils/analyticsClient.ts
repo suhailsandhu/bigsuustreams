@@ -112,6 +112,71 @@ declare global {
   }
 }
 
+export function getUmamiConfig(): { websiteId: string; host: string; isConnected: boolean } {
+  try {
+    const websiteId = localStorage.getItem('bss_umami_website_id') || localStorage.getItem('bigsuu_umami_id') || '';
+    const host = localStorage.getItem('bss_umami_host') || 'https://cloud.umami.is/script.js';
+    const isConnected = Boolean(websiteId && websiteId.trim().length > 0);
+    return { websiteId, host, isConnected };
+  } catch {
+    return { websiteId: '', host: 'https://cloud.umami.is/script.js', isConnected: false };
+  }
+}
+
+export function setUmamiConfig(websiteId: string, host?: string): boolean {
+  try {
+    const cleanId = websiteId.trim();
+    const cleanHost = (host && host.trim()) ? host.trim() : 'https://cloud.umami.is/script.js';
+
+    if (cleanId) {
+      localStorage.setItem('bss_umami_website_id', cleanId);
+      localStorage.setItem('bigsuu_umami_id', cleanId);
+      localStorage.setItem('bss_umami_host', cleanHost);
+    } else {
+      localStorage.removeItem('bss_umami_website_id');
+      localStorage.removeItem('bigsuu_umami_id');
+      localStorage.removeItem('bss_umami_host');
+    }
+
+    // Hot-reload Umami script tag in DOM
+    if (typeof document !== 'undefined') {
+      const existing = document.querySelector('script[data-bss-umami="true"]');
+      if (existing) {
+        existing.remove();
+      }
+      if (cleanId) {
+        const s = document.createElement('script');
+        s.defer = true;
+        s.src = cleanHost;
+        s.setAttribute('data-website-id', cleanId);
+        s.setAttribute('data-auto-track', 'true');
+        s.setAttribute('data-bss-umami', 'true');
+        s.onerror = () => {};
+        document.head.appendChild(s);
+      }
+    }
+    return true;
+  } catch (err) {
+    console.error('Failed to set Umami config:', err);
+    return false;
+  }
+}
+
+export function sendUmamiTestEvent(): boolean {
+  try {
+    if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
+      window.umami.track('admin_test_ping', {
+        source: 'BigSuuStreams Admin Hub',
+        timestamp: new Date().toISOString()
+      });
+      return true;
+    }
+  } catch {
+    // fallback
+  }
+  return false;
+}
+
 export function trackUmamiEvent(eventName: string, eventData?: Record<string, any>) {
   try {
     if (typeof window !== 'undefined' && window.umami && typeof window.umami.track === 'function') {
@@ -120,6 +185,23 @@ export function trackUmamiEvent(eventName: string, eventData?: Record<string, an
   } catch {
     // Non-blocking telemetry
   }
+}
+
+export function trackStreamPlaybackStart(streamKey: string, gameName: string, sport: string, quality: string) {
+  trackUmamiEvent('stream_playback_start', {
+    streamKey,
+    game: gameName,
+    sport,
+    quality,
+    timestamp: new Date().toISOString()
+  });
+}
+
+export function trackQualityChange(streamKey: string, newQuality: string) {
+  trackUmamiEvent('quality_change', {
+    streamKey,
+    quality: newQuality
+  });
 }
 
 export function trackPageView(streamKey?: string, gameName?: string) {

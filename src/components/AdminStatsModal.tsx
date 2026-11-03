@@ -3,8 +3,9 @@ import {
   X, RefreshCw, Users, Tv,
   ShieldAlert, Sparkles, TrendingUp, CheckCircle2, UserCheck,
   Search, Download, Globe, Activity, Sliders, ShieldCheck,
-  Clock, Shield
+  Clock, Shield, ExternalLink, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { setUmamiConfig, sendUmamiTestEvent } from '../utils/analyticsClient';
 
 interface AdminStatsModalProps {
   isOpen: boolean;
@@ -117,6 +118,16 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [searchQuery, setSearchQuery] = useState('');
   const [customGa4Id, setCustomGa4Id] = useState(() => localStorage.getItem('bss_custom_ga4_id') || '');
   const [ga4SavedNotice, setGa4SavedNotice] = useState(false);
+  const [umamiWebsiteId, setUmamiWebsiteId] = useState(() => {
+    return localStorage.getItem('bss_umami_website_id') || localStorage.getItem('bigsuu_umami_id') || '';
+  });
+  const [umamiHost, setUmamiHost] = useState(() => {
+    return localStorage.getItem('bss_umami_host') || 'https://cloud.umami.is/script.js';
+  });
+  const [umamiSavedNotice, setUmamiSavedNotice] = useState(false);
+  const [umamiTestNotice, setUmamiTestNotice] = useState<string | null>(null);
+  const [showUmamiGuide, setShowUmamiGuide] = useState(false);
+  const [showAdvancedUmamiHost, setShowAdvancedUmamiHost] = useState(false);
   const [healthData, setHealthData] = useState<any>(null);
   const [isAuditing, setIsAuditing] = useState(false);
 
@@ -229,6 +240,29 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
     localStorage.setItem('bss_custom_ga4_id', customGa4Id.trim());
     setGa4SavedNotice(true);
     setTimeout(() => setGa4SavedNotice(false), 3000);
+  };
+
+  const handleSaveUmami = () => {
+    const success = setUmamiConfig(umamiWebsiteId, umamiHost);
+    if (success) {
+      setUmamiSavedNotice(true);
+      setTimeout(() => setUmamiSavedNotice(false), 3500);
+    }
+  };
+
+  const handleTestUmami = () => {
+    if (!umamiWebsiteId.trim()) {
+      setUmamiTestNotice('Please enter and save your Umami Website ID first.');
+      setTimeout(() => setUmamiTestNotice(null), 3500);
+      return;
+    }
+    const sent = sendUmamiTestEvent();
+    if (sent) {
+      setUmamiTestNotice('✓ Telemetry event "admin_test_ping" sent! Check your Umami Realtime dashboard.');
+    } else {
+      setUmamiTestNotice('Event queued. (Umami script will fire telemetry automatically upon connecting).');
+    }
+    setTimeout(() => setUmamiTestNotice(null), 4500);
   };
 
   // Filtered collections based on search query
@@ -796,6 +830,150 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                           </span>
                         ))}
                       </div>
+
+                      {t.id === 'umami' && (
+                        <div className="pt-3 border-t border-gray-100 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+                              Umami Connection Status:
+                              {umamiWebsiteId.trim() ? (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  Connected
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+                                  ID Required
+                                </span>
+                              )}
+                            </span>
+
+                            <div className="flex items-center gap-2">
+                              <a
+                                href="https://cloud.umami.is"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 transition"
+                              >
+                                Umami Cloud <ExternalLink className="w-3 h-3" />
+                              </a>
+                              <span className="text-gray-300">|</span>
+                              <a
+                                href="https://github.com/umami-software/umami"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 hover:text-black transition"
+                              >
+                                GitHub Repo <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                              Umami Website ID (UUID):
+                            </label>
+                            <input
+                              type="text"
+                              value={umamiWebsiteId}
+                              onChange={(e) => setUmamiWebsiteId(e.target.value)}
+                              placeholder="e.g. 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                              className="w-full px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-mono focus:border-black focus:outline-none"
+                            />
+                          </div>
+
+                          {showAdvancedUmamiHost && (
+                            <div className="space-y-1 bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                              <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider block">
+                                Custom Script Host (GitHub / Self-Hosted URL):
+                              </label>
+                              <input
+                                type="text"
+                                value={umamiHost}
+                                onChange={(e) => setUmamiHost(e.target.value)}
+                                placeholder="https://cloud.umami.is/script.js"
+                                className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-mono bg-white focus:border-black focus:outline-none"
+                              />
+                              <p className="text-[9px] text-gray-400">
+                                Leave as default for Umami Cloud, or specify your self-hosted script endpoint.
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowAdvancedUmamiHost(!showAdvancedUmamiHost)}
+                              className="text-[10px] font-semibold text-gray-500 hover:text-gray-800 transition cursor-pointer flex items-center gap-1"
+                            >
+                              {showAdvancedUmamiHost ? 'Hide Advanced Host' : 'Configure Self-Hosted Host'}
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleTestUmami}
+                                className="px-2.5 py-1.5 rounded-xl border border-gray-300 text-[11px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                              >
+                                Test Ping
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveUmami}
+                                className="px-3.5 py-1.5 rounded-xl bg-black text-white text-[11px] font-bold hover:bg-neutral-800 transition cursor-pointer shadow-2xs"
+                              >
+                                Save & Connect
+                              </button>
+                            </div>
+                          </div>
+
+                          {umamiSavedNotice && (
+                            <p className="text-[10px] font-bold text-emerald-600 animate-fadeIn">
+                              ✓ Umami configuration saved! Tracker script updated in real time.
+                            </p>
+                          )}
+
+                          {umamiTestNotice && (
+                            <p className="text-[10px] font-bold text-blue-600 animate-fadeIn">
+                              {umamiTestNotice}
+                            </p>
+                          )}
+
+                          {/* 3-Step Setup Guide Accordion */}
+                          <div className="border border-gray-200 rounded-xl overflow-hidden mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowUmamiGuide(!showUmamiGuide)}
+                              className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition text-[11px] font-bold text-gray-700 cursor-pointer"
+                            >
+                              <span>How to Connect Umami (3 Simple Steps)</span>
+                              {showUmamiGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                            {showUmamiGuide && (
+                              <div className="p-3 bg-white text-xs text-gray-600 space-y-2 border-t border-gray-200">
+                                <div className="flex gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
+                                  <p>
+                                    Log in to <a href="https://cloud.umami.is" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">Umami Cloud</a> (free tier) or deploy the <a href="https://github.com/umami-software/umami" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">Umami GitHub Repo</a> on your own server.
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] font-black flex items-center justify-center shrink-0">2</span>
+                                  <p>
+                                    In Settings &rarr; <strong>Websites</strong>, click <strong>+ Add Website</strong>. Enter Name (e.g. <code>BigSuuStreams</code>) and Domain (<code>bigsuustreams.com</code>).
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] font-black flex items-center justify-center shrink-0">3</span>
+                                  <p>
+                                    Click <strong>Edit</strong> on your website in Umami to copy its <strong>Website ID (UUID)</strong>. Paste it into the box above and click <strong>Save & Connect</strong>.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {t.id === 'ga4' && (
                         <div className="pt-2 border-t border-gray-100 space-y-2">
