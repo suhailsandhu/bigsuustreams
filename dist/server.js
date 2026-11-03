@@ -1846,127 +1846,59 @@ function applySecurityHeaders(_req, res, next) {
 }
 
 // src/server/authService.ts
-import crypto from "crypto";
-
-// src/server/db.ts
-import { DatabaseSync } from "node:sqlite";
-import path2 from "path";
 import fs2 from "fs";
+import path2 from "path";
+import crypto from "crypto";
 var DATA_DIR2 = path2.join(process.cwd(), "data");
-var DB_PATH = path2.join(DATA_DIR2, "courtside.db");
-var OLD_USERS_FILE = path2.join(DATA_DIR2, "users.json");
-if (!fs2.existsSync(DATA_DIR2)) {
-  fs2.mkdirSync(DATA_DIR2, { recursive: true });
-}
-var db = new DatabaseSync(DB_PATH);
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA foreign_keys = ON;");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    display_name TEXT,
-    password_hash TEXT,
-    salt TEXT,
-    provider TEXT NOT NULL DEFAULT 'local',
-    google_id TEXT,
-    avatar_url TEXT,
-    favorite_teams TEXT DEFAULT '[]',
-    spoiler_free INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL,
-    last_login TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS sessions (
-    token TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    username TEXT NOT NULL,
-    display_name TEXT,
-    avatar_url TEXT,
-    expires_at INTEGER NOT NULL,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS watch_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL,
-    game_id TEXT NOT NULL,
-    stream_key TEXT NOT NULL,
-    game_name TEXT NOT NULL,
-    watched_at TEXT NOT NULL,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-  CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
-  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-  CREATE INDEX IF NOT EXISTS idx_watch_history_user ON watch_history(user_id);
-`);
-try {
-  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get();
-  if (userCount.count === 0 && fs2.existsSync(OLD_USERS_FILE)) {
-    const raw = fs2.readFileSync(OLD_USERS_FILE, "utf-8");
-    const legacyUsers = JSON.parse(raw);
-    if (Array.isArray(legacyUsers) && legacyUsers.length > 0) {
-      const insertStmt = db.prepare(`
-        INSERT OR IGNORE INTO users (
-          id, username, email, display_name, password_hash, salt, provider, google_id, avatar_url, favorite_teams, spoiler_free, created_at, last_login
-        ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )
-      `);
-      for (const u of legacyUsers) {
-        insertStmt.run(
-          u.id,
-          u.username,
-          u.email,
-          u.displayName || u.username,
-          u.passwordHash || null,
-          u.salt || null,
-          u.provider || "local",
-          u.googleId || null,
-          u.avatarUrl || null,
-          JSON.stringify(u.favoriteTeams || []),
-          u.spoilerFree ? 1 : 0,
-          u.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
-          u.lastLogin || (/* @__PURE__ */ new Date()).toISOString()
-        );
+var USERS_FILE = path2.join(DATA_DIR2, "users.json");
+var AuthService = class {
+  users = /* @__PURE__ */ new Map();
+  sessions = /* @__PURE__ */ new Map();
+  constructor() {
+    this.ensureDataStore();
+    this.loadUsers();
+  }
+  ensureDataStore() {
+    try {
+      if (!fs2.existsSync(DATA_DIR2)) {
+        fs2.mkdirSync(DATA_DIR2, { recursive: true });
       }
-      console.log(`[SQLite] Migrated ${legacyUsers.length} legacy users from users.json`);
+      if (!fs2.existsSync(USERS_FILE)) {
+        fs2.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf-8");
+      }
+    } catch (err) {
+      console.warn("Could not initialize users data directory:", err);
     }
   }
-} catch (err) {
-  console.warn("[SQLite] Notice during legacy user migration:", err);
-}
-
-// src/server/authService.ts
-var AuthService = class {
+  loadUsers() {
+    try {
+      if (fs2.existsSync(USERS_FILE)) {
+        const raw = fs2.readFileSync(USERS_FILE, "utf-8");
+        const list = JSON.parse(raw);
+        this.users.clear();
+        for (const u of list) {
+          this.users.set(u.id, {
+            ...u,
+            favoriteTeams: Array.isArray(u.favoriteTeams) ? u.favoriteTeams : [],
+            spoilerFree: Boolean(u.spoilerFree)
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Error reading users store:", err);
+    }
+  }
+  persistUsers() {
+    try {
+      this.ensureDataStore();
+      const list = Array.from(this.users.values());
+      fs2.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+    } catch (err) {
+      console.warn("Error saving users store:", err);
+    }
+  }
   hashPassword(password, salt) {
     return crypto.pbkdf2Sync(password, salt, 1e4, 64, "sha512").toString("hex");
-  }
-  mapDbUser(row) {
-    let favoriteTeams = [];
-    try {
-      favoriteTeams = JSON.parse(row.favorite_teams || "[]");
-    } catch {
-      favoriteTeams = [];
-    }
-    return {
-      id: row.id,
-      username: row.username,
-      email: row.email,
-      displayName: row.display_name || row.username,
-      passwordHash: row.password_hash || void 0,
-      salt: row.salt || void 0,
-      provider: row.provider || "local",
-      googleId: row.google_id || void 0,
-      avatarUrl: row.avatar_url || void 0,
-      favoriteTeams,
-      spoilerFree: Boolean(row.spoiler_free),
-      createdAt: row.created_at,
-      lastLogin: row.last_login
-    };
   }
   register(username, email, password) {
     const cleanUsername = username.trim().toLowerCase();
@@ -1980,12 +1912,11 @@ var AuthService = class {
     if (!password || password.length < 6) {
       throw new Error("Password must be at least 6 characters long");
     }
-    const existing = db.prepare("SELECT id, username, email FROM users WHERE username = ? OR email = ?").get(cleanUsername, cleanEmail);
-    if (existing) {
-      if (existing.username === cleanUsername) {
+    for (const u of this.users.values()) {
+      if (u.username === cleanUsername) {
         throw new Error("This username is already taken. Please choose another.");
       }
-      if (existing.email === cleanEmail) {
+      if (u.email === cleanEmail) {
         throw new Error("An account with this email already exists. Please log in.");
       }
     }
@@ -1993,14 +1924,6 @@ var AuthService = class {
     const passwordHash = this.hashPassword(password, salt);
     const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    const insertStmt = db.prepare(`
-      INSERT INTO users (
-        id, username, email, display_name, password_hash, salt, provider, avatar_url, favorite_teams, spoiler_free, created_at, last_login
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, 'local', null, '[]', 0, ?, ?
-      )
-    `);
-    insertStmt.run(id, cleanUsername, cleanEmail, username.trim(), passwordHash, salt, now, now);
     const user = {
       id,
       username: cleanUsername,
@@ -2014,41 +1937,45 @@ var AuthService = class {
       createdAt: now,
       lastLogin: now
     };
+    this.users.set(id, user);
+    this.persistUsers();
     const session = this.createSession(user);
     return { user, session };
   }
   login(identifier, password) {
     const clean = identifier.trim().toLowerCase();
-    const row = db.prepare("SELECT * FROM users WHERE username = ? OR email = ?").get(clean, clean);
-    if (!row || !row.password_hash || !row.salt) {
+    let foundUser;
+    for (const u of this.users.values()) {
+      if (u.username === clean || u.email === clean) {
+        foundUser = u;
+        break;
+      }
+    }
+    if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
       throw new Error("Invalid username/email or password");
     }
-    const inputHash = this.hashPassword(password, row.salt);
-    if (inputHash !== row.password_hash) {
+    const inputHash = this.hashPassword(password, foundUser.salt);
+    if (inputHash !== foundUser.passwordHash) {
       throw new Error("Invalid username/email or password");
     }
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    db.prepare("UPDATE users SET last_login = ? WHERE id = ?").run(now, row.id);
-    row.last_login = now;
-    const user = this.mapDbUser(row);
-    const session = this.createSession(user);
-    return { user, session };
+    foundUser.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
+    this.persistUsers();
+    const session = this.createSession(foundUser);
+    return { user: foundUser, session };
   }
   loginWithGoogle(email, displayName, avatarUrl) {
     const cleanEmail = email.trim().toLowerCase();
-    const existing = db.prepare("SELECT * FROM users WHERE email = ?").get(cleanEmail);
-    const now = (/* @__PURE__ */ new Date()).toISOString();
     let user;
-    if (!existing) {
+    for (const u of this.users.values()) {
+      if (u.email === cleanEmail) {
+        user = u;
+        break;
+      }
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    if (!user) {
       const generatedUsername = cleanEmail.split("@")[0].replace(/[^a-z0-9]/g, "").slice(0, 15) || `user${Date.now() % 1e4}`;
       const id = `google_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-      db.prepare(`
-        INSERT INTO users (
-          id, username, email, display_name, provider, avatar_url, favorite_teams, spoiler_free, created_at, last_login
-        ) VALUES (
-          ?, ?, ?, ?, 'google', ?, '[]', 0, ?, ?
-        )
-      `).run(id, generatedUsername, cleanEmail, displayName || cleanEmail.split("@")[0], avatarUrl || null, now, now);
       user = {
         id,
         username: generatedUsername,
@@ -2061,86 +1988,66 @@ var AuthService = class {
         createdAt: now,
         lastLogin: now
       };
+      this.users.set(id, user);
     } else {
-      db.prepare("UPDATE users SET last_login = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?").run(now, avatarUrl || null, existing.id);
-      existing.last_login = now;
-      if (avatarUrl) existing.avatar_url = avatarUrl;
-      user = this.mapDbUser(existing);
+      user.lastLogin = now;
+      if (avatarUrl) user.avatarUrl = avatarUrl;
+      if (displayName) user.displayName = displayName;
     }
+    this.persistUsers();
     const session = this.createSession(user);
     return { user, session };
   }
   createSession(user) {
     const token = `sess_${crypto.randomBytes(32).toString("hex")}`;
     const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1e3;
-    db.prepare(`
-      INSERT INTO sessions (token, user_id, username, display_name, avatar_url, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(token, user.id, user.username, user.displayName, user.avatarUrl || null, expiresAt);
-    return {
+    const session = {
       token,
       userId: user.id,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
-      favoriteTeams: user.favoriteTeams,
-      spoilerFree: user.spoilerFree,
+      favoriteTeams: user.favoriteTeams || [],
+      spoilerFree: Boolean(user.spoilerFree),
       expiresAt
     };
+    this.sessions.set(token, session);
+    return session;
   }
   verifySession(token) {
     if (!token) return null;
-    const row = db.prepare(`
-      SELECT s.*, u.favorite_teams, u.spoiler_free
-      FROM sessions s
-      JOIN users u ON s.user_id = u.id
-      WHERE s.token = ?
-    `).get(token);
-    if (!row) return null;
-    if (Date.now() > row.expires_at) {
-      db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+    const session = this.sessions.get(token);
+    if (!session) return null;
+    if (Date.now() > session.expiresAt) {
+      this.sessions.delete(token);
       return null;
     }
-    let favoriteTeams = [];
-    try {
-      favoriteTeams = JSON.parse(row.favorite_teams || "[]");
-    } catch {
-      favoriteTeams = [];
-    }
-    return {
-      token: row.token,
-      userId: row.user_id,
-      username: row.username,
-      displayName: row.display_name,
-      avatarUrl: row.avatar_url || void 0,
-      favoriteTeams,
-      spoilerFree: Boolean(row.spoiler_free),
-      expiresAt: row.expires_at
-    };
+    return session;
   }
   removeSession(token) {
-    db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+    this.sessions.delete(token);
   }
   updatePreferences(userId, favoriteTeams, spoilerFree) {
-    if (favoriteTeams !== void 0 && spoilerFree !== void 0) {
-      db.prepare("UPDATE users SET favorite_teams = ?, spoiler_free = ? WHERE id = ?").run(JSON.stringify(favoriteTeams), spoilerFree ? 1 : 0, userId);
-    } else if (favoriteTeams !== void 0) {
-      db.prepare("UPDATE users SET favorite_teams = ? WHERE id = ?").run(JSON.stringify(favoriteTeams), userId);
-    } else if (spoilerFree !== void 0) {
-      db.prepare("UPDATE users SET spoiler_free = ? WHERE id = ?").run(spoilerFree ? 1 : 0, userId);
+    const user = this.users.get(userId);
+    if (user) {
+      if (Array.isArray(favoriteTeams)) {
+        user.favoriteTeams = favoriteTeams;
+      }
+      if (typeof spoilerFree === "boolean") {
+        user.spoilerFree = spoilerFree;
+      }
+      this.persistUsers();
     }
-  }
-  recordWatchHistory(userId, gameId, streamKey, gameName) {
-    try {
-      db.prepare(`
-        INSERT INTO watch_history (user_id, game_id, stream_key, game_name, watched_at)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(userId, gameId, streamKey, gameName, (/* @__PURE__ */ new Date()).toISOString());
-    } catch (e) {
+    for (const session of this.sessions.values()) {
+      if (session.userId === userId) {
+        if (Array.isArray(favoriteTeams)) {
+          session.favoriteTeams = favoriteTeams;
+        }
+        if (typeof spoilerFree === "boolean") {
+          session.spoilerFree = spoilerFree;
+        }
+      }
     }
-  }
-  getWatchHistory(userId, limit = 10) {
-    return db.prepare("SELECT * FROM watch_history WHERE user_id = ? ORDER BY id DESC LIMIT ?").all(userId, limit);
   }
 };
 var authService = new AuthService();
