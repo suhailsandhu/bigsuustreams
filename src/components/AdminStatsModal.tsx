@@ -207,7 +207,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         fetchStats(cleanPin);
       } else {
         const data = await res.json();
-        setError(data.error || 'Invalid Admin Passcode (Default: 7777)');
+        setError(data.error || 'Invalid Admin Passcode');
       }
     } catch {
       if (cleanPin === '7777' || cleanPin === '77777' || cleanPin === '2222') {
@@ -216,7 +216,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         setIsAuthorized(true);
         fetchStats('7777');
       } else {
-        setError('Invalid Admin Passcode. Use 7777 to unlock.');
+        setError('Invalid Admin Passcode.');
       }
     } finally {
       setLoading(false);
@@ -595,7 +595,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                 type="password"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="Enter 4-digit PIN (7777)"
+                placeholder="••••"
                 autoFocus
                 className="w-full px-3.5 py-2.5 rounded-lg bg-white border border-neutral-300 text-center text-base font-mono font-bold tracking-widest focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition"
               />
