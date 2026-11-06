@@ -3,11 +3,9 @@ import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle, ShieldCheck,
-  Layers, Car, Zap
+  Layers
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
-import { detectTeslaEnvironment, type TeslaDeviceInfo } from '../utils/teslaDetector.ts';
-import { teslaAudioBeacon } from '../utils/teslaAudioBeacon.ts';
 
 interface CourtsidePlayerProps {
   stream: Stream;
@@ -168,19 +166,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const [isVerified, setIsVerified] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const controlsTimeoutRef = useRef<any>(null);
-
-  // Tesla Infotainment & Reverse-Engineered CyberDash Architecture
-  const [teslaInfo, setTeslaInfo] = useState<TeslaDeviceInfo | null>(null);
-  const [isTeslaModeActive, setIsTeslaModeActive] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bss_tesla_mode');
-      if (saved !== null) return saved === 'true';
-    }
-    return false;
-  });
-  const [useCanvasRender, setUseCanvasRender] = useState<boolean>(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasAnimFrameRef = useRef<number | null>(null);
 
   // Available qualities: 720p, 1080p, and 2160p (540p removed per user request)
   const availableQualities = React.useMemo(() => {
@@ -410,58 +395,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     return () => clearTimeout(autoRetryTimer);
   }, [hasError, loadHlsStream]);
 
-  // Tesla Infotainment Environment Detection
-  useEffect(() => {
-    const info = detectTeslaEnvironment();
-    setTeslaInfo(info);
-    if (info.isTesla && localStorage.getItem('bss_tesla_mode') === null) {
-      setIsTeslaModeActive(true);
-    }
-  }, []);
-
-  // Tesla Audio Keepalive Beacon: Prevents Chromium audio suspension during vehicle motion/transitions
-  useEffect(() => {
-    if (isTeslaModeActive) {
-      teslaAudioBeacon.start();
-    } else {
-      teslaAudioBeacon.stop();
-    }
-    return () => {
-      teslaAudioBeacon.stop();
-    };
-  }, [isTeslaModeActive]);
-
-  // Canvas GPU Presentation Pipeline (Reverse-Engineered from CyberDash WebCodecs/Canvas Architecture)
-  useEffect(() => {
-    if (!useCanvasRender || !isPlaying) {
-      if (canvasAnimFrameRef.current) cancelAnimationFrame(canvasAnimFrameRef.current);
-      return;
-    }
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let active = true;
-    const renderFrame = () => {
-      if (!active) return;
-      if (video.readyState >= 2 && !video.paused && !video.ended) {
-        if (canvas.width !== video.videoWidth && video.videoWidth > 0) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-        }
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      }
-      canvasAnimFrameRef.current = requestAnimationFrame(renderFrame);
-    };
-    renderFrame();
-    return () => {
-      active = false;
-      if (canvasAnimFrameRef.current) cancelAnimationFrame(canvasAnimFrameRef.current);
-    };
-  }, [useCanvasRender, isPlaying]);
-
   // Video event listeners
   useEffect(() => {
     const video = videoRef.current;
@@ -624,18 +557,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           // @ts-ignore
           webkit-playsinline="true"
           x-webkit-airplay="allow"
-          className={`w-full h-full object-contain cursor-pointer ${useCanvasRender ? 'hidden' : 'block'}`}
+          className="w-full h-full object-contain cursor-pointer"
           onClick={togglePlay}
         />
-
-        {/* Reverse-Engineered CyberDash Canvas GPU Presentation Pipeline */}
-        {useCanvasRender && (
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full object-contain cursor-pointer"
-            onClick={togglePlay}
-          />
-        )}
 
         {/* Loading Indicator (Clean, Lightweight, Centered - No Overlapping Controls) */}
         {isLoading && !hasError && (
@@ -688,20 +612,12 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                 </span>
               </div>
 
-              <div className="flex items-center space-x-1.5">
-                {isTeslaModeActive && (
-                  <div className="flex items-center space-x-1 bg-white/90 border border-blue-200 px-2 py-0.5 rounded-full shadow-xs backdrop-blur-xs">
-                    <Car className="w-3 h-3 text-blue-600" />
-                    <span className="text-[10px] font-semibold text-blue-700">Tesla {teslaInfo?.mcuType === 'amd-ryzen' ? 'Ryzen' : 'Infotainment'}</span>
-                  </div>
-                )}
-                {isVerified && (
-                  <div className="flex items-center space-x-1 bg-white/90 border border-emerald-200 px-2 py-0.5 rounded-full shadow-xs backdrop-blur-xs">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                    <span className="text-[10px] font-semibold text-emerald-700">Verified</span>
-                  </div>
-                )}
-              </div>
+              {isVerified && (
+                <div className="flex items-center space-x-1 bg-white/90 border border-emerald-200 px-2 py-0.5 rounded-full shadow-xs backdrop-blur-xs">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                  <span className="text-[10px] font-semibold text-emerald-700">Verified</span>
+                </div>
+              )}
             </div>
 
             {/* Center Play/Pause Touch Button */}
@@ -787,73 +703,25 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         )}
       </div>
 
-      {/* Under-player Quality & Infotainment Mode Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-0.5 pt-0.5">
-        <div className="flex items-center space-x-2">
-          <span className="text-[11px] font-medium text-gray-500">Quality:</span>
-          <div className="inline-flex bg-gray-100 p-0.5 rounded-lg space-x-0.5 border border-gray-200/60">
-            {availableQualities.map((q) => (
-              <button
-                key={q}
-                onClick={() => onQualityChange(q)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                  selectedQuality === q
-                    ? 'bg-white text-gray-900 shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tesla In-Car Infotainment Mode Controls */}
-        <div className="flex items-center space-x-1.5">
-          <button
-            onClick={() => {
-              const next = !isTeslaModeActive;
-              setIsTeslaModeActive(next);
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('bss_tesla_mode', String(next));
-              }
-            }}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer ${
-              isTeslaModeActive
-                ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-2xs'
-                : 'bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-200/60'
-            }`}
-            title="Tesla Infotainment & Audio Keepalive Beacon Mode"
-          >
-            <Car className="w-3.5 h-3.5" />
-            <span>Tesla Mode</span>
-          </button>
-
-          {isTeslaModeActive && (
+      {/* Under-player Quality Switcher (Apple-style Segmented Control) */}
+      <div className="flex items-center space-x-2 px-0.5 pt-0.5">
+        <span className="text-[11px] font-medium text-gray-500">Quality:</span>
+        <div className="inline-flex bg-gray-100 p-0.5 rounded-lg space-x-0.5 border border-gray-200/60">
+          {availableQualities.map((q) => (
             <button
-              onClick={() => setUseCanvasRender(!useCanvasRender)}
-              className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all border cursor-pointer ${
-                useCanvasRender
-                  ? 'bg-purple-50 text-purple-700 border-purple-200 shadow-2xs'
-                  : 'bg-gray-100 text-gray-500 hover:text-gray-900 border-gray-200/60'
+              key={q}
+              onClick={() => onQualityChange(q)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                selectedQuality === q
+                  ? 'bg-white text-gray-900 shadow-2xs'
+                  : 'text-gray-500 hover:text-gray-900'
               }`}
-              title="Toggle Canvas 2D/GPU presentation pipeline"
             >
-              <Zap className="w-3 h-3" />
-              <span>{useCanvasRender ? 'Canvas Active' : 'Enable Canvas'}</span>
+              {q}
             </button>
-          )}
+          ))}
         </div>
       </div>
-
-      {isTeslaModeActive && (
-        <div className="bg-blue-50/60 border border-blue-100 rounded-xl px-3 py-1.5 flex items-center space-x-2 text-[10px] text-blue-700">
-          <Car className="w-3.5 h-3.5 shrink-0 text-blue-600" />
-          <span>
-            <strong>Tesla Infotainment Active</strong> ({teslaInfo?.mcuType === 'amd-ryzen' ? 'AMD Ryzen' : 'Chromium'}): Audio beacon keepalive active. Playback optimized for in-car touchscreen display.
-          </span>
-        </div>
-      )}
     </div>
   );
 };
