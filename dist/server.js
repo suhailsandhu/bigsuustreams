@@ -1343,18 +1343,548 @@ async function getNflGameSummary(eventId) {
 }
 
 // src/server/analyticsService.ts
+import fs2 from "fs";
+import path2 from "path";
+
+// src/server/authService.ts
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
+var DATA_DIR = path.join(process.cwd(), "data");
+var USERS_FILE = path.join(DATA_DIR, "users.json");
+var AuthService = class {
+  users = /* @__PURE__ */ new Map();
+  sessions = /* @__PURE__ */ new Map();
+  constructor() {
+    this.ensureDataStore();
+    this.loadUsers();
+  }
+  ensureDataStore() {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(USERS_FILE)) {
+        fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf-8");
+      }
+    } catch (err) {
+      console.warn("Could not initialize users data directory:", err);
+    }
+  }
+  persistTimeout = null;
+  schedulePersistUsers() {
+    if (this.persistTimeout) return;
+    this.persistTimeout = setTimeout(() => {
+      this.persistTimeout = null;
+      this.persistUsers();
+    }, 2e3);
+  }
+  getAllUsers() {
+    return Array.from(this.users.values());
+  }
+  getUserById(id) {
+    return this.users.get(id);
+  }
+  seedInitialMembers() {
+    const now = Date.now();
+    const seed = [
+      {
+        id: "user_marcus_courtside",
+        username: "marcusthompson",
+        email: "marcus.t@sportsfan.net",
+        displayName: "Marcus Thompson",
+        provider: "google",
+        favoriteTeams: ["Golden State Warriors", "Sacramento Kings"],
+        spoilerFree: false,
+        createdAt: new Date(now - 14 * 864e5).toISOString(),
+        lastLogin: new Date(now - 12 * 6e4).toISOString(),
+        stats: {
+          totalWatchSeconds: 53100,
+          // 14h 45m
+          totalStreamsWatched: 12,
+          totalVisits: 28,
+          lastOnline: new Date(now - 12 * 6e4).toISOString(),
+          lastGameWatched: "\u{1F3C0} Golden State Warriors vs Sacramento Kings",
+          lastDeviceTag: "Apple iPhone 15 Pro (iOS)",
+          lastRegion: "Pacific US (CA/WA)",
+          lastQuality: "1080p HD",
+          watchHistory: [
+            {
+              gameName: "\u{1F3C0} Golden State Warriors vs Sacramento Kings",
+              sport: "nba",
+              watchedAt: new Date(now - 12 * 6e4).toISOString(),
+              watchSeconds: 4500
+            },
+            {
+              gameName: "\u{1F3C0} Los Angeles Lakers vs Phoenix Suns",
+              sport: "nba",
+              watchedAt: new Date(now - 864e5).toISOString(),
+              watchSeconds: 7200
+            },
+            {
+              gameName: "\u{1F3C8} San Francisco 49ers vs Dallas Cowboys",
+              sport: "nfl",
+              watchedAt: new Date(now - 3 * 864e5).toISOString(),
+              watchSeconds: 8400
+            }
+          ]
+        }
+      },
+      {
+        id: "user_elena_vip",
+        username: "elenarostova",
+        email: "elena_courtside@gmail.com",
+        displayName: "Elena Rostova",
+        provider: "google",
+        favoriteTeams: ["Los Angeles Lakers", "Miami Heat"],
+        spoilerFree: true,
+        createdAt: new Date(now - 9 * 864e5).toISOString(),
+        lastLogin: new Date(now - 65 * 6e4).toISOString(),
+        stats: {
+          totalWatchSeconds: 3e4,
+          // 8h 20m
+          totalStreamsWatched: 7,
+          totalVisits: 16,
+          lastOnline: new Date(now - 65 * 6e4).toISOString(),
+          lastGameWatched: "\u{1F3C0} Los Angeles Lakers vs Denver Nuggets",
+          lastDeviceTag: "Apple Mac (macOS)",
+          lastRegion: "Eastern US (NY/FL)",
+          lastQuality: "1080p HD",
+          watchHistory: [
+            {
+              gameName: "\u{1F3C0} Los Angeles Lakers vs Denver Nuggets",
+              sport: "nba",
+              watchedAt: new Date(now - 65 * 6e4).toISOString(),
+              watchSeconds: 5400
+            },
+            {
+              gameName: "\u{1F3C0} Boston Celtics vs New York Knicks",
+              sport: "nba",
+              watchedAt: new Date(now - 2 * 864e5).toISOString(),
+              watchSeconds: 6100
+            }
+          ]
+        }
+      },
+      {
+        id: "user_david_miller",
+        username: "davidmiller",
+        email: "dmiller_nfl@yahoo.com",
+        displayName: "David Miller",
+        provider: "local",
+        favoriteTeams: ["Kansas City Chiefs"],
+        spoilerFree: false,
+        createdAt: new Date(now - 5 * 864e5).toISOString(),
+        lastLogin: new Date(now - 4 * 36e5).toISOString(),
+        stats: {
+          totalWatchSeconds: 18600,
+          // 5h 10m
+          totalStreamsWatched: 4,
+          totalVisits: 9,
+          lastOnline: new Date(now - 4 * 36e5).toISOString(),
+          lastGameWatched: "\u{1F3C8} Kansas City Chiefs vs Baltimore Ravens",
+          lastDeviceTag: "Windows PC (Desktop)",
+          lastRegion: "Central US (TX/IL)",
+          lastQuality: "720p 60fps",
+          watchHistory: [
+            {
+              gameName: "\u{1F3C8} Kansas City Chiefs vs Baltimore Ravens",
+              sport: "nfl",
+              watchedAt: new Date(now - 4 * 36e5).toISOString(),
+              watchSeconds: 7800
+            }
+          ]
+        }
+      },
+      {
+        id: "user_vip_fan",
+        username: "vip_fan",
+        email: "vip@bigsuustreams.com",
+        displayName: "VIP Courtside Pass",
+        provider: "local",
+        favoriteTeams: ["Sacramento Kings", "Boston Celtics"],
+        spoilerFree: false,
+        createdAt: new Date(now - 21 * 864e5).toISOString(),
+        lastLogin: new Date(now - 5 * 6e4).toISOString(),
+        stats: {
+          totalWatchSeconds: 123300,
+          // 34h 15m
+          totalStreamsWatched: 29,
+          totalVisits: 52,
+          lastOnline: new Date(now - 5 * 6e4).toISOString(),
+          lastGameWatched: "\u{1F3C0} Boston Celtics vs Golden State Warriors",
+          lastDeviceTag: "Apple iPad (iPadOS)",
+          lastRegion: "Pacific US (CA/WA)",
+          lastQuality: "1080p HD",
+          watchHistory: [
+            {
+              gameName: "\u{1F3C0} Boston Celtics vs Golden State Warriors",
+              sport: "nba",
+              watchedAt: new Date(now - 5 * 6e4).toISOString(),
+              watchSeconds: 3600
+            },
+            {
+              gameName: "\u{1F3C0} Sacramento Kings vs Minnesota Timberwolves",
+              sport: "nba",
+              watchedAt: new Date(now - 864e5).toISOString(),
+              watchSeconds: 7200
+            }
+          ]
+        }
+      }
+    ];
+    for (const u of seed) {
+      this.users.set(u.id, u);
+    }
+    this.persistUsers();
+  }
+  recordUserActivity(identifier, data) {
+    if (!identifier.userId && !identifier.email && !identifier.username) return;
+    let target;
+    if (identifier.userId) {
+      target = this.users.get(identifier.userId);
+    }
+    if (!target && identifier.email) {
+      const cleanEmail = identifier.email.trim().toLowerCase();
+      for (const u of this.users.values()) {
+        if (u.email.toLowerCase() === cleanEmail) {
+          target = u;
+          break;
+        }
+      }
+    }
+    if (!target && identifier.username) {
+      const cleanUname = identifier.username.trim().toLowerCase();
+      for (const u of this.users.values()) {
+        if (u.username.toLowerCase() === cleanUname) {
+          target = u;
+          break;
+        }
+      }
+    }
+    if (!target) return;
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    if (!target.stats) {
+      target.stats = {
+        totalWatchSeconds: 0,
+        totalStreamsWatched: 0,
+        totalVisits: 1,
+        lastOnline: nowIso,
+        watchHistory: []
+      };
+    }
+    target.stats.lastOnline = nowIso;
+    if (data.deviceTag) target.stats.lastDeviceTag = data.deviceTag;
+    if (data.region) target.stats.lastRegion = data.region;
+    if (data.quality) target.stats.lastQuality = data.quality;
+    if (data.isNewVisit) {
+      target.stats.totalVisits = (target.stats.totalVisits || 1) + 1;
+    }
+    if (data.secondsWatched && data.secondsWatched > 0) {
+      target.stats.totalWatchSeconds = (target.stats.totalWatchSeconds || 0) + data.secondsWatched;
+    }
+    if (data.gameName || data.streamKey) {
+      const gName = data.gameName || "Live Sports Broadcast";
+      target.stats.lastGameWatched = gName;
+      if (!Array.isArray(target.stats.watchHistory)) {
+        target.stats.watchHistory = [];
+      }
+      const recent = target.stats.watchHistory[0];
+      const isSameRecent = recent && (data.streamKey && recent.streamKey === data.streamKey || recent.gameName === gName);
+      const recentTime = recent ? new Date(recent.watchedAt).getTime() : 0;
+      const isWithinWindow = Date.now() - recentTime < 30 * 60 * 1e3;
+      if (recent && isSameRecent && isWithinWindow) {
+        recent.watchSeconds = (recent.watchSeconds || 0) + (data.secondsWatched || 20);
+        recent.watchedAt = nowIso;
+      } else {
+        target.stats.watchHistory.unshift({
+          gameName: gName,
+          sport: gName.toLowerCase().includes("nfl") || /chiefs|eagles|ravens|bills|cowboys|packers|49ers|lions/i.test(gName) ? "nfl" : "nba",
+          streamKey: data.streamKey,
+          watchedAt: nowIso,
+          watchSeconds: data.secondsWatched || 20
+        });
+        target.stats.totalStreamsWatched = (target.stats.totalStreamsWatched || 0) + 1;
+        if (target.stats.watchHistory.length > 25) {
+          target.stats.watchHistory.pop();
+        }
+      }
+    }
+    this.schedulePersistUsers();
+  }
+  loadUsers() {
+    try {
+      if (fs.existsSync(USERS_FILE)) {
+        const raw = fs.readFileSync(USERS_FILE, "utf-8");
+        const list = JSON.parse(raw);
+        this.users.clear();
+        for (const u of list) {
+          this.users.set(u.id, {
+            ...u,
+            favoriteTeams: Array.isArray(u.favoriteTeams) ? u.favoriteTeams : [],
+            spoilerFree: Boolean(u.spoilerFree),
+            stats: u.stats || {
+              totalWatchSeconds: 0,
+              totalStreamsWatched: 0,
+              totalVisits: 1,
+              lastOnline: u.lastLogin || u.createdAt,
+              watchHistory: []
+            }
+          });
+        }
+      }
+      if (this.users.size === 0) {
+        this.seedInitialMembers();
+      }
+    } catch (err) {
+      console.warn("Error reading users store:", err);
+    }
+  }
+  persistUsers() {
+    try {
+      this.ensureDataStore();
+      const list = Array.from(this.users.values());
+      fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+    } catch (err) {
+      console.warn("Error saving users store:", err);
+    }
+  }
+  hashPassword(password, salt) {
+    return crypto.pbkdf2Sync(password, salt, 1e4, 64, "sha512").toString("hex");
+  }
+  register(username, email, password) {
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanUsername || cleanUsername.length < 3) {
+      throw new Error("Username must be at least 3 characters long");
+    }
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      throw new Error("Please provide a valid email address");
+    }
+    if (!password || password.length < 6) {
+      throw new Error("Password must be at least 6 characters long");
+    }
+    for (const u of this.users.values()) {
+      if (u.username === cleanUsername) {
+        throw new Error("This username is already taken. Please choose another.");
+      }
+      if (u.email === cleanEmail) {
+        throw new Error("An account with this email already exists. Please log in.");
+      }
+    }
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = this.hashPassword(password, salt);
+    const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const user = {
+      id,
+      username: cleanUsername,
+      email: cleanEmail,
+      displayName: username.trim(),
+      passwordHash,
+      salt,
+      provider: "local",
+      favoriteTeams: [],
+      spoilerFree: false,
+      createdAt: now,
+      lastLogin: now,
+      stats: {
+        totalWatchSeconds: 0,
+        totalStreamsWatched: 0,
+        totalVisits: 1,
+        lastOnline: now,
+        watchHistory: []
+      }
+    };
+    this.users.set(id, user);
+    this.persistUsers();
+    const session = this.createSession(user);
+    return { user, session };
+  }
+  login(identifier, password) {
+    const clean = identifier.trim().toLowerCase();
+    let foundUser;
+    for (const u of this.users.values()) {
+      if (u.username === clean || u.email === clean) {
+        foundUser = u;
+        break;
+      }
+    }
+    if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
+      throw new Error("Invalid username/email or password");
+    }
+    const inputHash = this.hashPassword(password, foundUser.salt);
+    if (inputHash !== foundUser.passwordHash) {
+      throw new Error("Invalid username/email or password");
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    foundUser.lastLogin = now;
+    if (!foundUser.stats) {
+      foundUser.stats = {
+        totalWatchSeconds: 0,
+        totalStreamsWatched: 0,
+        totalVisits: 1,
+        lastOnline: now,
+        watchHistory: []
+      };
+    } else {
+      foundUser.stats.lastOnline = now;
+      foundUser.stats.totalVisits = (foundUser.stats.totalVisits || 0) + 1;
+    }
+    this.persistUsers();
+    const session = this.createSession(foundUser);
+    return { user: foundUser, session };
+  }
+  loginWithGoogle(email, displayName, avatarUrl) {
+    const cleanEmail = email.trim().toLowerCase();
+    let user;
+    for (const u of this.users.values()) {
+      if (u.email === cleanEmail) {
+        user = u;
+        break;
+      }
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    if (!user) {
+      const generatedUsername = cleanEmail.split("@")[0].replace(/[^a-z0-9]/g, "").slice(0, 15) || `user${Date.now() % 1e4}`;
+      const id = `google_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      user = {
+        id,
+        username: generatedUsername,
+        email: cleanEmail,
+        displayName: displayName || cleanEmail.split("@")[0],
+        provider: "google",
+        avatarUrl,
+        favoriteTeams: [],
+        spoilerFree: false,
+        createdAt: now,
+        lastLogin: now,
+        stats: {
+          totalWatchSeconds: 0,
+          totalStreamsWatched: 0,
+          totalVisits: 1,
+          lastOnline: now,
+          watchHistory: []
+        }
+      };
+      this.users.set(id, user);
+    } else {
+      user.lastLogin = now;
+      if (avatarUrl) user.avatarUrl = avatarUrl;
+      if (displayName) user.displayName = displayName;
+      if (!user.stats) {
+        user.stats = {
+          totalWatchSeconds: 0,
+          totalStreamsWatched: 0,
+          totalVisits: 1,
+          lastOnline: now,
+          watchHistory: []
+        };
+      } else {
+        user.stats.lastOnline = now;
+        user.stats.totalVisits = (user.stats.totalVisits || 0) + 1;
+      }
+    }
+    this.persistUsers();
+    const session = this.createSession(user);
+    return { user, session };
+  }
+  createSession(user) {
+    const token = `sess_${crypto.randomBytes(32).toString("hex")}`;
+    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1e3;
+    const session = {
+      token,
+      userId: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      favoriteTeams: user.favoriteTeams || [],
+      spoilerFree: Boolean(user.spoilerFree),
+      expiresAt
+    };
+    this.sessions.set(token, session);
+    return session;
+  }
+  verifySession(token) {
+    if (!token) return null;
+    const session = this.sessions.get(token);
+    if (!session) return null;
+    if (Date.now() > session.expiresAt) {
+      this.sessions.delete(token);
+      return null;
+    }
+    return session;
+  }
+  removeSession(token) {
+    this.sessions.delete(token);
+  }
+  syncExistingUser(user) {
+    const id = user.id || `u_${Date.now()}`;
+    const existing = this.users.get(id);
+    if (existing) return existing;
+    for (const u of this.users.values()) {
+      if (user.email && u.email.toLowerCase() === user.email.toLowerCase()) return u;
+      if (user.username && u.username.toLowerCase() === user.username.toLowerCase()) return u;
+    }
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    const restored = {
+      id,
+      username: user.username || "Member",
+      email: user.email || `${user.username || "user"}@bigsuustreams.com`,
+      displayName: user.displayName || user.username || "Member",
+      provider: user.provider || "local",
+      createdAt: user.createdAt || nowIso,
+      lastLogin: nowIso,
+      favoriteTeams: Array.isArray(user.favoriteTeams) ? user.favoriteTeams : [],
+      spoilerFree: Boolean(user.spoilerFree),
+      stats: user.stats || {
+        totalWatchSeconds: 0,
+        totalStreamsWatched: 0,
+        totalVisits: 1,
+        lastOnline: nowIso,
+        watchHistory: []
+      }
+    };
+    this.users.set(id, restored);
+    this.persistUsers();
+    return restored;
+  }
+  updatePreferences(userId, favoriteTeams, spoilerFree) {
+    const user = this.users.get(userId);
+    if (user) {
+      if (Array.isArray(favoriteTeams)) {
+        user.favoriteTeams = favoriteTeams;
+      }
+      if (typeof spoilerFree === "boolean") {
+        user.spoilerFree = spoilerFree;
+      }
+      this.persistUsers();
+    }
+    for (const session of this.sessions.values()) {
+      if (session.userId === userId) {
+        if (Array.isArray(favoriteTeams)) {
+          session.favoriteTeams = favoriteTeams;
+        }
+        if (typeof spoilerFree === "boolean") {
+          session.spoilerFree = spoilerFree;
+        }
+      }
+    }
+  }
+};
+var authService = new AuthService();
+
+// src/server/analyticsService.ts
 var EXCLUDED_EMAILS = [
   (process.env.ADMIN_EMAIL || "").trim().toLowerCase(),
   "owner@bss.internal",
   "vip@bss.internal"
 ].filter(Boolean);
-var DATA_DIR = path.join(process.cwd(), "data");
-var VISITORS_FILE = path.join(DATA_DIR, "visitors.json");
-var ANALYTICS_STATE_FILE = path.join(DATA_DIR, "analytics_history.json");
-var CONFIG_FILE = path.join(DATA_DIR, "analytics_config.json");
-var BACKUP_DIR = path.join(DATA_DIR, "backups");
+var DATA_DIR2 = path2.join(process.cwd(), "data");
+var VISITORS_FILE = path2.join(DATA_DIR2, "visitors.json");
+var ANALYTICS_STATE_FILE = path2.join(DATA_DIR2, "analytics_history.json");
+var CONFIG_FILE = path2.join(DATA_DIR2, "analytics_config.json");
+var BACKUP_DIR = path2.join(DATA_DIR2, "backups");
 function resolveRegion(tz) {
   if (!tz) return "North America";
   const clean = tz.replace(/_/g, " ");
@@ -1425,14 +1955,14 @@ var AnalyticsTracker = class {
   }
   createAutomatedBackup() {
     try {
-      if (!fs.existsSync(BACKUP_DIR)) {
-        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      if (!fs2.existsSync(BACKUP_DIR)) {
+        fs2.mkdirSync(BACKUP_DIR, { recursive: true });
       }
-      const files = [VISITORS_FILE, ANALYTICS_STATE_FILE, CONFIG_FILE, path.join(DATA_DIR, "users.json")];
+      const files = [VISITORS_FILE, ANALYTICS_STATE_FILE, CONFIG_FILE, path2.join(DATA_DIR2, "users.json")];
       for (const f of files) {
-        if (fs.existsSync(f)) {
-          const base = path.basename(f);
-          fs.copyFileSync(f, path.join(BACKUP_DIR, `latest_${base}`));
+        if (fs2.existsSync(f)) {
+          const base = path2.basename(f);
+          fs2.copyFileSync(f, path2.join(BACKUP_DIR, `latest_${base}`));
         }
       }
     } catch (err) {
@@ -1441,16 +1971,16 @@ var AnalyticsTracker = class {
   }
   ensureDataDir() {
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (!fs2.existsSync(DATA_DIR2)) {
+        fs2.mkdirSync(DATA_DIR2, { recursive: true });
       }
     } catch {
     }
   }
   loadConfig() {
     try {
-      if (fs.existsSync(CONFIG_FILE)) {
-        const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
+      if (fs2.existsSync(CONFIG_FILE)) {
+        const raw = fs2.readFileSync(CONFIG_FILE, "utf-8");
         const parsed = JSON.parse(raw);
         this.analyticsConfig = {
           umamiWebsiteId: parsed.umamiWebsiteId || "",
@@ -1479,7 +2009,7 @@ var AnalyticsTracker = class {
     }
     this.analyticsConfig.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
     try {
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.analyticsConfig, null, 2), "utf-8");
+      fs2.writeFileSync(CONFIG_FILE, JSON.stringify(this.analyticsConfig, null, 2), "utf-8");
     } catch (e) {
       console.warn("Could not persist analytics config:", e);
     }
@@ -1487,8 +2017,8 @@ var AnalyticsTracker = class {
   }
   loadAnalyticsState() {
     try {
-      if (fs.existsSync(ANALYTICS_STATE_FILE)) {
-        const raw = fs.readFileSync(ANALYTICS_STATE_FILE, "utf-8");
+      if (fs2.existsSync(ANALYTICS_STATE_FILE)) {
+        const raw = fs2.readFileSync(ANALYTICS_STATE_FILE, "utf-8");
         const s = JSON.parse(raw);
         if (s && s.todayStr === this.todayStr) {
           if (Array.isArray(s.uniqueVisitorsToday)) {
@@ -1539,15 +2069,15 @@ var AnalyticsTracker = class {
         hourlyPageViews: this.hourlyPageViews,
         savedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
-      fs.writeFileSync(ANALYTICS_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
+      fs2.writeFileSync(ANALYTICS_STATE_FILE, JSON.stringify(payload, null, 2), "utf-8");
     } catch (e) {
       console.warn("Could not persist analytics state:", e);
     }
   }
   loadVisitorsStore() {
     try {
-      if (fs.existsSync(VISITORS_FILE)) {
-        const raw = fs.readFileSync(VISITORS_FILE, "utf-8");
+      if (fs2.existsSync(VISITORS_FILE)) {
+        const raw = fs2.readFileSync(VISITORS_FILE, "utf-8");
         const list = JSON.parse(raw);
         for (const r of list) {
           this.knownDevices.set(r.deviceId, r);
@@ -1558,11 +2088,11 @@ var AnalyticsTracker = class {
   }
   persistVisitorsStore() {
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (!fs2.existsSync(DATA_DIR2)) {
+        fs2.mkdirSync(DATA_DIR2, { recursive: true });
       }
       const list = Array.from(this.knownDevices.values()).slice(-500);
-      fs.writeFileSync(VISITORS_FILE, JSON.stringify(list, null, 2), "utf-8");
+      fs2.writeFileSync(VISITORS_FILE, JSON.stringify(list, null, 2), "utf-8");
     } catch {
     }
   }
@@ -1608,6 +2138,24 @@ var AnalyticsTracker = class {
     const region = resolveRegion(timezone);
     const sessionDuration = payload.sessionDuration || 0;
     const quality = payload.quality || "1080p";
+    if (payload.userId || payload.userEmail || payload.username) {
+      try {
+        authService.recordUserActivity(
+          { userId: payload.userId, email: payload.userEmail, username: payload.username },
+          {
+            secondsWatched: payload.streamKey ? 20 : 0,
+            gameName: payload.gameName,
+            streamKey: payload.streamKey,
+            deviceTag,
+            region,
+            quality,
+            isNewVisit: Boolean(payload.isInitial)
+          }
+        );
+      } catch (e) {
+        console.warn("Could not record user activity:", e);
+      }
+    }
     const nowIso = (/* @__PURE__ */ new Date()).toISOString();
     const existingDev = this.knownDevices.get(deviceId);
     if (existingDev) {
@@ -1666,8 +2214,10 @@ var AnalyticsTracker = class {
       path: payload.path || "/",
       streamKey: payload.streamKey,
       gameName: payload.gameName,
+      userId: payload.userId,
       userEmail: payload.userEmail,
       username: payload.username,
+      displayName: payload.displayName,
       clientHash,
       timezone,
       region,
@@ -1746,19 +2296,36 @@ var AnalyticsTracker = class {
     const nightViews = this.hourlyPageViews.slice(23, 24).reduce((a, b) => a + b, 0) + this.hourlyPageViews.slice(0, 6).reduce((a, b) => a + b, 0);
     let registeredUsersList = [];
     try {
-      const usersFile = path.join(DATA_DIR, "users.json");
-      if (fs.existsSync(usersFile)) {
-        const raw = fs.readFileSync(usersFile, "utf-8");
-        registeredUsersList = JSON.parse(raw).map((u) => ({
+      const allUsers = authService.getAllUsers();
+      registeredUsersList = allUsers.map((u) => {
+        const active = Array.from(this.activeSessions.values()).find(
+          (s) => s.userId && s.userId === u.id || s.userEmail && s.userEmail.toLowerCase() === u.email.toLowerCase() || s.username && s.username.toLowerCase() === u.username.toLowerCase()
+        );
+        const isOnline = Boolean(active && active.lastPing >= cutoff);
+        return {
           id: u.id,
           username: u.username,
           email: u.email,
-          displayName: u.displayName,
+          displayName: u.displayName || u.username,
+          avatarUrl: u.avatarUrl,
           provider: u.provider,
           createdAt: u.createdAt,
-          lastLogin: u.lastLogin
-        }));
-      }
+          lastLogin: u.lastLogin,
+          favoriteTeams: u.favoriteTeams || [],
+          spoilerFree: Boolean(u.spoilerFree),
+          isOnline,
+          activeStream: active ? active.gameName || (active.streamKey ? "Live Broadcast" : "Browsing Schedule") : void 0,
+          activeDevice: active ? active.deviceTag || active.device : void 0,
+          currentWatchDurationMinutes: active ? Math.max(1, Math.round((active.sessionDuration || 60) / 60)) : void 0,
+          stats: u.stats || {
+            totalWatchSeconds: 0,
+            totalStreamsWatched: 0,
+            totalVisits: 1,
+            lastOnline: u.lastLogin || u.createdAt,
+            watchHistory: []
+          }
+        };
+      });
     } catch {
     }
     const activeSessionsList = Array.from(this.activeSessions.entries()).filter(([_, s]) => s.lastPing >= cutoff).map(([id, s]) => ({
@@ -2046,236 +2613,6 @@ function applySecurityHeaders(_req, res, next) {
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();
 }
-
-// src/server/authService.ts
-import fs2 from "fs";
-import path2 from "path";
-import crypto from "crypto";
-var DATA_DIR2 = path2.join(process.cwd(), "data");
-var USERS_FILE = path2.join(DATA_DIR2, "users.json");
-var AuthService = class {
-  users = /* @__PURE__ */ new Map();
-  sessions = /* @__PURE__ */ new Map();
-  constructor() {
-    this.ensureDataStore();
-    this.loadUsers();
-  }
-  ensureDataStore() {
-    try {
-      if (!fs2.existsSync(DATA_DIR2)) {
-        fs2.mkdirSync(DATA_DIR2, { recursive: true });
-      }
-      if (!fs2.existsSync(USERS_FILE)) {
-        fs2.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf-8");
-      }
-    } catch (err) {
-      console.warn("Could not initialize users data directory:", err);
-    }
-  }
-  loadUsers() {
-    try {
-      if (fs2.existsSync(USERS_FILE)) {
-        const raw = fs2.readFileSync(USERS_FILE, "utf-8");
-        const list = JSON.parse(raw);
-        this.users.clear();
-        for (const u of list) {
-          this.users.set(u.id, {
-            ...u,
-            favoriteTeams: Array.isArray(u.favoriteTeams) ? u.favoriteTeams : [],
-            spoilerFree: Boolean(u.spoilerFree)
-          });
-        }
-      }
-    } catch (err) {
-      console.warn("Error reading users store:", err);
-    }
-  }
-  persistUsers() {
-    try {
-      this.ensureDataStore();
-      const list = Array.from(this.users.values());
-      fs2.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
-    } catch (err) {
-      console.warn("Error saving users store:", err);
-    }
-  }
-  hashPassword(password, salt) {
-    return crypto.pbkdf2Sync(password, salt, 1e4, 64, "sha512").toString("hex");
-  }
-  register(username, email, password) {
-    const cleanUsername = username.trim().toLowerCase();
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanUsername || cleanUsername.length < 3) {
-      throw new Error("Username must be at least 3 characters long");
-    }
-    if (!cleanEmail || !cleanEmail.includes("@")) {
-      throw new Error("Please provide a valid email address");
-    }
-    if (!password || password.length < 6) {
-      throw new Error("Password must be at least 6 characters long");
-    }
-    for (const u of this.users.values()) {
-      if (u.username === cleanUsername) {
-        throw new Error("This username is already taken. Please choose another.");
-      }
-      if (u.email === cleanEmail) {
-        throw new Error("An account with this email already exists. Please log in.");
-      }
-    }
-    const salt = crypto.randomBytes(16).toString("hex");
-    const passwordHash = this.hashPassword(password, salt);
-    const id = `user_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    const user = {
-      id,
-      username: cleanUsername,
-      email: cleanEmail,
-      displayName: username.trim(),
-      passwordHash,
-      salt,
-      provider: "local",
-      favoriteTeams: [],
-      spoilerFree: false,
-      createdAt: now,
-      lastLogin: now
-    };
-    this.users.set(id, user);
-    this.persistUsers();
-    const session = this.createSession(user);
-    return { user, session };
-  }
-  login(identifier, password) {
-    const clean = identifier.trim().toLowerCase();
-    let foundUser;
-    for (const u of this.users.values()) {
-      if (u.username === clean || u.email === clean) {
-        foundUser = u;
-        break;
-      }
-    }
-    if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
-      throw new Error("Invalid username/email or password");
-    }
-    const inputHash = this.hashPassword(password, foundUser.salt);
-    if (inputHash !== foundUser.passwordHash) {
-      throw new Error("Invalid username/email or password");
-    }
-    foundUser.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
-    this.persistUsers();
-    const session = this.createSession(foundUser);
-    return { user: foundUser, session };
-  }
-  loginWithGoogle(email, displayName, avatarUrl) {
-    const cleanEmail = email.trim().toLowerCase();
-    let user;
-    for (const u of this.users.values()) {
-      if (u.email === cleanEmail) {
-        user = u;
-        break;
-      }
-    }
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    if (!user) {
-      const generatedUsername = cleanEmail.split("@")[0].replace(/[^a-z0-9]/g, "").slice(0, 15) || `user${Date.now() % 1e4}`;
-      const id = `google_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-      user = {
-        id,
-        username: generatedUsername,
-        email: cleanEmail,
-        displayName: displayName || cleanEmail.split("@")[0],
-        provider: "google",
-        avatarUrl,
-        favoriteTeams: [],
-        spoilerFree: false,
-        createdAt: now,
-        lastLogin: now
-      };
-      this.users.set(id, user);
-    } else {
-      user.lastLogin = now;
-      if (avatarUrl) user.avatarUrl = avatarUrl;
-      if (displayName) user.displayName = displayName;
-    }
-    this.persistUsers();
-    const session = this.createSession(user);
-    return { user, session };
-  }
-  createSession(user) {
-    const token = `sess_${crypto.randomBytes(32).toString("hex")}`;
-    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1e3;
-    const session = {
-      token,
-      userId: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      favoriteTeams: user.favoriteTeams || [],
-      spoilerFree: Boolean(user.spoilerFree),
-      expiresAt
-    };
-    this.sessions.set(token, session);
-    return session;
-  }
-  verifySession(token) {
-    if (!token) return null;
-    const session = this.sessions.get(token);
-    if (!session) return null;
-    if (Date.now() > session.expiresAt) {
-      this.sessions.delete(token);
-      return null;
-    }
-    return session;
-  }
-  removeSession(token) {
-    this.sessions.delete(token);
-  }
-  syncExistingUser(user) {
-    const id = user.id || `u_${Date.now()}`;
-    const existing = this.users.get(id);
-    if (existing) return existing;
-    for (const u of this.users.values()) {
-      if (user.email && u.email.toLowerCase() === user.email.toLowerCase()) return u;
-      if (user.username && u.username.toLowerCase() === user.username.toLowerCase()) return u;
-    }
-    const restored = {
-      id,
-      username: user.username || "Member",
-      email: user.email || `${user.username || "user"}@bigsuustreams.com`,
-      displayName: user.displayName || user.username || "Member",
-      provider: user.provider || "local",
-      createdAt: user.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
-      lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
-      favoriteTeams: Array.isArray(user.favoriteTeams) ? user.favoriteTeams : [],
-      spoilerFree: Boolean(user.spoilerFree)
-    };
-    this.users.set(id, restored);
-    this.persistUsers();
-    return restored;
-  }
-  updatePreferences(userId, favoriteTeams, spoilerFree) {
-    const user = this.users.get(userId);
-    if (user) {
-      if (Array.isArray(favoriteTeams)) {
-        user.favoriteTeams = favoriteTeams;
-      }
-      if (typeof spoilerFree === "boolean") {
-        user.spoilerFree = spoilerFree;
-      }
-      this.persistUsers();
-    }
-    for (const session of this.sessions.values()) {
-      if (session.userId === userId) {
-        if (Array.isArray(favoriteTeams)) {
-          session.favoriteTeams = favoriteTeams;
-        }
-        if (typeof spoilerFree === "boolean") {
-          session.spoilerFree = spoilerFree;
-        }
-      }
-    }
-  }
-};
-var authService = new AuthService();
 
 // src/server/autonomousWatchdog.ts
 var AutonomousWatchdog = class {

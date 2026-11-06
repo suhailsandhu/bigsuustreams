@@ -63,7 +63,7 @@ function getSessionId(): string {
   }
 }
 
-function getLoggedInUser(): { email?: string; username?: string } | null {
+function getLoggedInUser(): { id?: string; email?: string; username?: string; displayName?: string } | null {
   try {
     const raw = localStorage.getItem('bigsuu_auth_user');
     if (raw) return JSON.parse(raw);
@@ -419,8 +419,10 @@ function sendPing(isInitial: boolean) {
       visitCount,
       device: category,
       deviceTag: tag,
+      userId: user?.id,
       userEmail: user?.email,
       username: user?.username,
+      displayName: user?.displayName,
       path,
       streamKey: currentStreamKey,
       gameName: currentGameName,

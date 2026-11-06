@@ -2,6 +2,7 @@
 // Designed with Shopify-grade metrics, device tagging, retention tracking, and owner exclusion
 import fs from 'fs';
 import path from 'path';
+import { authService } from './authService.ts';
 
 declare const process: any;
 
@@ -24,8 +25,10 @@ interface VisitorSession {
   path: string;
   streamKey?: string;
   gameName?: string;
+  userId?: string;
   userEmail?: string;
   username?: string;
+  displayName?: string;
   clientHash: string;
   timezone?: string;
   region?: string;
@@ -326,8 +329,10 @@ class AnalyticsTracker {
       deviceTag?: string;
       deviceId?: string;
       visitCount?: number;
+      userId?: string;
       userEmail?: string;
       username?: string;
+      displayName?: string;
       path?: string;
       streamKey?: string;
       gameName?: string;
@@ -355,6 +360,26 @@ class AnalyticsTracker {
     const region = resolveRegion(timezone);
     const sessionDuration = payload.sessionDuration || 0;
     const quality = payload.quality || '1080p';
+
+    // Update member account telemetry (watch time, last online, visits, games)
+    if (payload.userId || payload.userEmail || payload.username) {
+      try {
+        authService.recordUserActivity(
+          { userId: payload.userId, email: payload.userEmail, username: payload.username },
+          {
+            secondsWatched: payload.streamKey ? 20 : 0,
+            gameName: payload.gameName,
+            streamKey: payload.streamKey,
+            deviceTag,
+            region,
+            quality,
+            isNewVisit: Boolean(payload.isInitial)
+          }
+        );
+      } catch (e) {
+        console.warn('Could not record user activity:', e);
+      }
+    }
 
     // Track Device Tagging & Returning Visitors
     const nowIso = new Date().toISOString();
@@ -423,8 +448,10 @@ class AnalyticsTracker {
       path: payload.path || '/',
       streamKey: payload.streamKey,
       gameName: payload.gameName,
+      userId: payload.userId,
       userEmail: payload.userEmail,
       username: payload.username,
+      displayName: payload.displayName,
       clientHash,
       timezone,
       region,
@@ -522,22 +549,42 @@ class AnalyticsTracker {
     const primeTimeViews = this.hourlyPageViews.slice(18, 23).reduce((a, b) => a + b, 0);
     const nightViews = this.hourlyPageViews.slice(23, 24).reduce((a, b) => a + b, 0) + this.hourlyPageViews.slice(0, 6).reduce((a, b) => a + b, 0);
 
-    // Registered Users Directory
+    // Registered Users Directory with Real-time Online Tracking & Keynote Dossier Stats
     let registeredUsersList: any[] = [];
     try {
-      const usersFile = path.join(DATA_DIR, 'users.json');
-      if (fs.existsSync(usersFile)) {
-        const raw = fs.readFileSync(usersFile, 'utf-8');
-        registeredUsersList = JSON.parse(raw).map((u: any) => ({
+      const allUsers = authService.getAllUsers();
+      registeredUsersList = allUsers.map((u: any) => {
+        const active = Array.from(this.activeSessions.values()).find(
+          s => (s.userId && s.userId === u.id) ||
+               (s.userEmail && s.userEmail.toLowerCase() === u.email.toLowerCase()) ||
+               (s.username && s.username.toLowerCase() === u.username.toLowerCase())
+        );
+        const isOnline = Boolean(active && active.lastPing >= cutoff);
+
+        return {
           id: u.id,
           username: u.username,
           email: u.email,
-          displayName: u.displayName,
+          displayName: u.displayName || u.username,
+          avatarUrl: u.avatarUrl,
           provider: u.provider,
           createdAt: u.createdAt,
-          lastLogin: u.lastLogin
-        }));
-      }
+          lastLogin: u.lastLogin,
+          favoriteTeams: u.favoriteTeams || [],
+          spoilerFree: Boolean(u.spoilerFree),
+          isOnline,
+          activeStream: active ? (active.gameName || (active.streamKey ? 'Live Broadcast' : 'Browsing Schedule')) : undefined,
+          activeDevice: active ? (active.deviceTag || active.device) : undefined,
+          currentWatchDurationMinutes: active ? Math.max(1, Math.round((active.sessionDuration || 60) / 60)) : undefined,
+          stats: u.stats || {
+            totalWatchSeconds: 0,
+            totalStreamsWatched: 0,
+            totalVisits: 1,
+            lastOnline: u.lastLogin || u.createdAt,
+            watchHistory: []
+          }
+        };
+      });
     } catch {
       // ignore
     }

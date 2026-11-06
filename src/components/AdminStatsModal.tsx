@@ -4,7 +4,8 @@ import {
   ShieldAlert, Sparkles, TrendingUp, CheckCircle2, UserCheck,
   Search, Download, Globe, Activity, Sliders, ShieldCheck,
   Clock, Shield, ExternalLink, ChevronDown, ChevronUp,
-  MapPin, Smartphone, LayoutGrid, List, Play, Radio
+  MapPin, Smartphone, LayoutGrid, List, Radio,
+  ArrowLeft, Calendar, Flame, Film
 } from 'lucide-react';
 import { setUmamiConfig, sendUmamiTestEvent } from '../utils/analyticsClient';
 
@@ -19,14 +20,42 @@ interface HourlyPoint {
   views: number;
 }
 
+interface UserStreamHistory {
+  gameName: string;
+  sport?: 'nba' | 'nfl' | 'other';
+  streamKey?: string;
+  watchedAt: string;
+  watchSeconds: number;
+}
+
+interface UserStats {
+  totalWatchSeconds: number;
+  totalStreamsWatched: number;
+  totalVisits: number;
+  lastOnline: string;
+  lastGameWatched?: string;
+  lastDeviceTag?: string;
+  lastRegion?: string;
+  lastQuality?: string;
+  watchHistory: UserStreamHistory[];
+}
+
 interface RegisteredUser {
   id: string;
   username: string;
   email: string;
   displayName: string;
+  avatarUrl?: string;
   provider: 'local' | 'google';
   createdAt: string;
   lastLogin: string;
+  favoriteTeams?: string[];
+  spoilerFree?: boolean;
+  isOnline?: boolean;
+  activeStream?: string;
+  activeDevice?: string;
+  currentWatchDurationMinutes?: number;
+  stats?: UserStats;
 }
 
 interface ActiveSessionItem {
@@ -132,6 +161,9 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [healthData, setHealthData] = useState<any>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [liveViewMode, setLiveViewMode] = useState<'cards' | 'table'>('cards');
+  const [selectedUser, setSelectedUser] = useState<RegisteredUser | null>(null);
+  const [memberViewMode, setMemberViewMode] = useState<'cards' | 'table'>('cards');
+  const [memberFilter, setMemberFilter] = useState<'all' | 'online' | 'google' | 'direct'>('all');
 
   // Authenticate Admin PIN
   const handleAuth = async (e?: React.FormEvent) => {
@@ -279,16 +311,63 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   // Filtered collections based on search query
   const q = searchQuery.trim().toLowerCase();
 
+  // Helper functions for member stats formatting
+  const formatWatchTime = (totalSeconds: number = 0): string => {
+    if (!totalSeconds || totalSeconds < 60) return `${Math.max(1, Math.round(totalSeconds))}s`;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    if (totalMinutes < 60) return `${totalMinutes}m`;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const formatRelativeTime = (isoString?: string): string => {
+    if (!isoString) return 'Never';
+    const diff = Date.now() - new Date(isoString).getTime();
+    if (isNaN(diff)) return 'Unknown';
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(isoString).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  const getFanRank = (watchSeconds: number = 0): { label: string; badgeColor: string; tier: string } => {
+    const hours = watchSeconds / 3600;
+    if (hours >= 20) return { label: 'Courtside VIP', tier: 'Top 1% Super Fan', badgeColor: 'bg-amber-50 text-amber-700 border-amber-300' };
+    if (hours >= 5) return { label: 'Season Ticket Fan', tier: 'Core Regular', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-300' };
+    if (hours >= 1) return { label: 'Dedicated Fan', tier: 'Active Fan', badgeColor: 'bg-blue-50 text-blue-700 border-blue-300' };
+    return { label: 'Rookie Fan', tier: 'New Member', badgeColor: 'bg-gray-100 text-gray-700 border-gray-200' };
+  };
+
+  const onlineMembersCount = useMemo(() => {
+    return (stats?.registeredUsers || []).filter(u => u.isOnline).length;
+  }, [stats?.registeredUsers]);
+
   const filteredUsers = useMemo(() => {
-    const users = stats?.registeredUsers || [];
+    let users = stats?.registeredUsers || [];
+    if (memberFilter === 'online') {
+      users = users.filter(u => u.isOnline);
+    } else if (memberFilter === 'google') {
+      users = users.filter(u => u.provider === 'google');
+    } else if (memberFilter === 'direct') {
+      users = users.filter(u => u.provider === 'local');
+    }
+
     if (!q) return users;
     return users.filter(u => 
       u.username.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q) ||
       (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+      (u.stats?.lastGameWatched && u.stats.lastGameWatched.toLowerCase().includes(q)) ||
+      (u.stats?.lastDeviceTag && u.stats.lastDeviceTag.toLowerCase().includes(q)) ||
+      (u.stats?.lastRegion && u.stats.lastRegion.toLowerCase().includes(q)) ||
       u.provider.toLowerCase().includes(q)
     );
-  }, [stats?.registeredUsers, q]);
+  }, [stats?.registeredUsers, q, memberFilter]);
 
   const filteredStreams = useMemo(() => {
     const streams = stats?.topStreams || [];
@@ -468,12 +547,18 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   <span>Who's Online Now ({stats?.activeSessions?.length || stats?.liveVisitors || 0})</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('users')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  onClick={() => {
+                    setActiveTab('users');
+                    setSelectedUser(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
                     activeTab === 'users' ? 'bg-white text-gray-950 shadow-2xs' : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Members ({stats?.registeredUsers?.length || 0})
+                  <span>Members ({stats?.registeredUsers?.length || 0})</span>
+                  {onlineMembersCount > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                  )}
                 </button>
                 <button
                   onClick={() => setActiveTab('trackers')}
@@ -694,7 +779,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                     {/* Stage KPI Cards */}
                     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 shrink-0">
                       <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-3.5 border border-white/10 text-center min-w-[110px]">
-                        <div className="text-xl sm:text-2xl font-black text-white">{stats?.totalDevices || 0}</div>
+                        <div className="text-xl sm:text-2xl font-black text-white">{stats?.retention?.totalDevices || stats?.totalVisitorsToday || 0}</div>
                         <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider mt-0.5">Total Fans</div>
                       </div>
                       <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-3.5 border border-white/10 text-center min-w-[110px]">
@@ -885,63 +970,528 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
               </div>
             )}
 
-            {/* TAB 3: REGISTERED MEMBERS */}
-            {activeTab === 'users' && (
-              <div className="p-4 sm:p-6 space-y-4">
+            {/* TAB 3: REGISTERED MEMBERS & KEYNOTE DOSSIER */}
+            {activeTab === 'users' && selectedUser && (
+              <div className="p-4 sm:p-6 space-y-5 animate-in fade-in duration-200">
+                {/* Dossier Header & Back Button */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm sm:text-base font-extrabold text-gray-900">
-                      Registered Member Accounts ({filteredUsers.length})
-                    </h4>
-                    <p className="text-[11px] text-gray-400">
-                      User accounts registered in local server store
-                    </p>
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    className="flex items-center space-x-2 text-xs font-bold text-gray-700 hover:text-black bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl transition cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Members List</span>
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    {selectedUser.isOnline ? (
+                      <span className="flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>ONLINE NOW</span>
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                        Last online {formatRelativeTime(selectedUser.stats?.lastOnline || selectedUser.lastLogin)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-xs">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-400 uppercase text-[10px] font-bold bg-gray-50">
-                        <th className="py-3 px-4">User</th>
-                        <th className="py-3 px-4">Email</th>
-                        <th className="py-3 px-4">Auth Type</th>
-                        <th className="py-3 px-4 text-right">Created Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 font-medium">
-                      {filteredUsers.length > 0 ? (
-                        filteredUsers.map((u) => (
-                          <tr key={u.id} className="hover:bg-gray-50/80 transition">
-                            <td className="py-3 px-4 font-bold text-gray-900 flex items-center space-x-2">
-                              <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black uppercase text-gray-800">
-                                {u.username[0] || 'U'}
+                {/* Keynote Obsidian Profile Stage */}
+                <div className="bg-gradient-to-br from-gray-950 via-neutral-900 to-black text-white rounded-3xl p-5 sm:p-7 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative z-10">
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-black flex items-center justify-center text-2xl sm:text-3xl font-black shadow-lg">
+                          {selectedUser.displayName ? selectedUser.displayName[0].toUpperCase() : selectedUser.username[0].toUpperCase()}
+                        </div>
+                        {selectedUser.isOnline && (
+                          <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-black animate-pulse" />
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                            {selectedUser.displayName || selectedUser.username}
+                          </h3>
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-emerald-300">
+                            {selectedUser.provider === 'google' ? 'Google' : 'Direct'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-neutral-400 font-mono mt-0.5">
+                          @{selectedUser.username} • {selectedUser.email}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 mt-1.5 flex items-center space-x-2">
+                          <Calendar className="w-3 h-3 text-neutral-400" />
+                          <span>Joined {new Date(selectedUser.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stage Presence Pill */}
+                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/10 shrink-0">
+                      <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider mb-1">Current Presence</div>
+                      {selectedUser.isOnline ? (
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-black text-emerald-400 flex items-center space-x-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>Watching Live Stream</span>
+                          </div>
+                          <div className="text-xs font-bold text-white truncate max-w-[200px]">
+                            {selectedUser.activeStream || selectedUser.stats?.lastGameWatched || 'Live Match'}
+                          </div>
+                          <div className="text-[10px] text-neutral-400">
+                            {selectedUser.activeDevice || selectedUser.stats?.lastDeviceTag || 'Mobile'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-bold text-neutral-300">Offline</div>
+                          <div className="text-[11px] text-neutral-400">
+                            Last seen: {new Date(selectedUser.stats?.lastOnline || selectedUser.lastLogin || selectedUser.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4 Presentation Metric Tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs">
+                    <div className="flex items-center space-x-1.5 text-emerald-600 text-[11px] font-bold uppercase tracking-wider mb-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Watch Time</span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                      {formatWatchTime(selectedUser.stats?.totalWatchSeconds || 0)}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">Total time watching games</div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs">
+                    <div className="flex items-center space-x-1.5 text-blue-600 text-[11px] font-bold uppercase tracking-wider mb-1">
+                      <Tv className="w-3.5 h-3.5" />
+                      <span>Streams Tuned</span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                      {selectedUser.stats?.totalStreamsWatched || selectedUser.stats?.watchHistory?.length || 0}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">Distinct games watched</div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs">
+                    <div className="flex items-center space-x-1.5 text-indigo-600 text-[11px] font-bold uppercase tracking-wider mb-1">
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>App Visits</span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                      {selectedUser.stats?.totalVisits || 1}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">Total platform sessions</div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs">
+                    <div className="flex items-center space-x-1.5 text-amber-600 text-[11px] font-bold uppercase tracking-wider mb-1">
+                      <Flame className="w-3.5 h-3.5" />
+                      <span>Fan Tier</span>
+                    </div>
+                    <div className="text-sm sm:text-base font-black text-gray-900 tracking-tight truncate">
+                      {getFanRank(selectedUser.stats?.totalWatchSeconds).label}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">
+                      {getFanRank(selectedUser.stats?.totalWatchSeconds).tier}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tech Environment & Profile Setup */}
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-gray-700">
+                    Viewer Environment & Preferences
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-white p-3 rounded-xl border border-gray-200">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Device & OS</div>
+                      <div className="font-extrabold text-gray-900 mt-0.5 flex items-center space-x-1.5">
+                        <Smartphone className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="truncate">{selectedUser.activeDevice || selectedUser.stats?.lastDeviceTag || 'Web Browser'}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-xl border border-gray-200">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Market Location</div>
+                      <div className="font-extrabold text-gray-900 mt-0.5 flex items-center space-x-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="truncate">{selectedUser.stats?.lastRegion || 'North America'}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-xl border border-gray-200">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Stream Quality</div>
+                      <div className="font-extrabold text-gray-900 mt-0.5 flex items-center space-x-1.5">
+                        <Radio className="w-3.5 h-3.5 text-gray-500" />
+                        <span>{selectedUser.stats?.lastQuality || '1080p HD'}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3 rounded-xl border border-gray-200">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Favorite Teams</div>
+                      <div className="font-extrabold text-gray-900 mt-0.5 truncate">
+                        {selectedUser.favoriteTeams && selectedUser.favoriteTeams.length > 0 
+                          ? selectedUser.favoriteTeams.join(', ') 
+                          : 'None selected'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Broadcast Watch History Timeline */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-extrabold text-gray-900 flex items-center space-x-2">
+                        <Film className="w-4 h-4 text-emerald-600" />
+                        <span>Game Watch History & Sessions</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-400">
+                        Detailed log of all broadcasts tuned into by this account
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-gray-500">
+                      {selectedUser.stats?.watchHistory?.length || 0} entries
+                    </span>
+                  </div>
+
+                  {selectedUser.stats?.watchHistory && selectedUser.stats.watchHistory.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedUser.stats.watchHistory.map((item, idx) => (
+                        <div 
+                          key={idx}
+                          className="bg-white border border-gray-200 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs hover:border-gray-300 transition"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <span className="text-lg">
+                              {item.sport === 'nfl' ? '🏈' : '🏀'}
+                            </span>
+                            <div>
+                              <div className="text-xs font-extrabold text-gray-900">
+                                {item.gameName}
                               </div>
-                              <span>{u.displayName || u.username}</span>
-                            </td>
-                            <td className="py-3 px-4 text-gray-600 font-mono text-[11px]">
-                              {u.email}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                {u.provider}
+                              <div className="text-[10px] text-gray-400">
+                                Tuned in {new Date(item.watchedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(item.watchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {formatWatchTime(item.watchSeconds)} watched
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-8 text-center space-y-2">
+                      <Tv className="w-8 h-8 text-gray-300 mx-auto" />
+                      <div className="text-xs font-extrabold text-gray-700">No game streams recorded yet</div>
+                      <p className="text-[11px] text-gray-400 max-w-sm mx-auto">
+                        As soon as this member opens a game, their watch duration, stream quality, and session time will record here automatically.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: REGISTERED MEMBERS - DIRECTORY */}
+            {activeTab === 'users' && !selectedUser && (
+              <div className="p-4 sm:p-6 space-y-5">
+                {/* Header & Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-base sm:text-lg font-black text-gray-900 flex items-center space-x-2">
+                      <Users className="w-5 h-5 text-gray-800" />
+                      <span>Member Accounts ({filteredUsers.length})</span>
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Click any person to view their complete Keynote watch dossier, live watch time, and streaming stats.
+                    </p>
+                  </div>
+
+                  {/* Filter Pills & View Toggle */}
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <div className="flex items-center bg-gray-100 p-0.5 rounded-xl text-xs font-bold text-gray-600">
+                      <button
+                        onClick={() => setMemberViewMode('cards')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          memberViewMode === 'cards' ? 'bg-white text-gray-950 shadow-2xs' : 'hover:text-black'
+                        }`}
+                        title="Presentation Cards"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setMemberViewMode('table')}
+                        className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          memberViewMode === 'table' ? 'bg-white text-gray-950 shadow-2xs' : 'hover:text-black'
+                        }`}
+                        title="Spreadsheet Table"
+                      >
+                        <List className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <button
+                    onClick={() => setMemberFilter('all')}
+                    className={`px-3 py-1 rounded-full font-bold transition cursor-pointer ${
+                      memberFilter === 'all'
+                        ? 'bg-black text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Members ({stats?.registeredUsers?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setMemberFilter('online')}
+                    className={`px-3 py-1 rounded-full font-bold transition cursor-pointer flex items-center space-x-1.5 ${
+                      memberFilter === 'online'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Online Now ({onlineMembersCount})</span>
+                  </button>
+                  <button
+                    onClick={() => setMemberFilter('google')}
+                    className={`px-3 py-1 rounded-full font-bold transition cursor-pointer ${
+                      memberFilter === 'google'
+                        ? 'bg-black text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Google Accounts
+                  </button>
+                  <button
+                    onClick={() => setMemberFilter('direct')}
+                    className={`px-3 py-1 rounded-full font-bold transition cursor-pointer ${
+                      memberFilter === 'direct'
+                        ? 'bg-black text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Direct Passcode / Email
+                  </button>
+                </div>
+
+                {/* 1. KEYNOTE PRESENTATION CARDS */}
+                {memberViewMode === 'cards' && (
+                  <div>
+                    {filteredUsers.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredUsers.map((u) => (
+                          <div
+                            key={u.id}
+                            onClick={() => setSelectedUser(u)}
+                            className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-200 shadow-xs hover:shadow-md hover:border-gray-400 transition cursor-pointer space-y-3.5 group relative"
+                          >
+                            {/* Member Card Top */}
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="relative">
+                                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-gray-900 to-gray-700 text-white flex items-center justify-center font-black text-base shadow-xs group-hover:scale-105 transition">
+                                    {u.displayName ? u.displayName[0].toUpperCase() : u.username[0].toUpperCase()}
+                                  </div>
+                                  {u.isOnline && (
+                                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="font-extrabold text-sm text-gray-900 group-hover:text-black">
+                                      {u.displayName || u.username}
+                                    </span>
+                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-600">
+                                      {u.provider}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-gray-400 font-mono">
+                                    {u.email}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Online / Last Seen Badge */}
+                              {u.isOnline ? (
+                                <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>ONLINE</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md">
+                                  {formatRelativeTime(u.stats?.lastOnline || u.lastLogin)}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Presentation Metric Pills */}
+                            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                              <div className="bg-gray-50 rounded-xl p-2 border border-gray-100">
+                                <div className="text-xs font-black text-gray-900">
+                                  {formatWatchTime(u.stats?.totalWatchSeconds || 0)}
+                                </div>
+                                <div className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Watch Time</div>
+                              </div>
+
+                              <div className="bg-gray-50 rounded-xl p-2 border border-gray-100">
+                                <div className="text-xs font-black text-gray-900">
+                                  {u.stats?.totalStreamsWatched || u.stats?.watchHistory?.length || 0}
+                                </div>
+                                <div className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Games</div>
+                              </div>
+
+                              <div className="bg-gray-50 rounded-xl p-2 border border-gray-100">
+                                <div className="text-xs font-black text-gray-900 truncate">
+                                  {(u.activeDevice || u.stats?.lastDeviceTag || 'Web').split(' ')[0]}
+                                </div>
+                                <div className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Device</div>
+                              </div>
+                            </div>
+
+                            {/* Active or Last Game Strip */}
+                            {u.isOnline ? (
+                              <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-2.5 flex items-center space-x-2 text-xs">
+                                <span className="text-sm">🏀</span>
+                                <div className="truncate">
+                                  <span className="font-black text-emerald-900">Streaming now: </span>
+                                  <span className="font-bold text-emerald-800">{u.activeStream || u.stats?.lastGameWatched || 'Live Broadcast'}</span>
+                                </div>
+                              </div>
+                            ) : u.stats?.lastGameWatched ? (
+                              <div className="bg-gray-50 rounded-xl p-2.5 flex items-center space-x-2 text-xs text-gray-600">
+                                <span className="text-sm">🏀</span>
+                                <div className="truncate">
+                                  <span className="text-gray-400 font-semibold">Last game: </span>
+                                  <span className="font-bold text-gray-800">{u.stats.lastGameWatched}</span>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {/* Footer Action */}
+                            <div className="pt-1 flex items-center justify-between text-xs font-bold text-gray-500 group-hover:text-black">
+                              <span className="text-[11px] text-gray-400">
+                                {u.stats?.totalVisits || 1} visits recorded
                               </span>
-                            </td>
-                            <td className="py-3 px-4 text-right text-gray-400 tabular-nums text-[11px]">
-                              {new Date(u.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                              <span className="flex items-center space-x-1 text-emerald-600 group-hover:text-emerald-700 font-extrabold text-[11px]">
+                                <span>View Stats & Dossier</span>
+                                <span>→</span>
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 border border-dashed border-gray-200 rounded-3xl p-10 text-center space-y-3">
+                        <Users className="w-8 h-8 text-gray-300 mx-auto" />
+                        <h4 className="text-sm font-extrabold text-gray-900">No Members Found</h4>
+                        <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                          {searchQuery ? `No members match "${searchQuery}"` : 'No member accounts match this filter.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. TABLE VIEW */}
+                {memberViewMode === 'table' && (
+                  <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-400 uppercase text-[10px] font-bold bg-gray-50">
+                          <th className="py-3 px-4">Member</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Watch Time</th>
+                          <th className="py-3 px-4">Games Tuned</th>
+                          <th className="py-3 px-4">Device</th>
+                          <th className="py-3 px-4 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-medium">
+                        {filteredUsers.length > 0 ? (
+                          filteredUsers.map((u) => (
+                            <tr 
+                              key={u.id} 
+                              onClick={() => setSelectedUser(u)}
+                              className="hover:bg-gray-50/80 transition cursor-pointer"
+                            >
+                              <td className="py-3 px-4 font-bold text-gray-900 flex items-center space-x-2">
+                                <div className="relative">
+                                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black uppercase text-gray-800">
+                                    {u.displayName ? u.displayName[0] : u.username[0] || 'U'}
+                                  </div>
+                                  {u.isOnline && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-gray-900">{u.displayName || u.username}</div>
+                                  <div className="text-[10px] text-gray-400 font-mono">@{u.username}</div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                {u.isOnline ? (
+                                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center space-x-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span>Online</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-gray-500">
+                                    {formatRelativeTime(u.stats?.lastOnline || u.lastLogin)}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-black text-gray-900">
+                                {formatWatchTime(u.stats?.totalWatchSeconds || 0)}
+                              </td>
+                              <td className="py-3 px-4 text-gray-700">
+                                {u.stats?.totalStreamsWatched || 0} games
+                              </td>
+                              <td className="py-3 px-4 text-gray-500 text-[11px] truncate max-w-[140px]">
+                                {u.activeDevice || u.stats?.lastDeviceTag || 'Web'}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedUser(u);
+                                  }}
+                                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 px-2.5 py-1 rounded-lg hover:bg-emerald-50 transition"
+                                >
+                                  View Dossier →
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="py-10 text-center text-xs text-gray-400">
+                              {searchQuery ? `No members match "${searchQuery}"` : 'No member accounts registered yet.'}
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="py-10 text-center text-xs text-gray-400">
-                            {searchQuery ? `No members match "${searchQuery}"` : 'No member accounts registered yet.'}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
