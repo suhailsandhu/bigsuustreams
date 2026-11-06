@@ -476,6 +476,23 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
     upstreamUrl: `/api/${sportCategory}/hls/${streamKey}/${selectedQuality}.m3u8`
   };
 }
+var StreamFreeProvider = class {
+  id = "streamfree";
+  name = "StreamFree Multi-Mirror Provider";
+  async getBasketballStreams(forceRefresh = false) {
+    return getBasketballStreams(forceRefresh);
+  }
+  async getFootballStreams(forceRefresh = false) {
+    return getFootballStreams(forceRefresh);
+  }
+  async resolveHlsStream(streamKey, requestedQuality = "1080p", sportCategory = "basketball") {
+    return resolveHlsStream(streamKey, requestedQuality, sportCategory);
+  }
+  async resolveStream(streamKey, requestedQuality = "1080p", sportCategory = "basketball") {
+    return resolveHlsStream(streamKey, requestedQuality, sportCategory);
+  }
+};
+var activeStreamProvider = new StreamFreeProvider();
 
 // src/utils/date.ts
 function getTodayDateString() {
@@ -2405,47 +2422,52 @@ var AutonomousWatchdog = class {
         watchItem.lastCheckedAt = now;
         const sportCategory = g.sport === "nfl" ? "football" : "basketball";
         try {
-          const resolved = await resolveHlsStream(g.streamKey, "1080p", sportCategory);
-          if (resolved.m3u8Text && resolved.m3u8Text.length > 50) {
+          let verification = await this.verifyStreamDeeply(g.streamKey, "1080p", sportCategory);
+          if (!verification.verified) {
+            const fallback720 = await this.verifyStreamDeeply(g.streamKey, "720p", sportCategory);
+            if (fallback720.verified) {
+              verification = fallback720;
+              this.stats.recoveriesAttemptedToday += 1;
+              this.logEvent(
+                "recovery",
+                "recovery",
+                `[Auto-Recovery] Recovered stream for ${g.name} via 720p fallback channel.`,
+                { streamKey: g.streamKey }
+              );
+            }
+          }
+          if (verification.verified) {
             const wasAlreadyReady = watchItem.status === "ready";
             watchItem.status = "ready";
-            watchItem.availableQualities = resolved.availableQualities;
-            watchItem.selectedQuality = resolved.selectedQuality;
+            watchItem.availableQualities = verification.availableQualities;
+            watchItem.selectedQuality = verification.selectedQuality;
+            watchItem.mpegTsVerified = verification.mpegTs;
+            watchItem.advancing = verification.advancing;
+            watchItem.syncOffset = verification.syncOffset;
+            watchItem.chunkBytes = verification.chunkBytes;
             watchItem.retryCount = 0;
-            watchItem.diagnosticNote = `Pre-warmed & primed. Quality: ${resolved.selectedQuality} (${resolved.availableQualities.join(", ")}).`;
+            watchItem.diagnosticNote = verification.note;
             if (!wasAlreadyReady) {
               this.stats.prewarmedCountToday += 1;
               this.logEvent(
                 "success",
                 "pregame",
-                `[Auto-Pregame] Verified & primed ${g.sport.toUpperCase()} stream: ${g.name}.`,
-                { streamKey: g.streamKey, quality: resolved.selectedQuality, minutesUntilStart: diffMinutes }
+                `[Auto-Pregame] Deeply verified & primed ${g.sport.toUpperCase()} stream: ${g.name}.`,
+                {
+                  streamKey: g.streamKey,
+                  quality: verification.selectedQuality,
+                  chunkBytes: verification.chunkBytes,
+                  syncOffset: verification.syncOffset,
+                  minutesUntilStart: diffMinutes
+                }
               );
             }
           } else {
             watchItem.status = diffMinutes > 0 ? "stream_pending" : "feed_delayed";
-            watchItem.diagnosticNote = diffMinutes > 0 ? `Waiting for broadcaster feed (starts ~5m before game). Auto-retrying every 30s.` : `Broadcaster feed initializing. Watchdog actively monitoring.`;
+            watchItem.diagnosticNote = diffMinutes > 0 ? `Waiting for broadcaster uplink (starts ~5m before start). Auto-retrying every 30s.` : `Broadcaster uplink delayed (${verification.note}). Watchdog actively monitoring.`;
           }
         } catch (err) {
           watchItem.retryCount += 1;
-          try {
-            const fallback = await resolveHlsStream(g.streamKey, "720p", sportCategory);
-            if (fallback.m3u8Text && fallback.m3u8Text.length > 50) {
-              watchItem.status = "ready";
-              watchItem.availableQualities = fallback.availableQualities;
-              watchItem.selectedQuality = fallback.selectedQuality;
-              watchItem.diagnosticNote = "Recovered via 720p failover channel.";
-              this.stats.recoveriesAttemptedToday += 1;
-              this.logEvent(
-                "recovery",
-                "recovery",
-                `[Auto-Recovery] Recovered stream for ${g.name} via fallback channel.`,
-                { streamKey: g.streamKey }
-              );
-              continue;
-            }
-          } catch {
-          }
           if (diffMinutes > 0) {
             watchItem.status = "stream_pending";
             watchItem.diagnosticNote = `Pregame check pending broadcaster uplink. Rechecking automatically.`;
@@ -2461,6 +2483,137 @@ var AutonomousWatchdog = class {
       if (now - item.startTimeUnix * 1e3 > 144e5) {
         this.pregameWatchlist.delete(key);
       }
+    }
+  }
+  /**
+   * Deep Playback Verification:
+   * Validates manifest, extracts media chunks, fetches binary chunk, verifies MPEG-TS 0x47 sync byte pattern,
+   * and ensures no fake HTML/JSON 200 error pages are treated as playable video.
+   */
+  async verifyStreamDeeply(streamKey, quality, sportCategory) {
+    try {
+      const resolved = await resolveHlsStream(streamKey, quality, sportCategory);
+      if (!resolved.m3u8Text || !resolved.m3u8Text.includes("#EXTM3U")) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality || quality,
+          availableQualities: resolved.availableQualities || [],
+          note: "Playlist unavailable or empty."
+        };
+      }
+      const lines = resolved.m3u8Text.split("\n");
+      const chunkLines = lines.filter((l) => l.startsWith("/api/stream/chunk/"));
+      if (chunkLines.length === 0) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: "Playlist contains no media chunks."
+        };
+      }
+      const firstChunk = chunkLines[0];
+      const parts = firstChunk.split("/");
+      const hash = parts[4];
+      const seg = parts[5];
+      const target = streamTargetMap.get(hash);
+      const upstreamUrl = target?.segmentMap?.get(seg);
+      if (!upstreamUrl) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: "Chunk not mapped in internal proxy memory."
+        };
+      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6e3);
+      const fetchUrl = upstreamUrl.split("#")[0];
+      const res = await fetch(fetchUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: `Upstream media chunk returned HTTP ${res.status}.`
+        };
+      }
+      const cType = res.headers.get("content-type") || "";
+      if (cType.includes("text/html") || cType.includes("application/json")) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: `Upstream returned HTML/JSON error page disguised with HTTP 200.`
+        };
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      let syncOffset = -1;
+      for (let i = 0; i < Math.min(buf.length - 188, 512); i++) {
+        if (buf[i] === 71 && buf[i + 188] === 71) {
+          if (i + 376 < buf.length && buf[i + 376] !== 71) continue;
+          syncOffset = i;
+          break;
+        }
+      }
+      if (syncOffset < 0) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: buf.length,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: "Chunk binary lacks MPEG-TS 0x47 packet sync byte."
+        };
+      }
+      return {
+        verified: true,
+        mpegTs: true,
+        advancing: true,
+        syncOffset,
+        chunkBytes: buf.length,
+        selectedQuality: resolved.selectedQuality,
+        availableQualities: resolved.availableQualities,
+        note: `Verified live MPEG-TS (${buf.length} bytes, sync@${syncOffset}). Quality: ${resolved.selectedQuality} (${resolved.availableQualities.join(", ")}).`
+      };
+    } catch (err) {
+      return {
+        verified: false,
+        mpegTs: false,
+        advancing: false,
+        syncOffset: -1,
+        chunkBytes: 0,
+        selectedQuality: quality,
+        availableQualities: [],
+        note: `Verification error: ${err?.message || err}`
+      };
     }
   }
   /**
@@ -2857,18 +3010,19 @@ function createTsCleanStream() {
     transform(chunk, encoding, callback) {
       if (!headerChecked) {
         buffered = Buffer.concat([buffered, chunk]);
-        if (buffered.length >= 64) {
+        if (buffered.length >= 512) {
           headerChecked = true;
-          if (buffered[0] === 137 && buffered[1] === 80 && buffered[2] === 78 && buffered[3] === 71) {
-            let syncOffset = 64;
-            if (buffered[64] !== 71) {
-              for (let i = 0; i < Math.min(buffered.length, 256); i++) {
-                if (buffered[i] === 71 && buffered[i + 188] === 71) {
-                  syncOffset = i;
-                  break;
-                }
+          let syncOffset = -1;
+          for (let i = 0; i < Math.min(buffered.length - 188, 512); i++) {
+            if (buffered[i] === 71 && buffered[i + 188] === 71) {
+              if (i + 376 < buffered.length && buffered[i + 376] !== 71) {
+                continue;
               }
+              syncOffset = i;
+              break;
             }
+          }
+          if (syncOffset >= 0) {
             this.push(buffered.subarray(syncOffset));
           } else {
             this.push(buffered);
@@ -2882,7 +3036,18 @@ function createTsCleanStream() {
     },
     flush(callback) {
       if (!headerChecked && buffered && buffered.length > 0) {
-        this.push(buffered);
+        let syncOffset = -1;
+        for (let i = 0; i < Math.min(buffered.length - 188, 512); i++) {
+          if (buffered[i] === 71 && buffered[i + 188] === 71) {
+            syncOffset = i;
+            break;
+          }
+        }
+        if (syncOffset >= 0) {
+          this.push(buffered.subarray(syncOffset));
+        } else {
+          this.push(buffered);
+        }
       }
       callback();
     }
@@ -2900,21 +3065,53 @@ async function handleChunkProxy(req, res) {
       const cleanSegment = path3.basename(segment);
       targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes("?") ? record.qStr : ""}`;
     }
+    let directSfUrl = null;
+    if (targetUrl && targetUrl.includes("#sf=")) {
+      try {
+        directSfUrl = decodeURIComponent(targetUrl.split("#sf=")[1]);
+      } catch {
+      }
+    }
     let upstreamRes = null;
     try {
       const parsed = new URL(targetUrl);
       const hostOrigin = parsed.origin;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8e3);
       const r = await fetch(targetUrl, {
+        signal: controller.signal,
         headers: {
           "Referer": hostOrigin,
           "Origin": hostOrigin,
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         }
       });
-      if (r.ok) {
+      clearTimeout(timeoutId);
+      const cType = r.headers.get("content-type") || "";
+      if (r.ok && !cType.includes("text/html") && !cType.includes("application/json")) {
         upstreamRes = r;
       }
     } catch {
+    }
+    if ((!upstreamRes || !upstreamRes.ok) && directSfUrl) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8e3);
+        const rSf = await fetch(directSfUrl, {
+          signal: controller.signal,
+          headers: {
+            "Referer": "https://strmfree.st",
+            "Origin": "https://strmfree.st",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          }
+        });
+        clearTimeout(timeoutId);
+        const cType = rSf.headers.get("content-type") || "";
+        if (rSf.ok && !cType.includes("text/html") && !cType.includes("application/json")) {
+          upstreamRes = rSf;
+        }
+      } catch {
+      }
     }
     if (!upstreamRes || !upstreamRes.ok) {
       const cleanSegment = path3.basename(segment);
@@ -2924,14 +3121,19 @@ async function handleChunkProxy(req, res) {
       }));
       for (const cand of candidateUrls) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6e3);
           const r = await fetch(cand.url, {
+            signal: controller.signal,
             headers: {
               "Referer": cand.host,
               "Origin": cand.host,
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             }
           });
-          if (r.ok) {
+          clearTimeout(timeoutId);
+          const cType = r.headers.get("content-type") || "";
+          if (r.ok && !cType.includes("text/html") && !cType.includes("application/json")) {
             upstreamRes = r;
             break;
           }
@@ -2950,8 +3152,14 @@ async function handleChunkProxy(req, res) {
     } else {
       const arrayBuf = await upstreamRes.arrayBuffer();
       const rawBuf = Buffer.from(arrayBuf);
-      const isFakePng = rawBuf[0] === 137 && rawBuf[1] === 80 && rawBuf[2] === 78 && rawBuf[3] === 71;
-      const cleanBuf = isFakePng ? rawBuf.subarray(64) : rawBuf;
+      let syncOffset = -1;
+      for (let i = 0; i < Math.min(rawBuf.length - 188, 512); i++) {
+        if (rawBuf[i] === 71 && rawBuf[i + 188] === 71) {
+          syncOffset = i;
+          break;
+        }
+      }
+      const cleanBuf = syncOffset >= 0 ? rawBuf.subarray(syncOffset) : rawBuf;
       return res.send(cleanBuf);
     }
   } catch (err) {

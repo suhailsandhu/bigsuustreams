@@ -1169,7 +1169,12 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                               </div>
                             </div>
 
-                            <div className="flex items-center space-x-3 shrink-0">
+                            <div className="flex items-center space-x-2 shrink-0">
+                              {item.mpegTsVerified && (
+                                <span className="hidden md:inline-flex items-center text-[10px] font-black text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300">
+                                  MPEG-TS Sync
+                                </span>
+                              )}
                               {statusBadge}
                             </div>
                           </div>

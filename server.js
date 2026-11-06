@@ -380,8 +380,8 @@ async function handleHls(req, res) {
   }
 }
 
-// Clean stream transformer: strips upstream 64-byte fake PNG image header disguise
-// to deliver 100% pure, standard MPEG-TS packets directly to the video player
+// Clean stream transformer: dynamically detects and strips upstream disguise headers
+// (such as TikTok 42-byte WebP or StreamFree 64-byte PNG) to deliver 100% pure MPEG-TS packets directly to the video player
 function createTsCleanStream() {
   let headerChecked = false;
   let buffered = Buffer.alloc(0);
@@ -390,19 +390,20 @@ function createTsCleanStream() {
     transform(chunk, encoding, callback) {
       if (!headerChecked) {
         buffered = Buffer.concat([buffered, chunk]);
-        if (buffered.length >= 64) {
+        if (buffered.length >= 512) {
           headerChecked = true;
-          // Check if starts with PNG signature: \x89PNG\r\n\x1a\n
-          if (buffered[0] === 0x89 && buffered[1] === 0x50 && buffered[2] === 0x4E && buffered[3] === 0x47) {
-            let syncOffset = 64;
-            if (buffered[64] !== 0x47) {
-              for (let i = 0; i < Math.min(buffered.length, 256); i++) {
-                if (buffered[i] === 0x47 && buffered[i + 188] === 0x47) {
-                  syncOffset = i;
-                  break;
-                }
+          let syncOffset = -1;
+          for (let i = 0; i < Math.min(buffered.length - 188, 512); i++) {
+            if (buffered[i] === 0x47 && buffered[i + 188] === 0x47) {
+              if (i + 376 < buffered.length && buffered[i + 376] !== 0x47) {
+                continue;
               }
+              syncOffset = i;
+              break;
             }
+          }
+
+          if (syncOffset >= 0) {
             this.push(buffered.subarray(syncOffset));
           } else {
             this.push(buffered);
@@ -416,7 +417,18 @@ function createTsCleanStream() {
     },
     flush(callback) {
       if (!headerChecked && buffered && buffered.length > 0) {
-        this.push(buffered);
+        let syncOffset = -1;
+        for (let i = 0; i < Math.min(buffered.length - 188, 512); i++) {
+          if (buffered[i] === 0x47 && buffered[i + 188] === 0x47) {
+            syncOffset = i;
+            break;
+          }
+        }
+        if (syncOffset >= 0) {
+          this.push(buffered.subarray(syncOffset));
+        } else {
+          this.push(buffered);
+        }
       }
       callback();
     }
@@ -441,25 +453,61 @@ async function handleChunkProxy(req, res) {
       targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
     }
 
+    // Check for direct CDN fallback URL embedded in hash fragment (#sf=)
+    let directSfUrl = null;
+    if (targetUrl && targetUrl.includes('#sf=')) {
+      try {
+        directSfUrl = decodeURIComponent(targetUrl.split('#sf=')[1]);
+      } catch {}
+    }
+
     let upstreamRes = null;
     try {
       const parsed = new URL(targetUrl);
       const hostOrigin = parsed.origin;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const r = await fetch(targetUrl, {
+        signal: controller.signal,
         headers: {
           'Referer': hostOrigin,
           'Origin': hostOrigin,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         }
       });
-      if (r.ok) {
+      clearTimeout(timeoutId);
+      const cType = r.headers.get('content-type') || '';
+      if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
         upstreamRes = r;
       }
     } catch {
       // Primary fetch failed
     }
 
-    // If initial fetch failed, try fallback candidate URLs
+    // Immediate Direct CDN Fallback if primary returned non-200 or HTML error
+    if ((!upstreamRes || !upstreamRes.ok) && directSfUrl) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const rSf = await fetch(directSfUrl, {
+          signal: controller.signal,
+          headers: {
+            'Referer': 'https://strmfree.st',
+            'Origin': 'https://strmfree.st',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          }
+        });
+        clearTimeout(timeoutId);
+        const cType = rSf.headers.get('content-type') || '';
+        if (rSf.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+          upstreamRes = rSf;
+        }
+      } catch {
+        // Direct SF fallback failed
+      }
+    }
+
+    // If initial fetch failed, try fallback candidate URLs across mirrors
     if (!upstreamRes || !upstreamRes.ok) {
       const cleanSegment = path.basename(segment);
       const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
@@ -469,14 +517,19 @@ async function handleChunkProxy(req, res) {
 
       for (const cand of candidateUrls) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
           const r = await fetch(cand.url, {
+            signal: controller.signal,
             headers: {
               'Referer': cand.host,
               'Origin': cand.host,
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
             }
           });
-          if (r.ok) {
+          clearTimeout(timeoutId);
+          const cType = r.headers.get('content-type') || '';
+          if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
             upstreamRes = r;
             break;
           }
@@ -500,8 +553,14 @@ async function handleChunkProxy(req, res) {
     } else {
       const arrayBuf = await upstreamRes.arrayBuffer();
       const rawBuf = Buffer.from(arrayBuf);
-      const isFakePng = rawBuf[0] === 0x89 && rawBuf[1] === 0x50 && rawBuf[2] === 0x4E && rawBuf[3] === 0x47;
-      const cleanBuf = isFakePng ? rawBuf.subarray(64) : rawBuf;
+      let syncOffset = -1;
+      for (let i = 0; i < Math.min(rawBuf.length - 188, 512); i++) {
+        if (rawBuf[i] === 0x47 && rawBuf[i + 188] === 0x47) {
+          syncOffset = i;
+          break;
+        }
+      }
+      const cleanBuf = syncOffset >= 0 ? rawBuf.subarray(syncOffset) : rawBuf;
       return res.send(cleanBuf);
     }
   } catch (err) {

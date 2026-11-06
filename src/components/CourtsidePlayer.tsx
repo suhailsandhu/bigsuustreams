@@ -308,9 +308,17 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           } else {
             if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
             hls.destroy();
+
+            // Automatic Failover: If 1080p failed multiple times, switch to 720p
+            if (selectedQuality === '1080p' && availableQualities.includes('720p')) {
+              console.log('Auto-failover to 720p stream variant...');
+              onQualityChange('720p');
+              return;
+            }
+
             setIsLoading(false);
             setHasError(true);
-            setErrorMessage('Network connection lost. Tap Retry Feed to reconnect.');
+            setErrorMessage('Coverage is preparing or reconnecting. Retrying automatically...');
           }
         }
       });
@@ -349,8 +357,12 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       video.addEventListener('error', () => {
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+        if (selectedQuality === '1080p' && availableQualities.includes('720p')) {
+          onQualityChange('720p');
+          return;
+        }
         setHasError(true);
-        setErrorMessage('Playback encountered an error. Tap Retry to reconnect.');
+        setErrorMessage('Coverage is preparing or reconnecting. Retrying automatically...');
         setIsLoading(false);
       });
     } else {
@@ -371,6 +383,17 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       }
     };
   }, [loadHlsStream]);
+
+  // Auto-recovery: automatically retry connecting every 10 seconds during coverage preparation or interruptions
+  useEffect(() => {
+    if (!hasError) return;
+    const autoRetryTimer = setTimeout(() => {
+      console.log('[CourtsidePlayer] Auto-reconnecting to stream feed...');
+      retryCountRef.current = 0;
+      loadHlsStream();
+    }, 10000);
+    return () => clearTimeout(autoRetryTimer);
+  }, [hasError, loadHlsStream]);
 
   // Video event listeners
   useEffect(() => {

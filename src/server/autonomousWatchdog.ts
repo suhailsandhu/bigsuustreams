@@ -15,6 +15,10 @@ export interface PregameWatchlistItem {
   selectedQuality?: string;
   retryCount: number;
   diagnosticNote?: string;
+  mpegTsVerified?: boolean;
+  advancing?: boolean;
+  syncOffset?: number;
+  chunkBytes?: number;
 }
 
 export interface ServiceHealthStatus {
@@ -247,57 +251,60 @@ class AutonomousWatchdog {
         const sportCategory = g.sport === 'nfl' ? 'football' : 'basketball';
 
         try {
-          // Proactively resolve stream and prime cache/target record
-          const resolved = await resolveHlsStream(g.streamKey, '1080p', sportCategory);
+          // Deep Playback Verification: Validates manifest, downloads segment, verifies MPEG-TS 0x47 sync pattern
+          let verification = await this.verifyStreamDeeply(g.streamKey, '1080p', sportCategory);
 
-          if (resolved.m3u8Text && resolved.m3u8Text.length > 50) {
+          // If 1080p fails deep verification, attempt auto-recovery with 720p
+          if (!verification.verified) {
+            const fallback720 = await this.verifyStreamDeeply(g.streamKey, '720p', sportCategory);
+            if (fallback720.verified) {
+              verification = fallback720;
+              this.stats.recoveriesAttemptedToday += 1;
+              this.logEvent(
+                'recovery',
+                'recovery',
+                `[Auto-Recovery] Recovered stream for ${g.name} via 720p fallback channel.`,
+                { streamKey: g.streamKey }
+              );
+            }
+          }
+
+          if (verification.verified) {
             const wasAlreadyReady = watchItem.status === 'ready';
             watchItem.status = 'ready';
-            watchItem.availableQualities = resolved.availableQualities;
-            watchItem.selectedQuality = resolved.selectedQuality;
+            watchItem.availableQualities = verification.availableQualities;
+            watchItem.selectedQuality = verification.selectedQuality;
+            watchItem.mpegTsVerified = verification.mpegTs;
+            watchItem.advancing = verification.advancing;
+            watchItem.syncOffset = verification.syncOffset;
+            watchItem.chunkBytes = verification.chunkBytes;
             watchItem.retryCount = 0;
-            watchItem.diagnosticNote = `Pre-warmed & primed. Quality: ${resolved.selectedQuality} (${resolved.availableQualities.join(', ')}).`;
+            watchItem.diagnosticNote = verification.note;
 
             if (!wasAlreadyReady) {
               this.stats.prewarmedCountToday += 1;
               this.logEvent(
                 'success',
                 'pregame',
-                `[Auto-Pregame] Verified & primed ${g.sport.toUpperCase()} stream: ${g.name}.`,
-                { streamKey: g.streamKey, quality: resolved.selectedQuality, minutesUntilStart: diffMinutes }
+                `[Auto-Pregame] Deeply verified & primed ${g.sport.toUpperCase()} stream: ${g.name}.`,
+                {
+                  streamKey: g.streamKey,
+                  quality: verification.selectedQuality,
+                  chunkBytes: verification.chunkBytes,
+                  syncOffset: verification.syncOffset,
+                  minutesUntilStart: diffMinutes
+                }
               );
             }
           } else {
-            // Stream not broadcasting yet
+            // Stream not broadcasting yet or uplinking
             watchItem.status = diffMinutes > 0 ? 'stream_pending' : 'feed_delayed';
             watchItem.diagnosticNote = diffMinutes > 0
-              ? `Waiting for broadcaster feed (starts ~5m before game). Auto-retrying every 30s.`
-              : `Broadcaster feed initializing. Watchdog actively monitoring.`;
+              ? `Waiting for broadcaster uplink (starts ~5m before start). Auto-retrying every 30s.`
+              : `Broadcaster uplink delayed (${verification.note}). Watchdog actively monitoring.`;
           }
         } catch (err: any) {
           watchItem.retryCount += 1;
-
-          // Attempt Automatic Recovery: try fallback to 720p or secondary category
-          try {
-            const fallback = await resolveHlsStream(g.streamKey, '720p', sportCategory);
-            if (fallback.m3u8Text && fallback.m3u8Text.length > 50) {
-              watchItem.status = 'ready';
-              watchItem.availableQualities = fallback.availableQualities;
-              watchItem.selectedQuality = fallback.selectedQuality;
-              watchItem.diagnosticNote = 'Recovered via 720p failover channel.';
-              this.stats.recoveriesAttemptedToday += 1;
-              this.logEvent(
-                'recovery',
-                'recovery',
-                `[Auto-Recovery] Recovered stream for ${g.name} via fallback channel.`,
-                { streamKey: g.streamKey }
-              );
-              continue;
-            }
-          } catch {
-            // Fallback also pending
-          }
-
           if (diffMinutes > 0) {
             watchItem.status = 'stream_pending';
             watchItem.diagnosticNote = `Pregame check pending broadcaster uplink. Rechecking automatically.`;
@@ -316,6 +323,161 @@ class AutonomousWatchdog {
       if (now - item.startTimeUnix * 1000 > 14400000) {
         this.pregameWatchlist.delete(key);
       }
+    }
+  }
+
+  /**
+   * Deep Playback Verification:
+   * Validates manifest, extracts media chunks, fetches binary chunk, verifies MPEG-TS 0x47 sync byte pattern,
+   * and ensures no fake HTML/JSON 200 error pages are treated as playable video.
+   */
+  private async verifyStreamDeeply(
+    streamKey: string,
+    quality: string,
+    sportCategory: 'basketball' | 'football'
+  ): Promise<{
+    verified: boolean;
+    mpegTs: boolean;
+    advancing: boolean;
+    syncOffset: number;
+    chunkBytes: number;
+    selectedQuality: string;
+    availableQualities: string[];
+    note: string;
+  }> {
+    try {
+      const resolved = await resolveHlsStream(streamKey, quality, sportCategory);
+      if (!resolved.m3u8Text || !resolved.m3u8Text.includes('#EXTM3U')) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality || quality,
+          availableQualities: resolved.availableQualities || [],
+          note: 'Playlist unavailable or empty.'
+        };
+      }
+
+      const lines = resolved.m3u8Text.split('\n');
+      const chunkLines = lines.filter(l => l.startsWith('/api/stream/chunk/'));
+      if (chunkLines.length === 0) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: 'Playlist contains no media chunks.'
+        };
+      }
+
+      // Deep inspect first chunk
+      const firstChunk = chunkLines[0];
+      const parts = firstChunk.split('/');
+      const hash = parts[4];
+      const seg = parts[5];
+      const target = streamTargetMap.get(hash);
+      const upstreamUrl = target?.segmentMap?.get(seg);
+
+      if (!upstreamUrl) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: 'Chunk not mapped in internal proxy memory.'
+        };
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const fetchUrl = upstreamUrl.split('#')[0];
+      const res = await fetch(fetchUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: `Upstream media chunk returned HTTP ${res.status}.`
+        };
+      }
+
+      const cType = res.headers.get('content-type') || '';
+      if (cType.includes('text/html') || cType.includes('application/json')) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: 0,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: `Upstream returned HTML/JSON error page disguised with HTTP 200.`
+        };
+      }
+
+      const buf = Buffer.from(await res.arrayBuffer());
+      let syncOffset = -1;
+      for (let i = 0; i < Math.min(buf.length - 188, 512); i++) {
+        if (buf[i] === 0x47 && buf[i + 188] === 0x47) {
+          if (i + 376 < buf.length && buf[i + 376] !== 0x47) continue;
+          syncOffset = i;
+          break;
+        }
+      }
+
+      if (syncOffset < 0) {
+        return {
+          verified: false,
+          mpegTs: false,
+          advancing: false,
+          syncOffset: -1,
+          chunkBytes: buf.length,
+          selectedQuality: resolved.selectedQuality,
+          availableQualities: resolved.availableQualities,
+          note: 'Chunk binary lacks MPEG-TS 0x47 packet sync byte.'
+        };
+      }
+
+      return {
+        verified: true,
+        mpegTs: true,
+        advancing: true,
+        syncOffset,
+        chunkBytes: buf.length,
+        selectedQuality: resolved.selectedQuality,
+        availableQualities: resolved.availableQualities,
+        note: `Verified live MPEG-TS (${buf.length} bytes, sync@${syncOffset}). Quality: ${resolved.selectedQuality} (${resolved.availableQualities.join(', ')}).`
+      };
+    } catch (err: any) {
+      return {
+        verified: false,
+        mpegTs: false,
+        advancing: false,
+        syncOffset: -1,
+        chunkBytes: 0,
+        selectedQuality: quality,
+        availableQualities: [],
+        note: `Verification error: ${err?.message || err}`
+      };
     }
   }
 

@@ -609,3 +609,48 @@ export async function resolveHlsStream(
     upstreamUrl: `/api/${sportCategory}/hls/${streamKey}/${selectedQuality}.m3u8`
   };
 }
+
+// ============================================================================
+// Replaceable Provider Interface & Registry
+// Decouples upstream providers so provider outages never break core architecture
+// ============================================================================
+
+export interface IStreamProvider {
+  readonly id: string;
+  readonly name: string;
+  getBasketballStreams(forceRefresh?: boolean): Promise<StreamsResponse>;
+  getFootballStreams(forceRefresh?: boolean): Promise<StreamsResponse>;
+  resolveHlsStream(streamKey: string, requestedQuality?: string, sportCategory?: 'basketball' | 'football'): Promise<ResolvedHls>;
+  resolveStream(streamKey: string, requestedQuality?: string, sportCategory?: 'basketball' | 'football'): Promise<ResolvedHls>;
+}
+
+export class StreamFreeProvider implements IStreamProvider {
+  public readonly id = 'streamfree';
+  public readonly name = 'StreamFree Multi-Mirror Provider';
+
+  public async getBasketballStreams(forceRefresh = false): Promise<StreamsResponse> {
+    return getBasketballStreams(forceRefresh);
+  }
+
+  public async getFootballStreams(forceRefresh = false): Promise<StreamsResponse> {
+    return getFootballStreams(forceRefresh);
+  }
+
+  public async resolveHlsStream(
+    streamKey: string,
+    requestedQuality = '1080p',
+    sportCategory: 'basketball' | 'football' = 'basketball'
+  ): Promise<ResolvedHls> {
+    return resolveHlsStream(streamKey, requestedQuality, sportCategory);
+  }
+
+  public async resolveStream(
+    streamKey: string,
+    requestedQuality = '1080p',
+    sportCategory: 'basketball' | 'football' = 'basketball'
+  ): Promise<ResolvedHls> {
+    return resolveHlsStream(streamKey, requestedQuality, sportCategory);
+  }
+}
+
+export const activeStreamProvider: IStreamProvider = new StreamFreeProvider();
