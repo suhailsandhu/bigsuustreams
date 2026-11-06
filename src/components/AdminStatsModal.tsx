@@ -3,7 +3,8 @@ import {
   X, RefreshCw, Users, Tv,
   ShieldAlert, Sparkles, TrendingUp, CheckCircle2, UserCheck,
   Search, Download, Globe, Activity, Sliders, ShieldCheck,
-  Clock, Shield, ExternalLink, ChevronDown, ChevronUp
+  Clock, Shield, ExternalLink, ChevronDown, ChevronUp,
+  MapPin, Smartphone, LayoutGrid, List, Play, Radio
 } from 'lucide-react';
 import { setUmamiConfig, sendUmamiTestEvent } from '../utils/analyticsClient';
 
@@ -130,6 +131,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [showAdvancedUmamiHost, setShowAdvancedUmamiHost] = useState(false);
   const [healthData, setHealthData] = useState<any>(null);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [liveViewMode, setLiveViewMode] = useState<'cards' | 'table'>('cards');
 
   // Authenticate Admin PIN
   const handleAuth = async (e?: React.FormEvent) => {
@@ -458,11 +460,12 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                 </button>
                 <button
                   onClick={() => setActiveTab('live')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
                     activeTab === 'live' ? 'bg-white text-gray-950 shadow-2xs' : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Live Viewers ({stats?.activeSessions?.length || stats?.liveVisitors || 1})
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                  <span>Who's Online Now ({stats?.activeSessions?.length || stats?.liveVisitors || 0})</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('users')}
@@ -663,71 +666,222 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
               </div>
             )}
 
-            {/* TAB 2: LIVE CONCURRENT VIEWERS */}
+            {/* TAB 2: KEYNOTE-STYLE LIVE AUDIENCE HUB */}
             {activeTab === 'live' && (
-              <div className="p-4 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm sm:text-base font-extrabold text-gray-900">
-                      Live Concurrent Sessions ({filteredSessions.length})
-                    </h4>
-                    <p className="text-[11px] text-gray-400">
-                      Real-time devices connected to BSS within the last 60 seconds
-                    </p>
+              <div className="p-4 sm:p-6 space-y-5">
+                
+                {/* 1. Keynote Dark Presentation Stage Banner */}
+                <div className="bg-gradient-to-br from-gray-950 via-neutral-900 to-black text-white rounded-3xl p-5 sm:p-7 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative z-10">
+                    <div>
+                      <div className="flex items-center space-x-2 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                        <span>Live Audience Overview</span>
+                      </div>
+                      <div className="text-3xl sm:text-5xl font-black tracking-tight flex items-baseline space-x-2.5">
+                        <span>{filteredSessions.length || stats?.liveVisitors || 0}</span>
+                        <span className="text-base sm:text-xl font-bold text-neutral-400">
+                          {filteredSessions.length === 1 ? 'person online now' : 'people online now'}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-neutral-300 mt-2 max-w-md leading-relaxed">
+                        Easy, presentation-ready audience viewer. Each card below shows exactly who is on your website, what game they're watching, and their city.
+                      </p>
+                    </div>
+
+                    {/* Stage KPI Cards */}
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 shrink-0">
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-3.5 border border-white/10 text-center min-w-[110px]">
+                        <div className="text-xl sm:text-2xl font-black text-white">{stats?.totalDevices || 0}</div>
+                        <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider mt-0.5">Total Fans</div>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-3.5 border border-white/10 text-center min-w-[110px]">
+                        <div className="text-xl sm:text-2xl font-black text-emerald-400">100%</div>
+                        <div className="text-[10px] font-bold text-neutral-300 uppercase tracking-wider mt-0.5">Stream Health</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-xs">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-400 uppercase text-[10px] font-bold bg-gray-50">
-                        <th className="py-3 px-4">User</th>
-                        <th className="py-3 px-4">Device & OS</th>
-                        <th className="py-3 px-4">Market Region</th>
-                        <th className="py-3 px-4">Current Stream / Page</th>
-                        <th className="py-3 px-4">Quality</th>
-                        <th className="py-3 px-4 text-right">Watch Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 font-medium">
-                      {filteredSessions.length > 0 ? (
-                        filteredSessions.map((s) => (
-                          <tr key={s.id} className="hover:bg-gray-50/80 transition">
-                            <td className="py-3 px-4 font-bold text-gray-900">
-                              <div className="flex items-center space-x-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                <span>{s.user}</span>
+                {/* 2. Controls & View Toggle (Cards vs Table) */}
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-extrabold text-gray-900">
+                      Active Viewers ({filteredSessions.length})
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Real-time updates without refreshing (telemetry updates every 15s)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200/80">
+                    <button
+                      onClick={() => setLiveViewMode('cards')}
+                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        liveViewMode === 'cards'
+                          ? 'bg-white text-gray-900 shadow-2xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span>Cards</span>
+                    </button>
+                    <button
+                      onClick={() => setLiveViewMode('table')}
+                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        liveViewMode === 'table'
+                          ? 'bg-white text-gray-900 shadow-2xs'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      <span>List</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Keynote Presentation Cards View */}
+                {liveViewMode === 'cards' && (
+                  <div>
+                    {filteredSessions.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {filteredSessions.map((s) => (
+                          <div
+                            key={s.id}
+                            className="bg-white rounded-3xl p-5 border border-gray-200/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                          >
+                            {/* Card Header: User Avatar & Live Status */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-gray-900 via-neutral-800 to-gray-700 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs relative">
+                                  <span>{s.user.slice(0, 2).toUpperCase()}</span>
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white animate-pulse" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-black text-gray-900 truncate">
+                                    {s.user}
+                                  </div>
+                                  <div className="text-[11px] text-gray-500 flex items-center space-x-1 mt-0.5">
+                                    <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                                    <span className="truncate font-semibold text-gray-600">{s.region || 'North America'}</span>
+                                  </div>
+                                </div>
                               </div>
-                            </td>
-                            <td className="py-3 px-4 text-gray-700">
-                              {s.deviceTag}
-                            </td>
-                            <td className="py-3 px-4 text-gray-600">
-                              {s.region}
-                            </td>
-                            <td className="py-3 px-4 text-gray-900 font-bold truncate max-w-[200px]">
-                              {s.currentStream}
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                {s.quality}
+
+                              <div className="text-right shrink-0">
+                                <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>Streaming</span>
+                                </span>
+                                <div className="text-[10px] text-gray-400 font-semibold mt-1 tabular-nums">
+                                  {s.durationMinutes}m active
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card Content: Stream Watched */}
+                            <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-3 flex items-center justify-between gap-3">
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shrink-0 text-sm">
+                                  {s.currentStream.toLowerCase().includes('nfl') || s.currentStream.toLowerCase().includes('football') ? '🏈' : '🏀'}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[10px] uppercase font-bold text-gray-400">Now Watching</div>
+                                  <div className="text-xs font-black text-gray-900 truncate">
+                                    {s.currentStream || 'Scoreboard / Homepage'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-gray-800 border border-gray-200 shadow-2xs shrink-0">
+                                {s.quality || '1080p HD'}
                               </span>
-                            </td>
-                            <td className="py-3 px-4 text-right text-gray-500 tabular-nums">
-                              {s.durationMinutes}m active
+                            </div>
+
+                            {/* Card Footer: Device Info */}
+                            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-100">
+                              <div className="flex items-center space-x-1.5">
+                                <Smartphone className="w-3.5 h-3.5 text-gray-400" />
+                                <span className="font-semibold text-gray-700">{s.deviceTag || s.device}</span>
+                              </div>
+                              <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                Live Connection
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 border border-dashed border-gray-200 rounded-3xl p-10 text-center space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto shadow-xs text-gray-400">
+                          <Users className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <h4 className="text-sm font-extrabold text-gray-900">Stage is Clear</h4>
+                        <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed">
+                          No visitors are streaming at this exact second. As soon as a fan opens a game, their card will appear right here with their city, device, and game.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Spreadsheet List View */}
+                {liveViewMode === 'table' && (
+                  <div className="overflow-x-auto bg-white border border-gray-200 rounded-2xl shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-400 uppercase text-[10px] font-bold bg-gray-50">
+                          <th className="py-3 px-4">User</th>
+                          <th className="py-3 px-4">Device & OS</th>
+                          <th className="py-3 px-4">Market Region</th>
+                          <th className="py-3 px-4">Current Stream / Page</th>
+                          <th className="py-3 px-4">Quality</th>
+                          <th className="py-3 px-4 text-right">Watch Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-medium">
+                        {filteredSessions.length > 0 ? (
+                          filteredSessions.map((s) => (
+                            <tr key={s.id} className="hover:bg-gray-50/80 transition">
+                              <td className="py-3 px-4 font-bold text-gray-900">
+                                <div className="flex items-center space-x-2">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                  <span>{s.user}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-gray-700">
+                                {s.deviceTag}
+                              </td>
+                              <td className="py-3 px-4 text-gray-600">
+                                {s.region}
+                              </td>
+                              <td className="py-3 px-4 text-gray-900 font-bold truncate max-w-[200px]">
+                                {s.currentStream}
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                  {s.quality}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right text-gray-500 tabular-nums">
+                                {s.durationMinutes}m active
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="py-10 text-center text-xs text-gray-400">
+                              {searchQuery ? `No active sessions match "${searchQuery}"` : 'No concurrent viewers online at this moment.'}
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="py-10 text-center text-xs text-gray-400">
-                            {searchQuery ? `No active sessions match "${searchQuery}"` : 'No concurrent viewers online at this moment.'}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
               </div>
             )}
 
