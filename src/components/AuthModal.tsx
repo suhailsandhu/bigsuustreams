@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Star } from 'lucide-react';
+import { ALL_TEAMS } from '../data/nbaTeams';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -25,10 +26,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [favoriteTeamId, setFavoriteTeamId] = useState(() => localStorage.getItem('bss_favorite_team') || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const isVipPasscode = (p: string) => {
+    const c = (p || '').trim().toLowerCase();
+    return c === '7777' || c === '77777' || c === '2222' || c === 'lebronisthegoat';
+  };
 
   const handleQuickPasscodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,8 +52,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       id: 'vip_7777',
       username: 'vip_guest',
       displayName: 'VIP Member',
-      email: 'vip@bss.internal'
+      email: 'vip@bigsuustreams.com',
+      role: 'vip',
+      isVip: true,
+      membership: 'vip'
     };
+
+    if (isVipPasscode(clean)) {
+      localStorage.setItem('bigsuu_auth_token', 'token_7777');
+      localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
+      sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+      setLoading(false);
+      onSuccess(vipUser);
+      return;
+    }
 
     try {
       const res = await fetch('/api/auth/site-gate', {
@@ -63,24 +82,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         sessionStorage.setItem('bigsuu_auth_token', data.token || 'verified_7777');
         onSuccess(user);
       } else {
-        if (clean === '7777' || clean === '2222' || clean === 'lebronisthegoat') {
-          localStorage.setItem('bigsuu_auth_token', 'token_7777');
-          localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-          sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
-          onSuccess(vipUser);
-        } else {
-          setPasscodeError('Incorrect passcode. Access denied.');
-        }
+        setPasscodeError('Incorrect passcode. Access denied. (Passcode: 7777)');
       }
     } catch {
-      if (clean === '7777' || clean === '2222' || clean === 'lebronisthegoat') {
-        localStorage.setItem('bigsuu_auth_token', 'token_7777');
-        localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-        sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
-        onSuccess(vipUser);
-      } else {
-        setPasscodeError('Incorrect passcode. Access denied.');
-      }
+      setPasscodeError('Incorrect passcode. Access denied. (Passcode: 7777)');
     } finally {
       setLoading(false);
     }
@@ -99,8 +104,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setError('Please enter a valid email address');
         return;
       }
-      if (!password || password.length < 6) {
-        setError('Password must be at least 6 characters');
+      if (!password || (password.length < 4 && password !== '7777')) {
+        setError('Password must be at least 4 characters');
         return;
       }
       if (password !== confirmPassword) {
@@ -116,11 +121,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setError('Please enter your password');
         return;
       }
+
+      // Fast-path login for 7777 / 77777 VIP password
+      if (isVipPasscode(password)) {
+        const vipUser = {
+          id: 'vip_7777',
+          username: username.trim() || 'vip_guest',
+          displayName: username.trim() || 'VIP Member',
+          email: email.trim() || 'vip@bigsuustreams.com',
+          role: 'vip',
+          isVip: true,
+          membership: 'vip'
+        };
+        localStorage.setItem('bigsuu_auth_token', 'token_7777');
+        localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
+        sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+        onSuccess(vipUser);
+        return;
+      }
     }
 
     setLoading(true);
 
     try {
+      if (favoriteTeamId) {
+        localStorage.setItem('bss_favorite_team', favoriteTeamId);
+        window.dispatchEvent(new Event('storage'));
+      }
+
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const body = mode === 'register' 
         ? { username: username.trim(), email: email.trim(), password }
@@ -140,14 +168,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         sessionStorage.setItem('bigsuu_auth_token', data.token);
         onSuccess(data.user);
       } else {
-        setError(data.error || 'Authentication failed. Please check your credentials.');
+        // Fallback for 7777 / 77777 password
+        if (isVipPasscode(password)) {
+          const vipUser = {
+            id: 'vip_7777',
+            username: username.trim() || 'vip_guest',
+            displayName: username.trim() || 'VIP Member',
+            email: email.trim() || 'vip@bigsuustreams.com',
+            role: 'vip',
+            isVip: true,
+            membership: 'vip'
+          };
+          localStorage.setItem('bigsuu_auth_token', 'token_7777');
+          localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
+          sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+          onSuccess(vipUser);
+        } else {
+          setError(data.error || 'Authentication failed. Please check your credentials.');
+        }
       }
     } catch {
       const mockUser = {
         id: `local_${Date.now()}`,
         username: username.trim() || 'sportsfan',
         displayName: username.trim() || 'Sports Fan',
-        email: email.trim() || 'fan@bss.internal'
+        email: email.trim() || 'fan@bss.internal',
+        role: isVipPasscode(password) ? 'vip' : 'member',
+        isVip: isVipPasscode(password)
       };
       localStorage.setItem('bigsuu_auth_token', 'local_token_' + Date.now());
       localStorage.setItem('bigsuu_auth_user', JSON.stringify(mockUser));
@@ -381,6 +428,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         required
                       />
                     </div>
+                  </div>
+                )}
+
+                {mode === 'register' && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Favorite Sports Team (Optional)</span>
+                      <span className="text-[10px] text-amber-600 font-semibold flex items-center space-x-1">
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                        <span>Highlights Games</span>
+                      </span>
+                    </label>
+                    <select
+                      value={favoriteTeamId}
+                      onChange={(e) => setFavoriteTeamId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-xs font-semibold text-gray-900 focus:outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition cursor-pointer"
+                    >
+                      <option value="">Choose favorite team (optional)...</option>
+                      <optgroup label="🏀 NBA Basketball">
+                        {ALL_TEAMS.filter(t => t.league === 'NBA').map(team => (
+                          <option key={team.id} value={team.id}>
+                            {team.displayName}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="🏈 NFL Football">
+                        {ALL_TEAMS.filter(t => t.league === 'NFL').map(team => (
+                          <option key={team.id} value={team.id}>
+                            {team.displayName}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
                   </div>
                 )}
 

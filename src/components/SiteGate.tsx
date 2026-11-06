@@ -6,7 +6,10 @@ interface SiteGateProps {
   onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms') => void;
 }
 
-const CORRECT_PASSCODE = 'lebronisthegoat';
+const isPasscodeValid = (p: string) => {
+  const c = p.trim().toLowerCase();
+  return c === '7777' || c === '77777' || c === '2222' || c === 'lebronisthegoat';
+};
 
 export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => {
   const [passcode, setPasscode] = useState('');
@@ -46,9 +49,9 @@ export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => 
         setErrorMessage('Too many failed attempts. Please wait a few minutes.');
       } else {
         // Fallback local check
-        if (clean === CORRECT_PASSCODE) {
-          localStorage.setItem('bigsuu_site_token', 'verified_lebronisthegoat');
-          sessionStorage.setItem('bigsuu_site_token', 'verified_lebronisthegoat');
+        if (isPasscodeValid(clean)) {
+          localStorage.setItem('bigsuu_site_token', 'verified_7777');
+          sessionStorage.setItem('bigsuu_site_token', 'verified_7777');
           onUnlock();
         } else {
           setError(true);
@@ -57,9 +60,9 @@ export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => 
       }
     } catch {
       // Offline fallback
-      if (clean === CORRECT_PASSCODE) {
-        localStorage.setItem('bigsuu_site_token', 'verified_lebronisthegoat');
-        sessionStorage.setItem('bigsuu_site_token', 'verified_lebronisthegoat');
+      if (isPasscodeValid(clean)) {
+        localStorage.setItem('bigsuu_site_token', 'verified_7777');
+        sessionStorage.setItem('bigsuu_site_token', 'verified_7777');
         onUnlock();
       } else {
         setError(true);

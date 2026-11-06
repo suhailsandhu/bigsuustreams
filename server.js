@@ -227,11 +227,19 @@ app.post('/api/user/preferences', (req, res) => {
 
 // Passcode gate support (Passcode 7777 / 2222)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
-  const { password } = req.body || {};
-  const clean = (typeof password === 'string' ? password.trim().toLowerCase() : '');
-  if (clean === '7777' || clean === '2222' || clean === 'lebronisthegoat') {
+  const { password, passcode } = req.body || {};
+  const clean = String(password || passcode || '').trim().toLowerCase();
+  if (clean === '7777' || clean === '77777' || clean === '2222' || clean === 'lebronisthegoat') {
     const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString('base64');
-    const user = { id: 'vip_7777', username: 'passcode_vip', displayName: 'VIP Member', email: 'vip@bigsuustreams.com' };
+    const user = { 
+      id: 'vip_7777', 
+      username: 'vip_guest', 
+      displayName: 'VIP Member', 
+      email: 'vip@bigsuustreams.com',
+      role: 'vip',
+      isVip: true,
+      membership: 'vip'
+    };
     return res.json({ success: true, token, user });
   }
   return res.status(401).json({ error: 'Incorrect passcode. Access denied.' });
