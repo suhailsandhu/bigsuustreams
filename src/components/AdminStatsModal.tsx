@@ -285,7 +285,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   };
 
   const handleSaveUmami = () => {
-    const authPin = sessionStorage.getItem('bigsuu_admin_pin') || '2222';
+    const authPin = sessionStorage.getItem('bigsuu_admin_pin') || '7777';
     const success = setUmamiConfig(umamiWebsiteId, umamiHost, authPin);
     if (success) {
       setUmamiSavedNotice(true);

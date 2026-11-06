@@ -52,3 +52,17 @@
 .animate-pulse-live {
   animation: pulse-live 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Smart TV & Remote D-Pad Navigation Focus Styling */
+:focus-visible {
+  outline: 3px solid #ea580c;
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) and (min-width: 1200px), (min-width: 1920px) {
+  /* TV 10-foot UI remote enhancements */
+  button:focus-visible, a:focus-visible, input:focus-visible {
+    transform: scale(1.03);
+    transition: transform 0.15s ease-out;
+  }
+}

@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { isSamsungSmartTv, isSmartTv, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
 import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle, ShieldCheck,
-  Layers
+  Layers, Tv
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
 
@@ -166,6 +167,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const [isVerified, setIsVerified] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const controlsTimeoutRef = useRef<any>(null);
+  const isTv = useMemo(() => isSmartTv(), []);
+  const isSamsung = useMemo(() => isSamsungSmartTv(), []);
+  const [tvAutoplayBlocked, setTvAutoplayBlocked] = useState(false);
 
   // Available qualities: 720p, 1080p, and 2160p (540p removed per user request)
   const availableQualities = React.useMemo(() => {
@@ -243,20 +247,24 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
     // 1. Check if Hls.js is supported
     if (Hls.isSupported()) {
-      const ultraLow = typeof window !== 'undefined' && localStorage.getItem('bss_low_latency') === 'true';
+      const tvConfig = getTvHlsConfig(isTv);
+      const ultraLow = !isTv && typeof window !== 'undefined' && localStorage.getItem('bss_low_latency') === 'true';
       const hls = new Hls({
-        enableWorker: true,
+        enableWorker: tvConfig.enableWorker,
         lowLatencyMode: ultraLow,
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 8,
-        fragLoadingMaxRetry: 6,
-        manifestLoadingMaxRetry: 6,
+        backBufferLength: tvConfig.backBufferLength,
+        maxBufferLength: tvConfig.maxBufferLength,
+        maxMaxBufferLength: tvConfig.maxMaxBufferLength,
+        maxBufferSize: tvConfig.maxBufferSize,
+        liveSyncDurationCount: tvConfig.liveSyncDurationCount,
+        liveMaxLatencyDurationCount: tvConfig.liveMaxLatencyDurationCount,
+        nudgeOffset: tvConfig.nudgeOffset,
+        nudgeMaxRetry: tvConfig.nudgeMaxRetry,
+        fragLoadingMaxRetry: tvConfig.fragLoadingMaxRetry,
+        manifestLoadingMaxRetry: tvConfig.manifestLoadingMaxRetry,
         levelLoadingMaxRetry: 6,
-        fragLoadingTimeOut: 20000,
-        manifestLoadingTimeOut: 15000,
+        fragLoadingTimeOut: tvConfig.fragLoadingTimeOut,
+        manifestLoadingTimeOut: tvConfig.manifestLoadingTimeOut,
         xhrSetup: (xhr) => {
           if (token) {
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -275,16 +283,21 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
         video.play().then(() => {
           setIsPlaying(true);
+          setTvAutoplayBlocked(false);
           retryCountRef.current = 0;
         }).catch(() => {
           video.muted = true;
           setIsMuted(true);
           video.play().then(() => {
             setIsPlaying(true);
+            setTvAutoplayBlocked(false);
             retryCountRef.current = 0;
           }).catch(() => {
             setIsPlaying(false);
             setIsLoading(false);
+            if (isTv) {
+              setTvAutoplayBlocked(true);
+            }
           });
         });
       });
@@ -298,13 +311,32 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.warn('HLS.js event error:', data.type, data.details);
         if (data.fatal) {
-          if (retryCountRef.current < 4) {
+          if (retryCountRef.current < (isTv ? 2 : 4)) {
             retryCountRef.current += 1;
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
               hls.startLoad();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError();
             }
+          } else if (isTv && video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Samsung Tizen Hardware Fallback: switch to Native AVPlayer pipeline
+            console.log('[CourtsidePlayer] Smart TV hardware failover to native HLS...');
+            hls.destroy();
+            hlsRef.current = null;
+            video.src = targetUrl;
+            video.load();
+            video.play().then(() => {
+              setIsPlaying(true);
+              setIsLoading(false);
+              setIsVerified(true);
+              setTvAutoplayBlocked(false);
+            }).catch(() => {
+              video.muted = true;
+              setIsMuted(true);
+              video.play().catch(() => {
+                setTvAutoplayBlocked(true);
+              });
+            });
           } else {
             if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
             hls.destroy();
@@ -438,15 +470,96 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     };
   }, []);
 
-  const togglePlay = () => {
+  const handleTvStartPlayback = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    setIsMuted(false);
+    video.play().then(() => {
+      setIsPlaying(true);
+      setTvAutoplayBlocked(false);
+    }).catch(() => {
+      video.muted = true;
+      setIsMuted(true);
+      video.play().then(() => {
+        setIsPlaying(true);
+        setTvAutoplayBlocked(false);
+      });
+    });
+  }, []);
+
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      video.play().catch(console.error);
+      video.play().then(() => {
+        setIsPlaying(true);
+        setTvAutoplayBlocked(false);
+      }).catch(console.error);
     } else {
       video.pause();
+      setIsPlaying(false);
     }
-  };
+  }, []);
+
+  // Samsung Smart TV Remote Control navigation & playback controls
+  useEffect(() => {
+    const handleRemoteKey = (e: KeyboardEvent) => {
+      const code = e.keyCode || e.which;
+
+      // 1. Enter / OK button on Samsung Remote
+      if (code === TV_KEYS.ENTER || code === TV_KEYS.SPACE) {
+        if (!isPlaying || tvAutoplayBlocked) {
+          e.preventDefault();
+          handleTvStartPlayback();
+        } else {
+          togglePlay();
+        }
+      }
+
+      // 2. Play button on Remote
+      else if (code === TV_KEYS.PLAY) {
+        e.preventDefault();
+        videoRef.current?.play().then(() => {
+          setIsPlaying(true);
+          setTvAutoplayBlocked(false);
+        }).catch(console.error);
+      }
+
+      // 3. Pause button on Remote
+      else if (code === TV_KEYS.PAUSE || code === TV_KEYS.STOP) {
+        e.preventDefault();
+        videoRef.current?.pause();
+        setIsPlaying(false);
+      }
+
+      // 4. Play/Pause toggle button on Remote
+      else if (code === TV_KEYS.PLAY_PAUSE) {
+        e.preventDefault();
+        togglePlay();
+      }
+
+      // 5. Tizen Return / Back button (keyCode 10009)
+      else if (code === TV_KEYS.RETURN) {
+        const doc = document as any;
+        const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+        if (isFs) {
+          e.preventDefault();
+          if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+          else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+          setIsFullscreen(false);
+        }
+      }
+
+      // 6. Mute key on TV remote
+      else if (code === TV_KEYS.MUTE) {
+        toggleMute();
+      }
+    };
+
+    window.addEventListener('keydown', handleRemoteKey);
+    return () => window.removeEventListener('keydown', handleRemoteKey);
+  }, [isPlaying, tvAutoplayBlocked, handleTvStartPlayback, togglePlay]);
 
   const toggleMute = () => {
     const video = videoRef.current;
@@ -525,7 +638,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   return (
     <div className="w-full flex flex-col space-y-2.5">
       {/* Top Header Status */}
-      <div className="flex items-center justify-end px-0.5">
+      <div className="flex items-center justify-end space-x-1.5 px-0.5">
+        {isSamsung && (
+          <div className="flex items-center space-x-1 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
+            <Tv className="w-3 h-3 text-amber-600" />
+            <span className="text-[10px] font-bold text-amber-700">Samsung TV Ready</span>
+          </div>
+        )}
         {stream.is_live ? (
           <div className="flex items-center space-x-1.5 bg-red-50 border border-red-200/80 px-2.5 py-0.5 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
@@ -554,12 +673,39 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           playsInline
           autoPlay
           muted={isMuted}
+          preload="auto"
+          tabIndex={0}
           // @ts-ignore
           webkit-playsinline="true"
           x-webkit-airplay="allow"
-          className="w-full h-full object-contain cursor-pointer"
+          x5-video-player-type="h5"
+          className="w-full h-full object-contain cursor-pointer focus:outline-hidden"
           onClick={togglePlay}
         />
+
+        {/* Samsung TV / Smart TV Remote "Press OK to Play" Overlay */}
+        {(!isPlaying && !isLoading && !hasError && (isTv || tvAutoplayBlocked)) && (
+          <div 
+            onClick={handleTvStartPlayback}
+            className="absolute inset-0 z-25 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center cursor-pointer select-none group"
+          >
+            <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full bg-white text-black flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110 group-active:scale-95 border-4 border-amber-500">
+              <Play className="w-9 h-9 sm:w-11 sm:h-11 fill-current ml-1" />
+            </div>
+            <div className="mt-4 space-y-1">
+              <h3 className="text-base sm:text-xl font-black text-white tracking-tight">
+                PRESS OK ON TV REMOTE TO WATCH
+              </h3>
+              <p className="text-xs text-neutral-300 max-w-md mx-auto">
+                {stream.name} • {selectedQuality} HD Live Stream
+              </p>
+            </div>
+            <div className="mt-3 flex items-center space-x-2 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/20 text-[11px] font-bold text-amber-300">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>Samsung TV Remote Ready (Press Enter / OK)</span>
+            </div>
+          </div>
+        )}
 
         {/* Loading Indicator (Clean, Lightweight, Centered - No Overlapping Controls) */}
         {isLoading && !hasError && (

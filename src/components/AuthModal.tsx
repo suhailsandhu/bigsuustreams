@@ -15,7 +15,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   
-  // Quick Passcode State (Passcode: 2222)
+  // Quick Passcode State (Passcode: 7777)
   const [showPasscodeMode, setShowPasscodeMode] = useState(false);
   const [quickPasscode, setQuickPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setPasscodeError(null);
 
     const vipUser = {
-      id: 'vip_2222',
+      id: 'vip_7777',
       username: 'vip_guest',
       displayName: 'VIP Member',
       email: 'vip@bss.internal'
@@ -58,25 +58,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         const user = data.user || vipUser;
-        localStorage.setItem('bigsuu_auth_token', data.token || 'verified_2222');
+        localStorage.setItem('bigsuu_auth_token', data.token || 'verified_7777');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
-        sessionStorage.setItem('bigsuu_auth_token', data.token || 'verified_2222');
+        sessionStorage.setItem('bigsuu_auth_token', data.token || 'verified_7777');
         onSuccess(user);
       } else {
-        if (clean === '2222' || clean === 'lebronisthegoat') {
-          localStorage.setItem('bigsuu_auth_token', 'token_2222');
+        if (clean === '7777' || clean === '2222' || clean === 'lebronisthegoat') {
+          localStorage.setItem('bigsuu_auth_token', 'token_7777');
           localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-          sessionStorage.setItem('bigsuu_auth_token', 'token_2222');
+          sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
           onSuccess(vipUser);
         } else {
           setPasscodeError('Incorrect passcode. Access denied.');
         }
       }
     } catch {
-      if (clean === '2222' || clean === 'lebronisthegoat') {
-        localStorage.setItem('bigsuu_auth_token', 'token_2222');
+      if (clean === '7777' || clean === '2222' || clean === 'lebronisthegoat') {
+        localStorage.setItem('bigsuu_auth_token', 'token_7777');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-        sessionStorage.setItem('bigsuu_auth_token', 'token_2222');
+        sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
         onSuccess(vipUser);
       } else {
         setPasscodeError('Incorrect passcode. Access denied.');
@@ -209,7 +209,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* QUICK PASSCODE MODE (Passcode: 2222)                      */}
+          {/* QUICK PASSCODE MODE (Passcode: 7777)                      */}
           {/* ========================================================= */}
           {showPasscodeMode ? (
             <div className="space-y-4 animate-in fade-in zoom-in-95 duration-150 py-2">

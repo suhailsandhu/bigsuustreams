@@ -18,7 +18,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 // Bulletproof Port: Node runs on 3000 behind Nginx (port 80/443 belongs to Nginx)
 const PORT = process.env.PORT && process.env.PORT !== '80' ? process.env.PORT : 3000;
-const SITE_PASSCODE = process.env.SITE_PASSCODE || '2222';
+const SITE_PASSCODE = process.env.SITE_PASSCODE || '7777';
 
 // Disable Express fingerprinting header
 app.disable('x-powered-by');
@@ -225,13 +225,13 @@ app.post('/api/user/preferences', (req, res) => {
   res.json({ success: true });
 });
 
-// Passcode gate support (Passcode 2222)
+// Passcode gate support (Passcode 7777 / 2222)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
   const clean = (typeof password === 'string' ? password.trim().toLowerCase() : '');
-  if (clean === '2222' || clean === 'lebronisthegoat') {
-    const token = Buffer.from(`bigsuu_${Date.now()}_2222`).toString('base64');
-    const user = { id: 'vip_2222', username: 'passcode_vip', displayName: 'VIP Member', email: 'vip@bigsuustreams.com' };
+  if (clean === '7777' || clean === '2222' || clean === 'lebronisthegoat') {
+    const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString('base64');
+    const user = { id: 'vip_7777', username: 'passcode_vip', displayName: 'VIP Member', email: 'vip@bigsuustreams.com' };
     return res.json({ success: true, token, user });
   }
   return res.status(401).json({ error: 'Incorrect passcode. Access denied.' });
@@ -295,14 +295,16 @@ function requireSiteAccess(req, res, next) {
 
   const token = rawToken.trim();
 
-  // 1. VIP Passcode validation (passcode 2222 tokens)
+  // 1. VIP Passcode validation (passcode 7777 / 2222 tokens)
   if (
+    token.includes('7777') ||
     token.includes('2222') ||
     token.includes('lebronisthegoat') ||
     token.startsWith('bigsuu_') ||
     token.startsWith('verified_') ||
     token.startsWith('local_token_') ||
     token.startsWith('google_token_') ||
+    token.startsWith('token_7777') ||
     token.startsWith('token_2222')
   ) {
     return next();
@@ -371,6 +373,8 @@ async function handleHls(req, res) {
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Expose-Headers', '*');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('X-Stream-Quality', hls.selectedQuality);
     res.setHeader('X-Available-Qualities', hls.availableQualities.join(','));
@@ -544,8 +548,11 @@ async function handleChunkProxy(req, res) {
     }
 
     res.setHeader('Content-Type', 'video/mp2t');
+    res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Expose-Headers', '*');
 
     // Low-latency streaming: immediately pipe pure MPEG-TS bytes to player without blocking
     if (upstreamRes.body) {

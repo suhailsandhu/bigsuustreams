@@ -1916,6 +1916,7 @@ var AnalyticsTracker = class {
     iPhone: 0,
     Android: 0,
     Desktop: 0,
+    SmartTV: 0,
     Other: 0
   };
   deviceTagCounts = /* @__PURE__ */ new Map();
@@ -2118,6 +2119,7 @@ var AnalyticsTracker = class {
   }
   normalizeDevice(raw) {
     const lower = (raw || "").toLowerCase();
+    if (lower.includes("smarttv") || lower.includes("tizen") || lower.includes("samsungbrowser") || lower.includes("tv")) return "SmartTV";
     if (lower.includes("iphone") || lower.includes("ipad") || lower.includes("ios")) return "iPhone";
     if (lower.includes("android")) return "Android";
     if (lower.includes("windows") || lower.includes("mac") || lower.includes("linux")) return "Desktop";
@@ -2235,7 +2237,7 @@ var AnalyticsTracker = class {
   }
   verifyPin(pin) {
     const trimmed = (pin || "").trim();
-    return trimmed === this.adminPin || trimmed === "2222" || trimmed === (process.env.SITE_PASSCODE || "2222");
+    return trimmed === this.adminPin || trimmed === "7777" || trimmed === "2222" || trimmed === (process.env.SITE_PASSCODE || "7777");
   }
   getStats() {
     this.cleanup();
@@ -3063,7 +3065,7 @@ var __filename = fileURLToPath(import.meta.url);
 var __dirname = path3.dirname(__filename);
 var app = express();
 var PORT = process.env.PORT && process.env.PORT !== "80" ? process.env.PORT : 3e3;
-var SITE_PASSCODE = process.env.SITE_PASSCODE || "2222";
+var SITE_PASSCODE = process.env.SITE_PASSCODE || "7777";
 app.disable("x-powered-by");
 app.use(applySecurityHeaders);
 app.use(cors());
@@ -3246,9 +3248,9 @@ app.post("/api/user/preferences", (req, res) => {
 app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password } = req.body || {};
   const clean = typeof password === "string" ? password.trim().toLowerCase() : "";
-  if (clean === "2222" || clean === "lebronisthegoat") {
-    const token = Buffer.from(`bigsuu_${Date.now()}_2222`).toString("base64");
-    const user = { id: "vip_2222", username: "passcode_vip", displayName: "VIP Member", email: "vip@bigsuustreams.com" };
+  if (clean === "7777" || clean === "2222" || clean === "lebronisthegoat") {
+    const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString("base64");
+    const user = { id: "vip_7777", username: "passcode_vip", displayName: "VIP Member", email: "vip@bigsuustreams.com" };
     return res.json({ success: true, token, user });
   }
   return res.status(401).json({ error: "Incorrect passcode. Access denied." });
@@ -3332,6 +3334,8 @@ async function handleHls(req, res) {
     }
     res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.setHeader("Access-Control-Expose-Headers", "*");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("X-Stream-Quality", hls.selectedQuality);
     res.setHeader("X-Available-Qualities", hls.availableQualities.join(","));
@@ -3482,8 +3486,11 @@ async function handleChunkProxy(req, res) {
       return res.status(upstreamRes ? upstreamRes.status : 502).send("Chunk fetch failed across all failover mirrors");
     }
     res.setHeader("Content-Type", "video/mp2t");
+    res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Cache-Control", "public, max-age=300");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.setHeader("Access-Control-Expose-Headers", "*");
     if (upstreamRes.body) {
       return Readable.fromWeb(upstreamRes.body).pipe(createTsCleanStream()).pipe(res);
     } else {

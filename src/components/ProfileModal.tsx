@@ -111,6 +111,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     currentUser?.role === 'vip' ||
     currentUser?.role === 'admin' ||
     currentUser?.membership === 'vip' ||
+    currentUser?.id === 'vip_7777' ||
     currentUser?.id === 'vip_2222' ||
     currentUser?.username === 'vip_guest'
   );

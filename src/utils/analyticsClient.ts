@@ -8,7 +8,7 @@ function isOwnerOrAdmin(): boolean {
     const raw = localStorage.getItem('bigsuu_auth_user');
     if (raw) {
       const u = JSON.parse(raw);
-      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_2222' || u.username === 'admin') return true;
+      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_7777' || u.id === 'vip_2222' || u.username === 'admin') return true;
     }
   } catch {
     // ignore
@@ -75,6 +75,9 @@ function getLoggedInUser(): { id?: string; email?: string; username?: string; di
 
 function detectDetailedDevice(): { category: string; tag: string } {
   const ua = navigator.userAgent || '';
+  if (/SMART-TV|Tizen|SamsungBrowser/i.test(ua)) return { category: 'SmartTV', tag: 'Samsung Smart TV (Tizen)' };
+  if (/Web0S|LG Browser/i.test(ua)) return { category: 'SmartTV', tag: 'LG Smart TV (webOS)' };
+  if (/Android TV|CrKey|GoogleTV|AFTT|AFTM|FireTV/i.test(ua)) return { category: 'SmartTV', tag: 'Smart TV (Streaming Box)' };
   if (/iPhone/.test(ua)) return { category: 'iPhone', tag: 'Apple iPhone (iOS)' };
   if (/iPad/.test(ua)) return { category: 'iPhone', tag: 'Apple iPad (iPadOS)' };
   if (/Android/.test(ua)) {
@@ -185,7 +188,7 @@ if (typeof window !== 'undefined') {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              pin: sessionStorage.getItem('bigsuu_admin_pin') || '2222',
+              pin: sessionStorage.getItem('bigsuu_admin_pin') || '7777',
               umamiWebsiteId: localId,
               umamiHost: localHost
             })
@@ -247,7 +250,7 @@ export function setUmamiConfig(websiteId: string, host?: string, pin?: string): 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pin: pin || sessionStorage.getItem('bigsuu_admin_pin') || '2222',
+        pin: pin || sessionStorage.getItem('bigsuu_admin_pin') || '7777',
         umamiWebsiteId: cleanId,
         umamiHost: cleanHost
       })
