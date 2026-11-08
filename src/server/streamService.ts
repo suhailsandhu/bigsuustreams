@@ -584,6 +584,11 @@ export async function resolveHlsStream(
       }
     }
 
+    // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only (HTTPS throws ERR_SSL_WRONG_VERSION_NUMBER)
+    if (fullSegmentUrl.includes('strmfree') && fullSegmentUrl.startsWith('https://cdn')) {
+      fullSegmentUrl = fullSegmentUrl.replace('https://', 'http://');
+    }
+
     // STABLE SEGMENT IDENTIFIER: exact segment file/token name WITHOUT dynamic s1_/s2_ prefix!
     const segKey = trimmed.split('?')[0].split('/').pop()?.replace(/[^a-zA-Z0-9_.-]/g, '') || 'chunk.ts';
     segmentMap.set(segKey, fullSegmentUrl);

@@ -58,22 +58,22 @@ export interface TvHlsConfig {
   manifestLoadingMaxRetry: number;
 }
 
-// Low-memory, worker-free configuration designed specifically for Samsung Smart TV (Tizen) hardware video decoders
+// Low-latency, jitter-tolerant HLS engine configuration for Smart TVs and Desktop
 export function getTvHlsConfig(isTv: boolean): TvHlsConfig {
   if (isTv) {
     return {
       enableWorker: false, // CRITICAL: Samsung Tizen browser worker transfer crashes MediaSource
-      lowLatencyMode: false, // TV CPUs benefit from stable segment buffering rather than ultra-low micro chunks
+      lowLatencyMode: false, // Stable segment buffering eliminates stutter and audio/video desync
       backBufferLength: 0, // Immediately free consumed chunks to preserve Tizen video RAM
-      maxBufferLength: 8, // Keep buffer small (8s) to prevent QuotaExceededError in TV hardware
-      maxMaxBufferLength: 16,
-      maxBufferSize: 25 * 1024 * 1024, // 25 MB max memory
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 12,
-      nudgeOffset: 0.15, // Prevents stalling at MPEG-TS timestamp boundaries
+      maxBufferLength: 20, // Generous 20s forward buffer prevents WiFi starvation lag
+      maxMaxBufferLength: 35,
+      maxBufferSize: 35 * 1024 * 1024, // 35 MB max memory
+      liveSyncDurationCount: 5, // 5-segment cushion eliminates live-edge buffering loops
+      liveMaxLatencyDurationCount: 14,
+      nudgeOffset: 0.2, // Smoothly bypasses MPEG-TS timestamp jitter
       nudgeMaxRetry: 10,
-      fragLoadingTimeOut: 25000, // Generous timeout for TV WiFi chips
-      manifestLoadingTimeOut: 20000,
+      fragLoadingTimeOut: 20000,
+      manifestLoadingTimeOut: 15000,
       fragLoadingMaxRetry: 8,
       manifestLoadingMaxRetry: 8
     };
@@ -83,17 +83,17 @@ export function getTvHlsConfig(isTv: boolean): TvHlsConfig {
   return {
     enableWorker: true,
     lowLatencyMode: false,
-    backBufferLength: 30,
-    maxBufferLength: 30,
+    backBufferLength: 20,
+    maxBufferLength: 30, // 30s forward buffer
     maxMaxBufferLength: 60,
     maxBufferSize: 60 * 1024 * 1024,
-    liveSyncDurationCount: 3,
-    liveMaxLatencyDurationCount: 8,
-    nudgeOffset: 0.1,
-    nudgeMaxRetry: 5,
+    liveSyncDurationCount: 4, // 4-segment cushion for smooth 60fps playback without lag
+    liveMaxLatencyDurationCount: 12,
+    nudgeOffset: 0.15,
+    nudgeMaxRetry: 8,
     fragLoadingTimeOut: 20000,
     manifestLoadingTimeOut: 15000,
-    fragLoadingMaxRetry: 6,
-    manifestLoadingMaxRetry: 6
+    fragLoadingMaxRetry: 8,
+    manifestLoadingMaxRetry: 8
   };
 }

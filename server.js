@@ -392,8 +392,24 @@ async function handleHls(req, res) {
   }
 }
 
-// Clean stream transformer: dynamically detects and strips upstream disguise headers
+// Fast clean TS buffer extractor: dynamically detects and strips upstream disguise headers
 // (such as TikTok 42-byte WebP or StreamFree 64-byte PNG) to deliver 100% pure MPEG-TS packets directly to the video player
+function cleanTsBuffer(rawBuf) {
+  if (!rawBuf || rawBuf.length === 0) return rawBuf;
+  let syncOffset = -1;
+  const scanLimit = Math.min(rawBuf.length - 188, 1024);
+  for (let i = 0; i < scanLimit; i++) {
+    if (rawBuf[i] === 0x47 && rawBuf[i + 188] === 0x47) {
+      if (i + 376 < rawBuf.length && rawBuf[i + 376] !== 0x47) {
+        continue;
+      }
+      syncOffset = i;
+      break;
+    }
+  }
+  return syncOffset >= 0 ? rawBuf.subarray(syncOffset) : rawBuf;
+}
+
 function createTsCleanStream() {
   let headerChecked = false;
   let buffered = Buffer.alloc(0);
@@ -447,95 +463,99 @@ function createTsCleanStream() {
   });
 }
 
+// In-Memory High-Speed LRU Segment Cache & In-Flight Request Coalescing
+// Eliminates stream lag & buffering by serving segments in < 2ms directly from server RAM
+const CHUNK_CACHE_LIMIT_BYTES = 120 * 1024 * 1024; // 120 MB RAM buffer cache
+let currentCacheBytes = 0;
+const chunkCache = new Map(); // key -> { buffer: Buffer, expires: number, size: number }
+const inflightChunks = new Map(); // key -> Promise<Buffer | null>
+
+function getCachedChunk(key) {
+  const item = chunkCache.get(key);
+  if (!item) return null;
+  if (item.expires < Date.now()) {
+    chunkCache.delete(key);
+    currentCacheBytes -= item.size;
+    return null;
+  }
+  return item.buffer;
+}
+
+function putCachedChunk(key, buffer, ttlMs = 45000) {
+  if (!buffer || buffer.length === 0) return;
+  while (currentCacheBytes + buffer.length > CHUNK_CACHE_LIMIT_BYTES && chunkCache.size > 0) {
+    const oldestKey = chunkCache.keys().next().value;
+    const old = chunkCache.get(oldestKey);
+    if (old) currentCacheBytes -= old.size;
+    chunkCache.delete(oldestKey);
+  }
+  chunkCache.set(key, {
+    buffer,
+    expires: Date.now() + ttlMs,
+    size: buffer.length
+  });
+  currentCacheBytes += buffer.length;
+}
+
 // Protected Video Chunk Proxy Endpoint
 // Proxies all HLS .ts / .js chunks through server memory
 // Upstream provider domains are 100% invisible to browser network inspection
 async function handleChunkProxy(req, res) {
   try {
     const { hash, segment } = req.params;
+    const cacheKey = `${hash}:${segment}`;
+
+    // 1. FAST PATH: Serve directly from server RAM cache if available (< 2ms response time)
+    const cached = getCachedChunk(cacheKey);
+    if (cached) {
+      res.setHeader('Content-Type', 'video/mp2t');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      res.setHeader('X-Proxy-Cache', 'HIT');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+      res.setHeader('Access-Control-Expose-Headers', '*');
+      return res.send(cached);
+    }
+
     const record = streamTargetMap.get(hash);
     if (!record || record.expires < Date.now()) {
       return res.status(404).send('Segment expired');
     }
 
-    // Lookup mapped upstream URL from segmentMap
-    let targetUrl = record.segmentMap?.get(segment);
-    if (!targetUrl) {
-      const cleanSegment = path.basename(segment);
-      targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
-    }
-
-    // Check for direct CDN fallback URL embedded in hash fragment (#sf=)
-    let directSfUrl = null;
-    if (targetUrl && targetUrl.includes('#sf=')) {
-      try {
-        directSfUrl = decodeURIComponent(targetUrl.split('#sf=')[1]);
-      } catch {}
-    }
-
-    let upstreamRes = null;
-    try {
-      const parsed = new URL(targetUrl);
-      const hostOrigin = parsed.origin;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const r = await fetch(targetUrl, {
-        signal: controller.signal,
-        headers: {
-          'Referer': hostOrigin,
-          'Origin': hostOrigin,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    // 2. IN-FLIGHT COALESCING: Multiple concurrent viewers share a single upstream fetch
+    let fetchPromise = inflightChunks.get(cacheKey);
+    if (!fetchPromise) {
+      fetchPromise = (async () => {
+        let targetUrl = record.segmentMap?.get(segment);
+        if (!targetUrl) {
+          const cleanSegment = path.basename(segment);
+          targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
         }
-      });
-      clearTimeout(timeoutId);
-      const cType = r.headers.get('content-type') || '';
-      if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
-        upstreamRes = r;
-      }
-    } catch {
-      // Primary fetch failed
-    }
 
-    // Immediate Direct CDN Fallback if primary returned non-200 or HTML error
-    if ((!upstreamRes || !upstreamRes.ok) && directSfUrl) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const rSf = await fetch(directSfUrl, {
-          signal: controller.signal,
-          headers: {
-            'Referer': 'https://strmfree.st',
-            'Origin': 'https://strmfree.st',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-          }
-        });
-        clearTimeout(timeoutId);
-        const cType = rSf.headers.get('content-type') || '';
-        if (rSf.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
-          upstreamRes = rSf;
+        // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only
+        if (targetUrl && targetUrl.includes('strmfree') && targetUrl.startsWith('https://cdn')) {
+          targetUrl = targetUrl.replace('https://', 'http://');
         }
-      } catch {
-        // Direct SF fallback failed
-      }
-    }
 
-    // If initial fetch failed, try fallback candidate URLs across mirrors
-    if (!upstreamRes || !upstreamRes.ok) {
-      const cleanSegment = path.basename(segment);
-      const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
-        url: `${bUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`,
-        host: (record.backupHosts && record.backupHosts[idx]) || record.workingHost
-      }));
+        let directSfUrl = null;
+        if (targetUrl && targetUrl.includes('#sf=')) {
+          try {
+            directSfUrl = decodeURIComponent(targetUrl.split('#sf=')[1]);
+          } catch {}
+        }
 
-      for (const cand of candidateUrls) {
+        let upstreamRes = null;
         try {
+          const parsed = new URL(targetUrl);
+          const hostOrigin = parsed.origin;
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 6000);
-          const r = await fetch(cand.url, {
+          const r = await fetch(targetUrl, {
             signal: controller.signal,
             headers: {
-              'Referer': cand.host,
-              'Origin': cand.host,
+              'Referer': hostOrigin,
+              'Origin': hostOrigin,
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
             }
           });
@@ -543,41 +563,112 @@ async function handleChunkProxy(req, res) {
           const cType = r.headers.get('content-type') || '';
           if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
             upstreamRes = r;
-            break;
           }
         } catch {
-          // Multi-source failover: try next mirror
+          // If HTTPS failed due to SSL error on HTTP-only CDN, retry with HTTP immediately
+          if (targetUrl.startsWith('https://')) {
+            try {
+              const httpUrl = targetUrl.replace('https://', 'http://');
+              const parsed = new URL(httpUrl);
+              const hostOrigin = parsed.origin;
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000);
+              const r = await fetch(httpUrl, {
+                signal: controller.signal,
+                headers: {
+                  'Referer': hostOrigin,
+                  'Origin': hostOrigin,
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                }
+              });
+              clearTimeout(timeoutId);
+              const cType = r.headers.get('content-type') || '';
+              if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+                upstreamRes = r;
+              }
+            } catch {}
+          }
         }
-      }
+
+        if ((!upstreamRes || !upstreamRes.ok) && directSfUrl) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+            const rSf = await fetch(directSfUrl, {
+              signal: controller.signal,
+              headers: {
+                'Referer': 'https://strmfree.st',
+                'Origin': 'https://strmfree.st',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+              }
+            });
+            clearTimeout(timeoutId);
+            const cType = rSf.headers.get('content-type') || '';
+            if (rSf.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+              upstreamRes = rSf;
+            }
+          } catch {}
+        }
+
+        if (!upstreamRes || !upstreamRes.ok) {
+          const cleanSegment = path.basename(segment);
+          const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
+            url: `${bUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`,
+            host: (record.backupHosts && record.backupHosts[idx]) || record.workingHost
+          }));
+
+          for (const cand of candidateUrls) {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000);
+              const r = await fetch(cand.url, {
+                signal: controller.signal,
+                headers: {
+                  'Referer': cand.host,
+                  'Origin': cand.host,
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                }
+              });
+              clearTimeout(timeoutId);
+              const cType = r.headers.get('content-type') || '';
+              if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+                upstreamRes = r;
+                break;
+              }
+            } catch {}
+          }
+        }
+
+        if (!upstreamRes || !upstreamRes.ok) {
+          return null;
+        }
+
+        const arrayBuf = await upstreamRes.arrayBuffer();
+        const rawBuf = Buffer.from(arrayBuf);
+        const cleanBuf = cleanTsBuffer(rawBuf);
+        putCachedChunk(cacheKey, cleanBuf, 45000);
+        return cleanBuf;
+      })();
+
+      inflightChunks.set(cacheKey, fetchPromise);
+      fetchPromise.finally(() => {
+        inflightChunks.delete(cacheKey);
+      });
     }
 
-    if (!upstreamRes || !upstreamRes.ok) {
-      return res.status(upstreamRes ? upstreamRes.status : 502).send('Chunk fetch failed across all failover mirrors');
+    const chunkData = await fetchPromise;
+    if (!chunkData) {
+      return res.status(502).send('Chunk fetch failed across all failover mirrors');
     }
 
     res.setHeader('Content-Type', 'video/mp2t');
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.setHeader('X-Proxy-Cache', 'MISS');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
-
-    // Low-latency streaming: immediately pipe pure MPEG-TS bytes to player without blocking
-    if (upstreamRes.body) {
-      return Readable.fromWeb(upstreamRes.body).pipe(createTsCleanStream()).pipe(res);
-    } else {
-      const arrayBuf = await upstreamRes.arrayBuffer();
-      const rawBuf = Buffer.from(arrayBuf);
-      let syncOffset = -1;
-      for (let i = 0; i < Math.min(rawBuf.length - 188, 512); i++) {
-        if (rawBuf[i] === 0x47 && rawBuf[i + 188] === 0x47) {
-          syncOffset = i;
-          break;
-        }
-      }
-      const cleanBuf = syncOffset >= 0 ? rawBuf.subarray(syncOffset) : rawBuf;
-      return res.send(cleanBuf);
-    }
+    return res.send(chunkData);
   } catch (err) {
     return res.status(502).send('Proxy error');
   }

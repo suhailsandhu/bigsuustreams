@@ -260,6 +260,10 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         liveMaxLatencyDurationCount: tvConfig.liveMaxLatencyDurationCount,
         nudgeOffset: tvConfig.nudgeOffset,
         nudgeMaxRetry: tvConfig.nudgeMaxRetry,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        fragLoadingRetryDelay: 500,
+        manifestLoadingRetryDelay: 500,
         fragLoadingMaxRetry: tvConfig.fragLoadingMaxRetry,
         manifestLoadingMaxRetry: tvConfig.manifestLoadingMaxRetry,
         levelLoadingMaxRetry: 6,
@@ -434,7 +438,23 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
-    const onWaiting = () => setIsLoading(true);
+    let stallCounter = 0;
+    let lastStallTime = 0;
+    const onWaiting = () => {
+      setIsLoading(true);
+      const now = Date.now();
+      if (now - lastStallTime < 15000) {
+        stallCounter++;
+        if (stallCounter >= 3 && selectedQuality === '1080p' && availableQualities.includes('720p')) {
+          console.log('[CourtsidePlayer] Repeated buffer stall detected, auto-adapting to 720p for smooth stream');
+          onQualityChange('720p');
+          stallCounter = 0;
+        }
+      } else {
+        stallCounter = 1;
+      }
+      lastStallTime = now;
+    };
     const onPlaying = () => {
       setIsLoading(false);
       setIsVerified(true);
