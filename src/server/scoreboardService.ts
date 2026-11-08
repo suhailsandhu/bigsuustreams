@@ -733,12 +733,24 @@ export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResp
     const awayNorm = normalizeName(awayTeam.displayName);
     const awayShort = normalizeName(awayTeam.shortDisplayName || awayTeam.name);
 
-    const matchedStream = streamsList.find((s: any) => {
+    // Match with game-specific stream first, then fall back to RedZone if no specific stream is available
+    let matchedStream = streamsList.find((s: any) => {
       const streamKeyNorm = normalizeName(s.stream_key);
       const matchHome = streamKeyNorm.includes(homeNorm) || (homeShort.length > 3 && streamKeyNorm.includes(homeShort));
       const matchAway = streamKeyNorm.includes(awayNorm) || (awayShort.length > 3 && streamKeyNorm.includes(awayShort));
-      return (matchHome && matchAway) || streamKeyNorm.includes('redzone');
+      return matchHome && matchAway;
     });
+
+    if (!matchedStream) {
+      matchedStream = streamsList.find((s: any) => {
+        const streamKeyNorm = normalizeName(s.stream_key);
+        return streamKeyNorm.includes(homeNorm) || streamKeyNorm.includes(awayNorm);
+      });
+    }
+
+    if (!matchedStream) {
+      matchedStream = streamsList.find((s: any) => normalizeName(s.stream_key).includes('redzone'));
+    }
 
     const isStreamLive = Boolean(
       matchedStream?.is_live || 
