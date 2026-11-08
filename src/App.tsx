@@ -16,19 +16,37 @@ import { LegalModal } from './components/LegalModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { findTeamByQuery } from './data/nbaTeams.ts';
+import { isSmartTv } from './utils/tvDetector.ts';
 import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
 
 export const App: React.FC = () => {
   // Current sport state ('nba' | 'nfl')
   const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>('nba');
 
-  // iOS-style Account Authentication state
+  // iOS-style Account Authentication state (auto-bypassed with VIP Guest pass on Smart TVs)
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const stored = localStorage.getItem('bigsuu_auth_user');
       const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
       if (token && stored) {
         return JSON.parse(stored);
+      }
+      // Smart TV living room optimization: grant automatic VIP pass
+      if (typeof window !== 'undefined' && isSmartTv()) {
+        const tvUser = {
+          id: 'vip_7777',
+          username: 'smart_tv_viewer',
+          displayName: 'Smart TV VIP',
+          email: 'tv@bigsuustreams.com',
+          role: 'vip',
+          isVip: true,
+          membership: 'vip'
+        };
+        try {
+          localStorage.setItem('bigsuu_auth_user', JSON.stringify(tvUser));
+          localStorage.setItem('bigsuu_auth_token', 'token_7777');
+        } catch {}
+        return tvUser;
       }
       return null;
     } catch {
@@ -355,8 +373,68 @@ export const App: React.FC = () => {
         window.location.hash = `#/game/${game.stream.streamKey}`;
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
-        console.warn('Stream fetch error:', err);
+        console.warn('Stream fetch error, creating fallback stream:', err);
+        const awayName = game.awayTeam?.displayName || game.awayTeam?.name || 'Away';
+        const homeName = game.homeTeam?.displayName || game.homeTeam?.name || 'Home';
+        const isNfl = game.league === 'NFL';
+        const fallbackStream: Stream = {
+          id: game.stream.streamKey,
+          name: `${awayName} at ${homeName}`,
+          category: isNfl ? 'football' : 'basketball',
+          league: isNfl ? 'NFL' : 'NBA',
+          stream_key: game.stream.streamKey,
+          match_timestamp: Math.floor(new Date(game.date).getTime() / 1000) || Math.floor(Date.now() / 1000),
+          viewers: 0,
+          is_external: false,
+          thumbnail_url: '',
+          sources: [
+            { quality: '1080p', url: '' },
+            { quality: '720p', url: '' }
+          ],
+          live_sources: [
+            { quality: '1080p', url: '' },
+            { quality: '720p', url: '' }
+          ],
+          team1: { name: awayName, logo: game.awayTeam?.logo || '' },
+          team2: { name: homeName, logo: game.homeTeam?.logo || '' },
+          is_live: Boolean(game.status?.isLive),
+          status: game.status?.isLive ? 'live' : 'upcoming'
+        };
+        setSelectedStream(fallbackStream);
+        window.location.hash = `#/game/${game.stream.streamKey}`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+    } else {
+      const awayName = game.awayTeam?.displayName || game.awayTeam?.name || 'Away';
+      const homeName = game.homeTeam?.displayName || game.homeTeam?.name || 'Home';
+      const isNfl = game.league === 'NFL';
+      const streamKey = `${awayName.toLowerCase().replace(/[^a-z0-9]/g, '')}-vs-${homeName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+      const fallbackStream: Stream = {
+        id: streamKey,
+        name: `${awayName} at ${homeName}`,
+        category: isNfl ? 'football' : 'basketball',
+        league: isNfl ? 'NFL' : 'NBA',
+        stream_key: streamKey,
+        match_timestamp: Math.floor(new Date(game.date).getTime() / 1000) || Math.floor(Date.now() / 1000),
+        viewers: 0,
+        is_external: false,
+        thumbnail_url: '',
+        sources: [
+          { quality: '1080p', url: '' },
+          { quality: '720p', url: '' }
+        ],
+        live_sources: [
+          { quality: '1080p', url: '' },
+          { quality: '720p', url: '' }
+        ],
+        team1: { name: awayName, logo: game.awayTeam?.logo || '' },
+        team2: { name: homeName, logo: game.homeTeam?.logo || '' },
+        is_live: Boolean(game.status?.isLive),
+        status: game.status?.isLive ? 'live' : 'upcoming'
+      };
+      setSelectedStream(fallbackStream);
+      window.location.hash = `#/game/${streamKey}`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 

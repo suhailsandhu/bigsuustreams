@@ -5,7 +5,7 @@ export function isSamsungSmartTv(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
   return (
-    /SMART-TV|Tizen|SamsungBrowser|SmartTV/i.test(ua) ||
+    /SMART-TV|Tizen|SamsungBrowser|SmartTV|Maple|Dolfin/i.test(ua) ||
     /Tizen\s*([0-9.]+)/i.test(ua) ||
     (typeof window !== 'undefined' && Boolean((window as any).tizen || (window as any).webapis))
   );
@@ -16,8 +16,8 @@ export function isSmartTv(): boolean {
   const ua = navigator.userAgent || '';
   return (
     isSamsungSmartTv() ||
-    /Web0S|NetCast|LG Browser|AppleTV|BRAVIA|Hisense|Vizio|Android TV|CrKey|GoogleTV|AFTT|AFTM|FireTV|Roku/i.test(ua) ||
-    /TV/i.test(navigator.userAgent)
+    /Web0S|NetCast|LG Browser|AppleTV|BRAVIA|Hisense|Vizio|Android TV|CrKey|GoogleTV|AFTT|AFTM|FireTV|Roku|Espial|Vewd|Opera TV|HbbTV/i.test(ua) ||
+    /TV/i.test(ua)
   );
 }
 

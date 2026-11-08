@@ -67,8 +67,10 @@
         } catch(e) {}
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-Cy94CQYb.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DCWvI0Id.css">
+    <script type="module" crossorigin src="/assets/index-b-TmBxaU.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DC2fSErW.css">
+    <script type="module">import'data:text/javascript,if(!import.meta.resolve)throw Error("import.meta.resolve not supported")';import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
+    <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
   </head>
   <body style="background-color: #f8fafc; color: #0f172a;">
     <div id="root">
@@ -82,8 +84,10 @@
 
 
     <script>
-      // Service worker management with automatic stale-cache recovery
-      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      // Service worker management with automatic stale-cache recovery (Disabled on Smart TVs to prevent storage lockups)
+      var isTvClient = /SMART-TV|Tizen|SamsungBrowser|SmartTV|Web0S|NetCast|LG Browser|AppleTV|BRAVIA|Hisense|Vizio|Android TV|CrKey|GoogleTV|AFTT|AFTM|FireTV|Roku|TV/i.test(navigator.userAgent || '');
+      
+      if (!isTvClient && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('/sw.js').then((reg) => {
           reg.update();
         }).catch((err) => {
@@ -114,6 +118,21 @@
           }
         }
       }, true);
+
+      // Smart TV fail-safe: If placeholder spinner remains visible for > 5 seconds, offer instant tap-to-enter
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.querySelector('[style*="animation: spin"]')) {
+          var fallbackDiv = document.createElement('div');
+          fallbackDiv.style.marginTop = '20px';
+          fallbackDiv.style.textAlign = 'center';
+          fallbackDiv.innerHTML = '<button onclick="window.location.reload(true)" style="background:#ea580c;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(234,88,12,0.3)">Press OK or Click to Load Streams</button>';
+          root.firstElementChild.appendChild(fallbackDiv);
+        }
+      }, 5000);
     </script>
+    <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
+    <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-CR1oT-cq.js"></script>
+    <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-D92DPmmX.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
   </body>
 </html>

@@ -1,11 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import legacy from '@vitejs/plugin-legacy';
 import { getBasketballStreams, getStreamByKey, getSourcesByKey, resolveHlsStream } from './src/server/streamService.ts';
 import { getScoreboard, getGameSummary, getStandings } from './src/server/scoreboardService.ts';
 
 export default defineConfig({
+  build: {
+    target: ['chrome58', 'edge16', 'firefox57', 'safari11', 'es2015']
+  },
   plugins: [
+    legacy({
+      targets: ['defaults', 'not IE 11', 'chrome >= 49', 'Samsung >= 5', 'safari >= 10'],
+      renderLegacyChunks: true
+    }),
     react(),
     tailwindcss(),
     {

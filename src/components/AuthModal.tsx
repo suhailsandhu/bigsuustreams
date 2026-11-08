@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Star } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Star, Tv } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 
 interface AuthModalProps {
@@ -37,6 +37,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     return c === '7777' || c === '77777' || c === '2222' || c === 'lebronisthegoat';
   };
 
+  const vipUser = {
+    id: 'vip_7777',
+    username: 'vip_guest',
+    displayName: 'VIP Member',
+    email: 'vip@bigsuustreams.com',
+    role: 'vip',
+    isVip: true,
+    membership: 'vip'
+  };
+
+  const handleTvGuestEnter = () => {
+    localStorage.setItem('bigsuu_auth_token', 'token_7777');
+    localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
+    sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+    onSuccess(vipUser);
+  };
+
   const handleQuickPasscodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = quickPasscode.trim().toLowerCase();
@@ -47,16 +64,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setLoading(true);
     setPasscodeError(null);
-
-    const vipUser = {
-      id: 'vip_7777',
-      username: 'vip_guest',
-      displayName: 'VIP Member',
-      email: 'vip@bigsuustreams.com',
-      role: 'vip',
-      isVip: true,
-      membership: 'vip'
-    };
 
     if (isVipPasscode(clean)) {
       localStorage.setItem('bigsuu_auth_token', 'token_7777');
@@ -483,6 +490,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
+                </button>
+
+                {/* Instant Access for Smart TVs & Guest Devices */}
+                <button
+                  type="button"
+                  onClick={handleTvGuestEnter}
+                  className="w-full py-2.5 px-4 rounded-xl border border-gray-200/90 bg-gray-50/80 hover:bg-gray-100 text-gray-700 font-bold text-xs transition active:scale-98 flex items-center justify-center space-x-2 cursor-pointer mt-2"
+                >
+                  <Tv className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Watch on Smart TV (Instant Guest Access)</span>
                 </button>
               </form>
             </>

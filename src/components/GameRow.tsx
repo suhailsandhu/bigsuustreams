@@ -107,16 +107,14 @@ export const GameRow: React.FC<GameRowProps> = ({
   const isStreamLiveNow = !isFinal && (isLive || Boolean(game.stream?.isLive) || (isUpcoming && minutesUntilStart <= 0));
 
   const handleRowClick = () => {
-    if (isStreamLiveNow) {
-      onWatchGame(game);
-    } else if (isFinal) {
+    if (isFinal) {
       if (onWatchHighlights) {
         onWatchHighlights(game);
       } else {
-        onOpenBoxScore(game);
+        onWatchGame(game);
       }
     } else {
-      onOpenBoxScore(game);
+      onWatchGame(game);
     }
   };
 
@@ -181,8 +179,16 @@ export const GameRow: React.FC<GameRowProps> = ({
               </div>
             </div>
           ) : (
-            /* Live or Completed Game: Scores & Status */
-            <div className="flex items-center space-x-2 sm:space-x-3.5">
+            /* Live or Completed Game: Scores & Status (Clicking score opens box score) */
+            <div 
+              onClick={(e) => {
+                if (isFinal) {
+                  e.stopPropagation();
+                  onOpenBoxScore(game);
+                }
+              }}
+              className="flex items-center space-x-2 sm:space-x-3.5"
+            >
               {/* Away Score */}
               <span
                 className={`text-lg sm:text-2xl font-black tabular-nums min-w-[24px] text-right ${
@@ -263,7 +269,7 @@ export const GameRow: React.FC<GameRowProps> = ({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onOpenBoxScore(game);
+              onWatchGame(game);
             }}
             className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-gray-100/90 hover:bg-gray-200/80 text-gray-600 text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 border border-gray-200/70 shadow-2xs transition active:scale-98 cursor-pointer"
           >

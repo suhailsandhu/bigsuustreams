@@ -95,8 +95,10 @@
     <script type="module" src="/src/main.tsx"></script>
 
     <script>
-      // Service worker management with automatic stale-cache recovery
-      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      // Service worker management with automatic stale-cache recovery (Disabled on Smart TVs to prevent storage lockups)
+      var isTvClient = /SMART-TV|Tizen|SamsungBrowser|SmartTV|Web0S|NetCast|LG Browser|AppleTV|BRAVIA|Hisense|Vizio|Android TV|CrKey|GoogleTV|AFTT|AFTM|FireTV|Roku|TV/i.test(navigator.userAgent || '');
+      
+      if (!isTvClient && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('/sw.js').then((reg) => {
           reg.update();
         }).catch((err) => {
@@ -127,6 +129,18 @@
           }
         }
       }, true);
+
+      // Smart TV fail-safe: If placeholder spinner remains visible for > 5 seconds, offer instant tap-to-enter
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.querySelector('[style*="animation: spin"]')) {
+          var fallbackDiv = document.createElement('div');
+          fallbackDiv.style.marginTop = '20px';
+          fallbackDiv.style.textAlign = 'center';
+          fallbackDiv.innerHTML = '<button onclick="window.location.reload(true)" style="background:#ea580c;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(234,88,12,0.3)">Press OK or Click to Load Streams</button>';
+          root.firstElementChild.appendChild(fallbackDiv);
+        }
+      }, 5000);
     </script>
   </body>
 </html>
