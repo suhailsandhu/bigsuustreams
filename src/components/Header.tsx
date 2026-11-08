@@ -69,6 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
             <img
               src="/nba-logo.png"
               alt="NBA"
+              style={{ maxHeight: '80px', width: 'auto' }}
               className="h-20 sm:h-24 md:h-28 w-auto object-contain transition-transform group-hover:scale-105 filter drop-shadow-sm"
             />
           ) : (

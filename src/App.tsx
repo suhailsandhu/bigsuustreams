@@ -492,7 +492,10 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col text-gray-900 selection:bg-orange-500/20 selection:text-orange-900">
+    <div 
+      style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column' }}
+      className="min-h-screen bg-[#f8f9fa] flex flex-col text-gray-900 selection:bg-orange-500/20 selection:text-orange-900"
+    >
       {/* Top White Header with Sport Logo and Switcher */}
       <Header
         onNavigateHome={handleBackToHome}
@@ -507,7 +510,10 @@ export const App: React.FC = () => {
         }}
       />
 
-      <main className="flex-1 w-full mx-auto px-2.5 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-6">
+      <main 
+        style={{ width: '100%', maxWidth: '1024px', margin: '0 auto', flex: '1 1 auto' }}
+        className="flex-1 w-full mx-auto px-2.5 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-6"
+      >
         {/* If a game stream or highlight is currently active, render the GameView */}
         {selectedStream ? (
           <GameView
@@ -516,7 +522,10 @@ export const App: React.FC = () => {
             onBack={handleBackToHome}
           />
         ) : (
-          <div className="max-w-4xl mx-auto space-y-2 sm:space-y-2.5">
+          <div 
+            style={{ maxWidth: '896px', margin: '0 auto', width: '100%' }}
+            className="max-w-4xl mx-auto space-y-2 sm:space-y-2.5"
+          >
             {/* NBA-Style Interactive Date Navigation Carousel (Thinner & Pushed to Top) */}
             <DateNavigation
               selectedDate={selectedDate}

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && esbuild server.js --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "build": "tsc -b && vite build && node scripts/postprocess-css.mjs && esbuild server.js --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
     "start": "node dist/server.js",
     "lint": "oxlint",
     "preview": "vite preview"

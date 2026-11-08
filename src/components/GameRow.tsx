@@ -136,11 +136,15 @@ export const GameRow: React.FC<GameRowProps> = ({
         {/* AWAY TEAM (Left Column) */}
         <div className="flex flex-col items-center text-center min-w-0">
           {/* Pure Logo - Prominent & Crisp (Increased Size) */}
-          <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+          <div 
+            style={{ width: '56px', height: '56px', maxWidth: '56px', maxHeight: '56px' }}
+            className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200"
+          >
             {away.logo ? (
               <img
                 src={away.logo}
                 alt={away.displayName}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 className="w-full h-full object-contain filter drop-shadow-xs"
                 loading="lazy"
               />
@@ -227,11 +231,15 @@ export const GameRow: React.FC<GameRowProps> = ({
         {/* HOME TEAM (Right Column) */}
         <div className="flex flex-col items-center text-center min-w-0">
           {/* Pure Logo - Prominent & Crisp (Increased Size) */}
-          <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200">
+          <div 
+            style={{ width: '56px', height: '56px', maxWidth: '56px', maxHeight: '56px' }}
+            className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200"
+          >
             {home.logo ? (
               <img
                 src={home.logo}
                 alt={home.displayName}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 className="w-full h-full object-contain filter drop-shadow-xs"
                 loading="lazy"
               />

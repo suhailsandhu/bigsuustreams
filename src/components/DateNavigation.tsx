@@ -182,6 +182,10 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
         ref={scrollContainerRef}
         className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5"
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
@@ -194,6 +198,7 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
               key={day.dateStr}
               ref={isSelected ? activeDayRef : undefined}
               onClick={() => onSelectDate(day.dateStr)}
+              style={{ minWidth: '48px', flexShrink: 0 }}
               className={`flex flex-col items-center justify-center flex-shrink-0 w-[48px] sm:w-[56px] py-1 sm:py-1.5 px-1 rounded-lg transition-all cursor-pointer ${
                 isSelected
                   ? 'bg-gray-200 border-2 border-gray-300 text-gray-950 shadow-2xs font-black scale-102'
