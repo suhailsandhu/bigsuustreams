@@ -866,11 +866,11 @@ app.post('/api/admin/health/audit', async (req, res) => {
 // Force kick-off for all active sessions & online users
 app.post('/api/admin/kick-all', (req, res) => {
   const pin = req.headers['x-admin-pin'] || req.body?.pin || req.query?.pin;
-  if (!analyticsService.verifyPin(pin)) {
+  if (!analytics.verifyPin(pin)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   authService.clearAllSessions();
-  analyticsService.clearActiveSessions();
+  analytics.clearActiveSessions();
   res.json({ success: true, message: 'All online visitors and active sessions have been kicked off.' });
 });
 
@@ -935,7 +935,7 @@ autonomousWatchdog.start();
 
 // Purge all old active sessions and online viewers on startup
 authService.clearAllSessions();
-analyticsService.clearActiveSessions();
+analytics.clearActiveSessions();
 console.log('⚡ [Admin] Purged all active sessions and online viewers on boot.');
 
 app.listen(PORT, '0.0.0.0', () => {
