@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, Star } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 
 interface AuthModalProps {
@@ -32,7 +32,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [favoriteTeamId, setFavoriteTeamId] = useState(() => localStorage.getItem('bss_favorite_team') || '');
   const [loading, setLoading] = useState(false);
@@ -47,9 +46,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const vipUser = {
     id: 'vip_7865',
-    username: 'vip_guest',
+    username: 'vip_member',
     displayName: 'VIP Member',
-    email: 'vip@bigsuustreams.com',
+    email: 'vip7865@bigsuustreams.com',
     role: 'vip',
     isVip: true,
     membership: 'vip'
@@ -116,10 +115,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setError('Password must be at least 4 characters');
         return;
       }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match');
-        return;
-      }
     } else {
       if (!username.trim()) {
         setError('Please enter your username or email');
@@ -134,9 +129,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (isVipPasscode(password)) {
         const vipUser = {
           id: 'vip_7865',
-          username: username.trim() || 'vip_guest',
+          username: username.trim() || 'vip_member',
           displayName: username.trim() || 'VIP Member',
-          email: email.trim() || 'vip@bigsuustreams.com',
+          email: email.trim() || 'vip7865@bigsuustreams.com',
           role: 'vip',
           isVip: true,
           membership: 'vip'
@@ -408,32 +403,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 {mode === 'register' && (
                   <div>
                     <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Repeat password"
-                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition"
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {mode === 'register' && (
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1 flex items-center justify-between">
-                      <span>Favorite Sports Team (Optional)</span>
-                      <span className="text-[10px] text-amber-600 font-semibold flex items-center space-x-1">
-                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                        <span>Highlights Games</span>
-                      </span>
+                      Favorite Sports Team (Optional)
                     </label>
                     <select
                       value={favoriteTeamId}

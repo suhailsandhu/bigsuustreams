@@ -29,15 +29,13 @@ export const App: React.FC = () => {
       const stored = localStorage.getItem('bigsuu_auth_user');
       const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
       
-      // PURGE: Immediately kick off all 7777 VIP passes, old guests, and expired VIP sessions
+      // PURGE: Kick off all revoked 7777 VIP passes and old 7777 guest sessions
       if (
         !token ||
         token.includes('7777') || 
         token.includes('verified_7777') || 
         stored?.includes('7777') || 
-        stored?.includes('vip_guest') || 
-        stored?.includes('smart_tv_viewer') ||
-        stored?.includes('vip@bigsuustreams.com')
+        stored?.includes('vip_7777')
       ) {
         localStorage.removeItem('bigsuu_auth_token');
         localStorage.removeItem('bigsuu_auth_user');
@@ -51,7 +49,7 @@ export const App: React.FC = () => {
 
       if (token && stored) {
         const u = JSON.parse(stored);
-        if (u.id === 'vip_7777' || u.username === 'vip_guest' || u.username === 'smart_tv_viewer') {
+        if (u.id === 'vip_7777') {
           return null;
         }
         return u;
@@ -94,9 +92,7 @@ export const App: React.FC = () => {
       token?.includes('7777') || 
       token?.includes('verified_7777') || 
       stored?.includes('7777') || 
-      stored?.includes('vip_guest') || 
-      stored?.includes('smart_tv_viewer') ||
-      stored?.includes('vip@bigsuustreams.com')
+      stored?.includes('vip_7777')
     ) {
       handleLogout();
     }

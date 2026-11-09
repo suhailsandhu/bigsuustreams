@@ -24,7 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
     currentUser?.role === 'admin' ||
     currentUser?.membership === 'vip' ||
     currentUser?.id === 'vip_7865' ||
-    currentUser?.username === 'vip_guest'
+    currentUser?.username === 'vip_guest' ||
+    currentUser?.username === 'vip_member'
   );
 
   const initial = (currentUser?.displayName || currentUser?.username || 'M')[0].toUpperCase();
@@ -35,24 +36,31 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Account / Membership Status in Top Right */}
       <div className="absolute right-3 sm:right-6 top-2.5 sm:top-3.5 flex flex-col items-end space-y-1.5 z-20">
         {currentUser && onOpenProfile && (
-          <button
-            onClick={onOpenProfile}
-            className={`flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1 rounded-full border shadow-2xs transition active:scale-95 cursor-pointer ${
-              isVip
-                ? 'bg-amber-50/80 text-amber-900 border-amber-200/80 hover:bg-amber-100/80'
-                : 'bg-gray-100 text-gray-700 border-gray-200/80 hover:bg-gray-200'
-            }`}
-            title="Account & Settings"
-          >
-            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold uppercase shrink-0 ${
-              isVip ? 'bg-amber-200 text-amber-900' : 'bg-gray-300 text-gray-700'
-            }`}>
-              {initial}
-            </div>
-            <span className="truncate max-w-[85px] sm:max-w-[120px] font-semibold">
-              {isVip ? 'VIP Member' : 'Basic Member'}
-            </span>
-          </button>
+          isVip ? (
+            <button
+              onClick={onOpenProfile}
+              className="flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1 rounded-full border shadow-2xs transition active:scale-95 cursor-pointer bg-amber-50/80 text-amber-900 border-amber-200/80 hover:bg-amber-100/80"
+              title="Account & Settings"
+            >
+              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold uppercase shrink-0 bg-amber-200 text-amber-900">
+                {initial}
+              </div>
+              <span className="truncate max-w-[85px] sm:max-w-[120px] font-semibold">
+                VIP Member
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenProfile}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#dbe0e6] hover:bg-[#ccd2d9] transition active:scale-95 cursor-pointer shadow-2xs border border-gray-300/50 overflow-hidden"
+              title="Account & Settings"
+              aria-label="Account & Settings"
+            >
+              <svg className="w-5 h-5 text-[#8a94a2]" viewBox="0 0 24 24" fill="currentColor">
+                <path fillRule="evenodd" d="M12 2a5 5 0 100 10 5 5 0 000-10zm-7 18a7 7 0 0114 0H5z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )
         )}
       </div>
 
