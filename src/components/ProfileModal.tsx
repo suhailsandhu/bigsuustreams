@@ -17,11 +17,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLogout,
   onSettingsChange
 }) => {
-  // 1. Preferences State
-  const [quality, setQuality] = useState(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('bss_default_quality') || '1080p' : '1080p';
-  });
+  // Ensure Autoplay with sound is enabled automatically for everyone
+  useEffect(() => {
+    try {
+      localStorage.setItem('bss_autoplay_sound', 'true');
+    } catch {}
+  }, []);
 
+  // 1. Preferences State
   const [selectedTeam, setSelectedTeam] = useState<SportsTeam | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('bss_favorite_team') || '';
@@ -34,34 +37,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return typeof window !== 'undefined' && localStorage.getItem('bss_hide_scores') === 'true';
   });
 
-  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_time_format') === '24h' ? '24h' : '12h';
-  });
-
   // 2. Playback State
-  const [autoplaySound, setAutoplaySound] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_autoplay_sound') === 'true';
-  });
-
   const [lowLatency, setLowLatency] = useState(() => {
     return typeof window !== 'undefined' && localStorage.getItem('bss_low_latency') === 'true';
-  });
-
-  const [hardwareAccel, setHardwareAccel] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_hardware_accel') !== 'false';
-  });
-
-  const [dvrBuffer, setDvrBuffer] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_dvr_scrub') !== 'false';
-  });
-
-  // 3. Notifications & Telemetry State
-  const [tipoffAlerts, setTipoffAlerts] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_tipoff_alerts') === 'true';
-  });
-
-  const [streamDiagnostics, setStreamDiagnostics] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_stream_diagnostics') === 'true';
   });
 
   const [cacheCleared, setCacheCleared] = useState(false);
@@ -120,12 +98,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const userInitials = (displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) || 'ME').toUpperCase();
 
   // Handlers
-  const handleQualityChange = (q: string) => {
-    setQuality(q);
-    localStorage.setItem('bss_default_quality', q);
-    onSettingsChange?.();
-  };
-
   const handleSelectTeam = (team: SportsTeam) => {
     setSelectedTeam(team);
     localStorage.setItem('bss_favorite_team', team.id);
@@ -149,54 +121,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onSettingsChange?.();
   };
 
-  const handleTimeFormatChange = (fmt: '12h' | '24h') => {
-    setTimeFormat(fmt);
-    localStorage.setItem('bss_time_format', fmt);
-    onSettingsChange?.();
-  };
-
-  const handleToggleSound = () => {
-    const next = !autoplaySound;
-    setAutoplaySound(next);
-    localStorage.setItem('bss_autoplay_sound', next ? 'true' : 'false');
-    onSettingsChange?.();
-  };
-
   const handleToggleLatency = () => {
     const next = !lowLatency;
     setLowLatency(next);
     localStorage.setItem('bss_low_latency', next ? 'true' : 'false');
-    onSettingsChange?.();
-  };
-
-  const handleToggleHardwareAccel = () => {
-    const next = !hardwareAccel;
-    setHardwareAccel(next);
-    localStorage.setItem('bss_hardware_accel', next ? 'true' : 'false');
-    onSettingsChange?.();
-  };
-
-  const handleToggleDvr = () => {
-    const next = !dvrBuffer;
-    setDvrBuffer(next);
-    localStorage.setItem('bss_dvr_scrub', next ? 'true' : 'false');
-    onSettingsChange?.();
-  };
-
-  const handleToggleTipoffAlerts = () => {
-    const next = !tipoffAlerts;
-    setTipoffAlerts(next);
-    localStorage.setItem('bss_tipoff_alerts', next ? 'true' : 'false');
-    if (next && typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
-      Notification.requestPermission();
-    }
-    onSettingsChange?.();
-  };
-
-  const handleToggleDiagnostics = () => {
-    const next = !streamDiagnostics;
-    setStreamDiagnostics(next);
-    localStorage.setItem('bss_stream_diagnostics', next ? 'true' : 'false');
     onSettingsChange?.();
   };
 
@@ -272,47 +200,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </h3>
             
             <div className="bg-neutral-50/80 rounded-2xl border border-gray-200/70 p-4 space-y-4">
-              
-              {/* Setting 1: Default Streaming Quality */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Default Quality
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Target stream resolution for game video feeds
-                  </div>
-                </div>
-
-                <div className="inline-flex p-1 bg-gray-200/80 rounded-xl shrink-0 self-start sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => handleQualityChange('1080p')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                      quality === '1080p'
-                        ? 'bg-white text-gray-900 shadow-2xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    1080p
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQualityChange('720p')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                      quality === '720p'
-                        ? 'bg-white text-gray-900 shadow-2xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    720p
-                  </button>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
-              {/* Setting 2: Add Favorite Team (NBA & NFL) */}
+              {/* Setting: Add Favorite Team (NBA & NFL) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
@@ -483,85 +371,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </button>
               </div>
 
-              <div className="border-t border-gray-200/60" />
-
-              {/* Setting 4: Time Display Format */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Time Format
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Display times in 12-hour (4:30 PM) or 24-hour (16:30)
-                  </div>
-                </div>
-
-                <div className="inline-flex p-1 bg-gray-200/80 rounded-xl shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleTimeFormatChange('12h')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                      timeFormat === '12h'
-                        ? 'bg-white text-gray-900 shadow-2xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    12h
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleTimeFormatChange('24h')}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                      timeFormat === '24h'
-                        ? 'bg-white text-gray-900 shadow-2xs'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    24h
-                  </button>
-                </div>
-              </div>
-
             </div>
           </div>
 
-          {/* SECTION 3: Playback & Streaming Settings */}
+          {/* SECTION 2: Playback Settings */}
           <div className="space-y-3">
             <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1">
               Playback & Video Engine
             </h3>
 
             <div className="bg-neutral-50/80 rounded-2xl border border-gray-200/70 p-4 space-y-4">
-              
-              {/* Autoplay with Sound */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Autoplay With Sound
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Attempt unmuted audio when opening live streams
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleSound}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    autoplaySound ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Autoplay with Sound"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      autoplaySound ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
               {/* Ultra-Low Latency Mode */}
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -584,131 +403,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <span
                     className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
                       lowLatency ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
-              {/* Hardware Acceleration */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Hardware Video Acceleration
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Uses GPU-accelerated video decoding for high-bitrate 60fps playback
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleHardwareAccel}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    hardwareAccel ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Hardware Acceleration"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      hardwareAccel ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
-              {/* Live DVR Buffer Scrubbing */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Live DVR Scrubbing
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Allows pausing, seeking, and rewinding through live broadcast streams
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleDvr}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    dvrBuffer ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Live DVR Buffer"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      dvrBuffer ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-          {/* SECTION 4: Alerts & Diagnostics */}
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1">
-              Alerts & Performance
-            </h3>
-
-            <div className="bg-neutral-50/80 rounded-2xl border border-gray-200/70 p-4 space-y-4">
-              
-              {/* Tip-Off Notifications */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Tip-Off Reminders
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Notify when your favorite team's broadcast goes live
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleTipoffAlerts}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    tipoffAlerts ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Tip-off Reminders"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      tipoffAlerts ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
-              {/* Stream Diagnostics Overlay */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Stream Diagnostics Overlay
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Show real-time bitrate, buffer health, and FPS telemetry
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleDiagnostics}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    streamDiagnostics ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Stream Diagnostics"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      streamDiagnostics ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
                 </button>

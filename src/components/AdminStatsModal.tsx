@@ -145,8 +145,8 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Navigation & Search State
-  const [activeTab, setActiveTab] = useState<'overview' | 'live' | 'users' | 'trackers' | 'health'>('overview');
+  // Navigation & Search State (Only Online Now and Members tabs per user instruction)
+  const [activeTab, setActiveTab] = useState<'live' | 'users'>('live');
   const [searchQuery, setSearchQuery] = useState('');
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
   const [chartMetric, setChartMetric] = useState<'views' | 'visitors'>('views');
@@ -378,7 +378,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const q = searchQuery.trim().toLowerCase();
 
   const filteredUsers = useMemo(() => {
-    let users = stats?.registeredUsers || [];
+    let users = [...(stats?.registeredUsers || [])];
     if (memberFilter === 'online') {
       users = users.filter(u => u.isOnline);
     } else if (memberFilter === 'google') {
@@ -387,16 +387,30 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
       users = users.filter(u => u.provider === 'local');
     }
 
+    // Always sort members in order of when they signed up (newest first)
+    users.sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
     if (!q) return users;
-    return users.filter(u => 
-      u.username.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      (u.displayName && u.displayName.toLowerCase().includes(q)) ||
-      (u.stats?.lastGameWatched && u.stats.lastGameWatched.toLowerCase().includes(q)) ||
-      (u.stats?.lastDeviceTag && u.stats.lastDeviceTag.toLowerCase().includes(q)) ||
-      (u.stats?.lastRegion && u.stats.lastRegion.toLowerCase().includes(q)) ||
-      u.provider.toLowerCase().includes(q)
-    );
+    return users.filter(u => {
+      const createdStr = u.createdAt 
+        ? new Date(u.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase()
+        : '';
+      return (
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+        (u.createdAt && u.createdAt.toLowerCase().includes(q)) ||
+        createdStr.includes(q) ||
+        (u.stats?.lastGameWatched && u.stats.lastGameWatched.toLowerCase().includes(q)) ||
+        (u.stats?.lastDeviceTag && u.stats.lastDeviceTag.toLowerCase().includes(q)) ||
+        (u.stats?.lastRegion && u.stats.lastRegion.toLowerCase().includes(q)) ||
+        u.provider.toLowerCase().includes(q)
+      );
+    });
   }, [stats?.registeredUsers, q, memberFilter]);
 
   const filteredStreams = useMemo(() => {
@@ -615,17 +629,8 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
             
             {/* Top Toolbar: Navigation Tabs & Search Bar */}
             <div className="p-3 sm:px-5 sm:py-2.5 bg-white border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sticky top-0 z-10">
-              {/* Navigation Tabs */}
+              {/* Navigation Tabs (Only Online Now and Members) */}
               <div className="flex items-center space-x-1 bg-neutral-100/90 p-0.5 rounded-lg text-xs font-medium">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('overview')}
-                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                    activeTab === 'overview' ? 'bg-white text-neutral-900 font-semibold shadow-2xs border border-neutral-200/60' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  Overview
-                </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('live')}
@@ -634,7 +639,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Who's Online Now ({stats?.activeSessions?.length || stats?.liveVisitors || 0})</span>
+                  <span>Online Now ({stats?.activeSessions?.length || stats?.liveVisitors || 0})</span>
                 </button>
                 <button
                   type="button"
@@ -649,27 +654,6 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   <span>Members ({stats?.registeredUsers?.length || 0})</span>
                   {onlineMembersCount > 0 && (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('trackers')}
-                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                    activeTab === 'trackers' ? 'bg-white text-neutral-900 font-semibold shadow-2xs border border-neutral-200/60' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  Tracker Hub
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('health')}
-                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center space-x-1.5 ${
-                    activeTab === 'health' ? 'bg-white text-neutral-900 font-semibold shadow-2xs border border-neutral-200/60' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  <span>Autonomous Monitor</span>
-                  {healthData?.status === 'degraded' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   )}
                 </button>
               </div>
@@ -697,7 +681,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
             </div>
 
             {/* TAB 1: OVERVIEW DASHBOARD */}
-            {activeTab === 'overview' && (
+            {(activeTab as any) === 'overview' && (
               <div className="p-4 sm:p-5 space-y-4">
 
                 {/* 1. PRIMARY METRICS ROW (5 Compact Umami-Style KPI Cards) */}
@@ -1259,6 +1243,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                       <thead>
                         <tr className="border-b border-neutral-200 bg-neutral-50/70 text-neutral-500 uppercase text-[10px] font-semibold">
                           <th className="py-2.5 px-3.5">Member</th>
+                          <th className="py-2.5 px-3.5">Signed Up</th>
                           <th className="py-2.5 px-3.5">Provider</th>
                           <th className="py-2.5 px-3.5">Total Watch Time</th>
                           <th className="py-2.5 px-3.5">Streams Watched</th>
@@ -1293,6 +1278,14 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                                         {u.email}
                                       </div>
                                     </div>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3.5 text-neutral-800 text-[11px] font-medium whitespace-nowrap">
+                                  <div className="font-bold text-neutral-900">
+                                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Earlier Member'}
+                                  </div>
+                                  <div className="text-[10px] text-neutral-400">
+                                    {u.createdAt ? new Date(u.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}
                                   </div>
                                 </td>
                                 <td className="py-2.5 px-3.5">
@@ -1490,7 +1483,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
             )}
 
             {/* TAB 4: TRACKER HUB (Clean Settings & Integrations) */}
-            {activeTab === 'trackers' && (
+            {(activeTab as any) === 'trackers' && (
               <div className="p-4 sm:p-5 space-y-4">
                 <div>
                   <h4 className="text-sm font-bold text-neutral-900">
@@ -1666,7 +1659,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
             )}
 
             {/* TAB 5: AUTONOMOUS OPERATIONS & SYSTEM HEALTH MONITOR */}
-            {activeTab === 'health' && (
+            {(activeTab as any) === 'health' && (
               <div className="p-4 sm:p-5 space-y-4">
                 
                 {/* Watchdog Status Panel */}

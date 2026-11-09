@@ -3,7 +3,7 @@ import { isSamsungSmartTv, isSmartTv, getTvHlsConfig, TV_KEYS } from '../utils/t
 import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
-  RefreshCw, AlertCircle, ShieldCheck,
+  RefreshCw, AlertCircle,
   Layers, Tv
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
@@ -152,24 +152,44 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const watchdogTimerRef = useRef<any>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const autoSound = localStorage.getItem('bss_autoplay_sound') === 'true';
-      return !autoSound; // If autoplay with sound is enabled, attempt unmuted (false)
-    }
-    return false;
-  });
+  // Autoplay with sound on automatically for everyone
+  const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [isVerified, setIsVerified] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const controlsTimeoutRef = useRef<any>(null);
   const isTv = useMemo(() => isSmartTv(), []);
   const isSamsung = useMemo(() => isSamsungSmartTv(), []);
   const [tvAutoplayBlocked, setTvAutoplayBlocked] = useState(false);
+
+  // Automatic Picture-in-Picture on swipe-out / app switch for iPhone & Mobile
+  useEffect(() => {
+    const handleVisibility = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      if (document.visibilityState === 'hidden' && !video.paused) {
+        if ((video as any).webkitSetPresentationMode && (video as any).webkitSupportsPresentationMode?.('picture-in-picture')) {
+          try {
+            (video as any).webkitSetPresentationMode('picture-in-picture');
+          } catch {}
+        } else if (document.pictureInPictureEnabled && !document.pictureInPictureElement) {
+          try {
+            video.requestPictureInPicture().catch(() => {});
+          } catch {}
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handleVisibility);
+    };
+  }, []);
 
   // Available qualities: 720p, 1080p, and 2160p (540p removed per user request)
   const availableQualities = React.useMemo(() => {
@@ -210,7 +230,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
-    setIsVerified(false);
     setShowControls(false);
 
     // Clear watchdog timer
@@ -282,7 +301,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
-        setIsVerified(true);
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
 
         video.play().then(() => {
@@ -308,7 +326,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       hls.on(Hls.Events.FRAG_LOADED, () => {
         setIsLoading(false);
-        setIsVerified(true);
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
       });
 
@@ -332,7 +349,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
             video.play().then(() => {
               setIsPlaying(true);
               setIsLoading(false);
-              setIsVerified(true);
               setTvAutoplayBlocked(false);
             }).catch(() => {
               video.muted = true;
@@ -365,7 +381,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       const markReady = () => {
         setIsLoading(false);
-        setIsVerified(true);
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
       };
 
@@ -457,7 +472,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     };
     const onPlaying = () => {
       setIsLoading(false);
-      setIsVerified(true);
     };
 
     const onWebkitBegin = () => setIsFullscreen(true);
@@ -697,6 +711,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           tabIndex={0}
           // @ts-ignore
           webkit-playsinline="true"
+          // @ts-ignore
+          autoPictureInPicture="true"
           x-webkit-airplay="allow"
           x5-video-player-type="h5"
           className="w-full h-full object-contain cursor-pointer focus:outline-hidden"
@@ -777,13 +793,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                   {stream.name}
                 </span>
               </div>
-
-              {isVerified && (
-                <div className="flex items-center space-x-1 bg-white/90 border border-emerald-200 px-2 py-0.5 rounded-full shadow-xs backdrop-blur-xs">
-                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                  <span className="text-[10px] font-semibold text-emerald-700">Verified</span>
-                </div>
-              )}
             </div>
 
             {/* Center Play/Pause Touch Button */}
@@ -867,26 +876,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
             </div>
           </div>
         )}
-      </div>
-
-      {/* Under-player Quality Switcher (Apple-style Segmented Control) */}
-      <div className="flex items-center space-x-2 px-0.5 pt-0.5">
-        <span className="text-[11px] font-medium text-gray-500">Quality:</span>
-        <div className="inline-flex bg-gray-100 p-0.5 rounded-lg space-x-0.5 border border-gray-200/60">
-          {availableQualities.map((q) => (
-            <button
-              key={q}
-              onClick={() => onQualityChange(q)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
-                selectedQuality === q
-                  ? 'bg-white text-gray-900 shadow-2xs'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );

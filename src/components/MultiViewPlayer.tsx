@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Hls from 'hls.js';
 import { 
-  Volume2, VolumeX, X, Plus, Maximize2, Minimize2, ArrowLeft, 
-  RefreshCw, AlertCircle, LayoutGrid, Check, Trophy, Search, ChevronDown
+  Volume2, VolumeX, X, Plus, Maximize2, ArrowLeft, 
+  RefreshCw, AlertCircle, LayoutGrid, Check, Trophy, Search, Tv
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
 import { isSmartTv, getTvHlsConfig } from '../utils/tvDetector.ts';
-import { fetchStreamDetails, formatTipoffTime } from '../services/api.ts';
+import { formatTipoffTime } from '../services/api.ts';
 
 interface MultiStreamSlot {
   id: string;
@@ -31,24 +31,25 @@ const MultiViewTile: React.FC<{
   index: number;
   isAudioActive: boolean;
   onFocusAudio: () => void;
+  onWatchBigScreen: () => void;
   onClose?: () => void;
   canClose: boolean;
-  onQualityChange: (quality: string) => void;
+  isBigScreen?: boolean;
 }> = ({
   slot,
   index,
   isAudioActive,
   onFocusAudio,
+  onWatchBigScreen,
   onClose,
   canClose,
-  onQualityChange
+  isBigScreen = false
 }) => {
   const { stream, game, quality } = slot;
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [showQualityMenu, setShowQualityMenu] = useState(false);
   const isTv = isSmartTv();
 
   const team1Name = game?.awayTeam?.shortDisplayName || game?.awayTeam?.name || stream.team1?.name || 'Away';
@@ -65,14 +66,13 @@ const MultiViewTile: React.FC<{
     video.muted = !isAudioActive;
     if (isAudioActive) {
       video.volume = 1;
-      // Attempt play if paused due to unmuting restrictions
       if (video.paused) {
         video.play().catch(() => {});
       }
     }
   }, [isAudioActive]);
 
-  // Load HLS Stream
+  // Load HLS Stream with Bulletproof Concurrent iOS Safari & Desktop Support
   const loadStream = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -87,20 +87,22 @@ const MultiViewTile: React.FC<{
 
     const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token') || '';
     const tokenParam = token ? `?t=${encodeURIComponent(token)}` : '';
-    const sportPrefix = (stream.category === 'football' || stream.league === 'NFL') ? 'football' : 'basketball';
+    const isNfl = stream.category === 'football' || stream.league === 'NFL' || stream.name.toLowerCase().includes('nfl');
+    const sportPrefix = isNfl ? 'football' : 'basketball';
     const targetUrl = `/api/${sportPrefix}/hls/${stream.stream_key}/${quality}.m3u8${tokenParam}`;
 
+    // Desktop Chrome, Firefox, Edge, Android (MSE Support)
     if (Hls.isSupported()) {
       const tvConfig = getTvHlsConfig(isTv);
       const hls = new Hls({
         enableWorker: tvConfig.enableWorker,
         lowLatencyMode: false,
-        backBufferLength: 15,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 30,
-        maxBufferSize: 30 * 1024 * 1024,
+        backBufferLength: 10,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 25,
+        maxBufferSize: 25 * 1024 * 1024,
         liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
+        liveMaxLatencyDurationCount: 5,
         maxBufferHole: 0.5,
         xhrSetup: (xhr) => {
           if (token) {
@@ -115,7 +117,6 @@ const MultiViewTile: React.FC<{
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
-        // Start muted unless this tile has audio focus
         video.muted = !isAudioActive;
         video.play().catch(() => {
           video.muted = true;
@@ -138,15 +139,27 @@ const MultiViewTile: React.FC<{
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = targetUrl;
+      // iPhone / iPad / Safari Native HLS:
+      // In iOS Safari, concurrent videos must explicitly have muted=true on DOM creation to avoid autoplay blocking
       video.muted = !isAudioActive;
-      video.play().catch(() => {});
-      setIsLoading(false);
+      video.src = targetUrl;
+      video.load();
+
+      const onCanPlay = () => {
+        setIsLoading(false);
+        video.play().catch(() => {
+          video.muted = true;
+          video.play().catch(() => {});
+        });
+      };
+
+      video.addEventListener('canplay', onCanPlay, { once: true });
+      video.addEventListener('loadedmetadata', () => setIsLoading(false), { once: true });
     } else {
       setHasError(true);
       setIsLoading(false);
     }
-  }, [stream.stream_key, stream.category, stream.league, quality, isAudioActive, isTv]);
+  }, [stream.stream_key, stream.category, stream.league, stream.name, quality, isAudioActive, isTv]);
 
   useEffect(() => {
     loadStream();
@@ -158,13 +171,13 @@ const MultiViewTile: React.FC<{
     };
   }, [loadStream]);
 
-  // If this stream is a YouTube highlights video
+  // If YouTube Highlights
   if (stream.youtubeVideoId) {
     return (
       <div 
         onClick={onFocusAudio}
         className={`relative aspect-video bg-black rounded-2xl overflow-hidden shadow-md transition-all ${
-          isAudioActive ? 'ring-2 ring-emerald-500 shadow-emerald-500/10' : 'border border-gray-200'
+          isAudioActive ? 'ring-2 ring-emerald-500' : 'border border-gray-200'
         }`}
       >
         <iframe
@@ -173,20 +186,17 @@ const MultiViewTile: React.FC<{
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           className="w-full h-full border-0 pointer-events-none"
         />
-        {/* Top Controls Overlay */}
-        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-20 pointer-events-auto">
-          <div className="flex items-center space-x-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-white text-[10px] font-bold">
+        <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-20 pointer-events-auto">
+          <div className="flex items-center space-x-1.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-white text-[10px] font-bold">
             <span>{team1Name} @ {team2Name}</span>
           </div>
           <div className="flex items-center space-x-1.5">
             <button
-              onClick={(e) => { e.stopPropagation(); onFocusAudio(); }}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center space-x-1 transition-all ${
-                isAudioActive ? 'bg-emerald-600 text-white' : 'bg-black/70 hover:bg-black/90 text-white/80'
-              }`}
+              onClick={(e) => { e.stopPropagation(); onWatchBigScreen(); }}
+              className="bg-black/70 hover:bg-black text-white px-2 py-1 rounded-full text-[10px] font-bold flex items-center space-x-1"
             >
-              {isAudioActive ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
-              <span>{isAudioActive ? 'Audio ON' : 'Muted'}</span>
+              <Maximize2 className="w-3 h-3" />
+              <span>Big Screen</span>
             </button>
             {canClose && onClose && (
               <button
@@ -205,134 +215,113 @@ const MultiViewTile: React.FC<{
   return (
     <div
       onClick={onFocusAudio}
-      className={`group relative aspect-video bg-neutral-950 rounded-2xl overflow-hidden shadow-lg select-none cursor-pointer transition-all duration-200 ${
+      className={`group relative aspect-video bg-neutral-950 rounded-2xl overflow-hidden shadow-md select-none cursor-pointer transition-all duration-200 ${
         isAudioActive 
-          ? 'ring-2 ring-emerald-500 ring-offset-2 ring-offset-neutral-900 shadow-emerald-500/20' 
+          ? 'ring-2 ring-emerald-500 shadow-emerald-500/20' 
           : 'border border-gray-800 hover:border-gray-600'
       }`}
     >
-      {/* Video Element */}
+      {/* Video Element with iOS Safari concurrency attributes */}
       <video
         ref={videoRef}
         playsInline
-        webkit-playsinline="true"
+        autoPlay
+        muted={!isAudioActive}
         preload="auto"
+        // @ts-ignore
+        webkit-playsinline="true"
+        // @ts-ignore
+        autoPictureInPicture="true"
+        x-webkit-airplay="allow"
         className="w-full h-full object-contain bg-black"
       />
 
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-neutral-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-10">
-          <div className="w-8 h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
-          <span className="text-[10px] font-extrabold text-white uppercase tracking-wider mt-2">
-            Loading Stream {index + 1}...
+        <div className="absolute inset-0 bg-neutral-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 pointer-events-none">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+          <span className="text-[10px] font-bold text-white uppercase tracking-wider mt-1.5">
+            Connecting Stream {index + 1}...
           </span>
         </div>
       )}
 
       {/* Error Overlay */}
       {hasError && !isLoading && (
-        <div className="absolute inset-0 bg-neutral-950/90 flex flex-col items-center justify-center p-4 text-center z-10">
-          <AlertCircle className="w-6 h-6 text-orange-500 mb-1.5" />
-          <span className="text-xs font-bold text-white">Stream Connecting</span>
+        <div className="absolute inset-0 bg-neutral-950/90 flex flex-col items-center justify-center p-3 text-center z-10">
+          <AlertCircle className="w-5 h-5 text-orange-500 mb-1" />
+          <span className="text-[11px] font-bold text-white">Stream Initializing</span>
           <button
             onClick={(e) => { e.stopPropagation(); loadStream(); }}
-            className="mt-2 inline-flex items-center space-x-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full transition-colors"
+            className="mt-1.5 inline-flex items-center space-x-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-full transition-colors"
           >
             <RefreshCw className="w-3 h-3" />
-            <span>Retry Feed</span>
+            <span>Retry</span>
           </button>
         </div>
       )}
 
       {/* Top Header Overlay Bar */}
-      <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-20 pointer-events-auto">
+      <div className="absolute top-1.5 left-1.5 right-1.5 sm:top-2 sm:left-2 sm:right-2 flex items-center justify-between z-20 pointer-events-auto">
         {/* Left: Team Matchup & Score */}
-        <div className="flex items-center space-x-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-white shadow-xs max-w-[65%]">
+        <div className="flex items-center space-x-1 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-white shadow-xs max-w-[60%]">
           {game?.awayTeam?.logo && (
-            <img src={game.awayTeam.logo} alt="" className="w-3.5 h-3.5 object-contain" />
+            <img src={game.awayTeam.logo} alt="" className="w-3 h-3 object-contain" />
           )}
-          <span className="text-[11px] font-extrabold truncate">
+          <span className="text-[10px] sm:text-[11px] font-black truncate">
             {team1Name} {isLive && awayScore > 0 ? awayScore : ''}
           </span>
           <span className="text-[9px] text-gray-400 font-bold">@</span>
           {game?.homeTeam?.logo && (
-            <img src={game.homeTeam.logo} alt="" className="w-3.5 h-3.5 object-contain" />
+            <img src={game.homeTeam.logo} alt="" className="w-3 h-3 object-contain" />
           )}
-          <span className="text-[11px] font-extrabold truncate">
+          <span className="text-[10px] sm:text-[11px] font-black truncate">
             {team2Name} {isLive && homeScore > 0 ? homeScore : ''}
           </span>
-          {isLive && (
-            <span className="inline-flex items-center space-x-1 text-[9px] font-bold text-red-400 pl-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="hidden sm:inline">{statusDetail}</span>
-            </span>
-          )}
         </div>
 
-        {/* Right: Audio Toggle, Quality, and Close */}
-        <div className="flex items-center space-x-1.5">
+        {/* Right: Audio Focus, Big Screen Expand, Close */}
+        <div className="flex items-center space-x-1">
           {/* Audio Focus Toggle Button */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               onFocusAudio();
             }}
-            title={isAudioActive ? 'Sound is playing from this stream' : 'Click to listen to this stream'}
-            className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center space-x-1 shadow-xs transition-all active:scale-95 ${
+            title={isAudioActive ? 'Sound playing from this stream' : 'Click to listen to this stream'}
+            className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold flex items-center space-x-1 transition-all active:scale-95 ${
               isAudioActive
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30'
-                : 'bg-black/70 hover:bg-black/90 text-gray-300 hover:text-white border border-white/10'
+                ? 'bg-emerald-600 text-white shadow-emerald-500/30'
+                : 'bg-black/70 hover:bg-black text-gray-300 border border-white/10'
             }`}
           >
             {isAudioActive ? (
               <>
-                <Volume2 className="w-3.5 h-3.5 animate-pulse text-white" />
-                <span className="font-extrabold">Listening</span>
+                <Volume2 className="w-3 h-3 animate-pulse text-white" />
+                <span className="font-extrabold hidden sm:inline">Listening</span>
               </>
             ) : (
               <>
-                <VolumeX className="w-3.5 h-3.5 text-gray-400" />
-                <span>Listen</span>
+                <VolumeX className="w-3 h-3 text-gray-400" />
+                <span className="hidden sm:inline">Listen</span>
               </>
             )}
           </button>
 
-          {/* Quality Selector */}
-          <div className="relative">
+          {/* Big Screen Watch Button */}
+          {!isBigScreen && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setShowQualityMenu(!showQualityMenu);
+                onWatchBigScreen();
               }}
-              className="bg-black/70 hover:bg-black/90 text-white/90 text-[10px] font-bold px-2 py-1 rounded-full border border-white/10 flex items-center space-x-0.5"
+              title="Watch in Big Screen"
+              className="bg-black/70 hover:bg-black text-white/90 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold flex items-center space-x-1 border border-white/10 transition-colors"
             >
-              <span>{quality}</span>
-              <ChevronDown className="w-2.5 h-2.5 ml-0.5 opacity-60" />
+              <Tv className="w-3 h-3 text-orange-400" />
+              <span className="hidden sm:inline">Big Screen</span>
             </button>
-            {showQualityMenu && (
-              <div 
-                className="absolute right-0 top-full mt-1 bg-neutral-900 border border-neutral-700 rounded-xl py-1 shadow-2xl z-30 min-w-[70px]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {['720p', '1080p'].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => {
-                      onQualityChange(q);
-                      setShowQualityMenu(false);
-                    }}
-                    className={`w-full text-left px-3 py-1 text-[11px] font-bold flex items-center justify-between ${
-                      quality === q ? 'text-emerald-400 bg-neutral-800' : 'text-gray-300 hover:bg-neutral-800'
-                    }`}
-                  >
-                    <span>{q}</span>
-                    {quality === q && <Check className="w-3 h-3 text-emerald-400" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Close Tile Button */}
           {canClose && onClose && (
@@ -341,8 +330,8 @@ const MultiViewTile: React.FC<{
                 e.stopPropagation();
                 onClose();
               }}
-              title="Remove this stream"
-              className="w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-gray-300 hover:text-white flex items-center justify-center border border-white/10 transition-colors"
+              title="Remove stream"
+              className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-black/70 hover:bg-red-600 text-gray-300 hover:text-white flex items-center justify-center border border-white/10 transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -350,21 +339,28 @@ const MultiViewTile: React.FC<{
         </div>
       </div>
 
-      {/* Bottom Subtle Overlay */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <span className="text-[9px] font-bold text-white/70 bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded-md">
-          {stream.league || 'NBA'} HD • Tile {index + 1}
+      {/* Bottom Hint on Tap/Hover */}
+      <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <span className="text-[8px] sm:text-[9px] font-bold text-white/80 bg-black/60 px-1.5 py-0.5 rounded-md">
+          {stream.league || 'NBA'} • Tap for sound
         </span>
-        <span className="text-[9px] font-semibold text-white/60 bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded-md">
-          {isAudioActive ? 'Sound Unmuted' : 'Click to un-mute'}
-        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onWatchBigScreen();
+          }}
+          className="pointer-events-auto text-[8px] sm:text-[9px] font-bold text-orange-400 bg-black/70 hover:bg-black px-1.5 py-0.5 rounded-md flex items-center space-x-0.5"
+        >
+          <Maximize2 className="w-2.5 h-2.5" />
+          <span>Expand</span>
+        </button>
       </div>
     </div>
   );
 };
 
 // ============================================================================
-// Add Stream Slot Card (Minimalist Dashed Tile)
+// Add Stream Slot Card (Dashed 16:9 Tile)
 // ============================================================================
 const AddStreamCard: React.FC<{
   currentCount: number;
@@ -374,15 +370,15 @@ const AddStreamCard: React.FC<{
   return (
     <button
       onClick={onClick}
-      className="relative aspect-video rounded-2xl border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white/60 hover:bg-white text-gray-600 hover:text-gray-900 flex flex-col items-center justify-center p-6 transition-all duration-200 group cursor-pointer shadow-2xs hover:shadow-sm"
+      className="relative aspect-video rounded-2xl border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white/60 hover:bg-white text-gray-600 hover:text-gray-900 flex flex-col items-center justify-center p-3 sm:p-6 transition-all duration-200 group cursor-pointer shadow-2xs hover:shadow-sm"
     >
-      <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-transform group-hover:scale-110 mb-3">
-        <Plus className="w-6 h-6" />
+      <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-gray-100 group-hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-transform group-hover:scale-110 mb-1.5 sm:mb-2">
+        <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
-      <span className="text-sm font-extrabold text-gray-900 group-hover:text-black">
-        Add Game to Multi-View
+      <span className="text-xs sm:text-sm font-extrabold text-gray-900 group-hover:text-black">
+        Add Game
       </span>
-      <span className="text-xs text-gray-500 font-medium mt-1">
+      <span className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5">
         Stream {currentCount + 1} of {maxStreams}
       </span>
     </button>
@@ -390,7 +386,7 @@ const AddStreamCard: React.FC<{
 };
 
 // ============================================================================
-// Game Picker Modal (Allows choosing from live & scheduled games)
+// Game Picker Modal
 // ============================================================================
 const GamePickerModal: React.FC<{
   isOpen: boolean;
@@ -405,7 +401,7 @@ const GamePickerModal: React.FC<{
   if (!isOpen) return null;
 
   const filteredGames = allGames.filter((g) => {
-    const isNfl = g.league === 'NFL';
+    const isNfl = g.league === 'NFL' || g.id?.startsWith('nfl_');
     if (sportFilter === 'nba' && isNfl) return false;
     if (sportFilter === 'nfl' && !isNfl) return false;
 
@@ -421,33 +417,33 @@ const GamePickerModal: React.FC<{
       <div className="bg-white border border-gray-200 rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-extrabold text-gray-900">
+            <h3 className="text-sm sm:text-base font-extrabold text-gray-900">
               Add Game to Multi-View
             </h3>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">
-              Choose a live or scheduled game to watch simultaneously.
+            <p className="text-[11px] sm:text-xs text-gray-500 font-medium mt-0.5">
+              Select any live or scheduled game to watch simultaneously.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Filter & Search Bar */}
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 space-y-3">
+        {/* Filter & Search */}
+        <div className="p-3 sm:p-4 border-b border-gray-100 bg-gray-50/50 space-y-2.5">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search team or game..."
+              placeholder="Search team or matchup..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl pl-9.5 pr-4 py-2 text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-hidden focus:border-gray-400 shadow-2xs"
+              className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-hidden focus:border-gray-400 shadow-2xs"
             />
           </div>
 
@@ -456,7 +452,7 @@ const GamePickerModal: React.FC<{
               <button
                 key={s}
                 onClick={() => setSportFilter(s)}
-                className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-all ${
+                className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase transition-all cursor-pointer ${
                   sportFilter === s
                     ? 'bg-black text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -469,7 +465,7 @@ const GamePickerModal: React.FC<{
         </div>
 
         {/* Games List */}
-        <div className="p-4 overflow-y-auto space-y-2 flex-1">
+        <div className="p-3 sm:p-4 overflow-y-auto space-y-2 flex-1">
           {filteredGames.length > 0 ? (
             filteredGames.map((game) => {
               const streamKey = game.stream?.streamKey || '';
@@ -483,15 +479,14 @@ const GamePickerModal: React.FC<{
               return (
                 <div
                   key={game.id}
-                  className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50/70 transition-all bg-white"
+                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50/70 transition-all bg-white"
                 >
-                  <div className="flex items-center space-x-3 min-w-0">
-                    {/* Away Team Logo */}
-                    <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 p-1 flex items-center justify-center shrink-0">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 p-1 flex items-center justify-center shrink-0">
                       {game.awayTeam?.logo ? (
                         <img src={game.awayTeam.logo} alt="" className="w-full h-full object-contain" />
                       ) : (
-                        <Trophy className="w-4 h-4 text-gray-400" />
+                        <Trophy className="w-3.5 h-3.5 text-gray-400" />
                       )}
                     </div>
 
@@ -506,11 +501,11 @@ const GamePickerModal: React.FC<{
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 mt-0.5">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase">
                           {game.league || 'NBA'}
                         </span>
                         {isLive ? (
-                          <span className="inline-flex items-center space-x-1 text-[10px] font-extrabold text-red-600">
+                          <span className="inline-flex items-center space-x-1 text-[9px] font-extrabold text-red-600">
                             <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
                             <span>{game.status?.shortDetail || 'LIVE'}</span>
                             <span className="tabular-nums font-black ml-1">
@@ -518,7 +513,7 @@ const GamePickerModal: React.FC<{
                             </span>
                           </span>
                         ) : (
-                          <span className="text-[10px] font-medium text-gray-500">
+                          <span className="text-[9px] font-medium text-gray-500">
                             {game.status?.shortDetail || 'Scheduled'}
                           </span>
                         )}
@@ -526,11 +521,10 @@ const GamePickerModal: React.FC<{
                     </div>
                   </div>
 
-                  {/* Action Button */}
                   <div>
                     {isAlreadyActive ? (
-                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">
-                        <Check className="w-3.5 h-3.5" />
+                      <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+                        <Check className="w-3 h-3" />
                         <span>Watching</span>
                       </span>
                     ) : (
@@ -539,10 +533,10 @@ const GamePickerModal: React.FC<{
                           onSelectGame(game);
                           onClose();
                         }}
-                        className="inline-flex items-center space-x-1 text-xs font-bold text-white bg-black hover:bg-neutral-800 px-3.5 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
+                        className="inline-flex items-center space-x-1 text-[11px] font-bold text-white bg-black hover:bg-neutral-800 px-3 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Stream</span>
+                        <Plus className="w-3 h-3" />
+                        <span>Add</span>
                       </button>
                     )}
                   </div>
@@ -570,44 +564,21 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
   onExit
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [audioSlotIndex, setAudioSlotIndex] = useState(0);
+  const [bigScreenIndex, setBigScreenIndex] = useState<number | null>(null);
 
-  // Read default quality setting
-  const defaultQuality = typeof window !== 'undefined'
-    ? localStorage.getItem('bss_default_quality') || '720p'
-    : '720p';
-
-  // State: Up to 4 active stream slots
+  // Up to 4 active stream slots
   const [slots, setSlots] = useState<MultiStreamSlot[]>([
     {
       id: initialStream.stream_key || 'slot_1',
       stream: initialStream,
       game: initialGame,
-      quality: defaultQuality
+      quality: '720p'
     }
   ]);
 
-  // Fullscreen support for the entire Multi-View stage
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
-    }
-  };
-
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
-
-  // Handle removing a slot
+  // Remove a slot
   const handleRemoveSlot = (index: number) => {
     if (slots.length <= 1) return;
     const updated = slots.filter((_, i) => i !== index);
@@ -615,65 +586,38 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
     if (audioSlotIndex >= updated.length) {
       setAudioSlotIndex(0);
     }
+    if (bigScreenIndex !== null) {
+      if (bigScreenIndex === index) {
+        setBigScreenIndex(null); // return to quad grid if the big screen tile was removed
+      } else if (bigScreenIndex > index) {
+        setBigScreenIndex(bigScreenIndex - 1);
+      }
+    }
   };
 
-  // Handle quality change for a slot
-  const handleQualityChange = (index: number, newQuality: string) => {
-    setSlots((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, quality: newQuality } : s))
-    );
-  };
-
-  // Handle adding a new game
+  // Add a new game to Multi-View
   const handleAddGame = async (game: ScoreboardGame) => {
     if (slots.length >= 4) return;
 
     let streamObj: Stream;
 
-    if (game.stream?.streamKey) {
-      try {
-        streamObj = await fetchStreamDetails(game.stream.streamKey);
-      } catch {
-        // Fallback stream builder
-        const awayName = game.awayTeam?.displayName || game.awayTeam?.name || 'Away';
-        const homeName = game.homeTeam?.displayName || game.homeTeam?.name || 'Home';
-        const isNfl = game.league === 'NFL';
-        const streamKey = game.stream.streamKey;
-        streamObj = {
-          id: streamKey,
-          name: `${awayName} at ${homeName}`,
-          category: isNfl ? 'football' : 'basketball',
-          league: isNfl ? 'NFL' : 'NBA',
-          stream_key: streamKey,
-          match_timestamp: Math.floor(new Date(game.date).getTime() / 1000) || Math.floor(Date.now() / 1000),
-          viewers: 0,
-          is_external: false,
-          thumbnail_url: '',
-          sources: [
-            { quality: '1080p', url: '' },
-            { quality: '720p', url: '' }
-          ],
-          live_sources: [
-            { quality: '1080p', url: '' },
-            { quality: '720p', url: '' }
-          ],
-          team1: { name: awayName, logo: game.awayTeam?.logo || '' },
-          team2: { name: homeName, logo: game.homeTeam?.logo || '' },
-          is_live: Boolean(game.status?.isLive),
-          status: game.status?.isLive ? 'live' : 'upcoming'
-        };
-      }
+    // 1. Direct streamData if already matched
+    if (game.stream?.streamData) {
+      streamObj = game.stream.streamData;
     } else {
+      // 2. Build reliable stream object for playback
+      const isNfl = game.league === 'NFL' || game.id?.startsWith('nfl_');
       const awayName = game.awayTeam?.displayName || game.awayTeam?.name || 'Away';
       const homeName = game.homeTeam?.displayName || game.homeTeam?.name || 'Home';
-      const isNfl = game.league === 'NFL';
-      const streamKey = `${awayName.toLowerCase().replace(/[^a-z0-9]/g, '')}-vs-${homeName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+      const cleanKey = game.stream?.streamKey || 
+        `${awayName.toLowerCase().replace(/[^a-z0-9]/g, '')}-vs-${homeName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+
       streamObj = {
-        id: streamKey,
+        id: cleanKey,
         name: `${awayName} at ${homeName}`,
         category: isNfl ? 'football' : 'basketball',
         league: isNfl ? 'NFL' : 'NBA',
-        stream_key: streamKey,
+        stream_key: cleanKey,
         match_timestamp: Math.floor(new Date(game.date).getTime() / 1000) || Math.floor(Date.now() / 1000),
         viewers: 0,
         is_external: false,
@@ -704,28 +648,13 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
     ]);
   };
 
-  // Determine grid columns based on slot count:
-  // 1: 1 col, 2: 2 cols, 3: 2 or 3 cols, 4: 2x2 grid
-  const getGridColsClass = () => {
-    const totalTiles = slots.length < 4 ? slots.length + 1 : slots.length;
-    if (slots.length === 1 && totalTiles === 1) return 'grid-cols-1';
-    if (totalTiles === 2) return 'grid-cols-1 md:grid-cols-2';
-    if (totalTiles === 3) return 'grid-cols-1 md:grid-cols-3';
-    return 'grid-cols-1 md:grid-cols-2'; // 2x2 quad grid for 4
-  };
-
   const activeStreamKeys = slots.map((s) => s.stream.stream_key);
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full rounded-3xl transition-all ${
-        isFullscreen ? 'bg-black p-4 fixed inset-0 z-50 overflow-y-auto' : 'space-y-4'
-      }`}
-    >
+    <div ref={containerRef} className="w-full space-y-3">
       {/* Top Multi-View Control Header */}
-      <div className="flex items-center justify-between bg-white border border-gray-200/90 rounded-2xl px-4 py-3 shadow-2xs">
-        <div className="flex items-center space-x-3">
+      <div className="flex items-center justify-between bg-white border border-gray-200/90 rounded-2xl px-3 sm:px-4 py-2.5 shadow-2xs">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             onClick={onExit}
             className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full transition-colors cursor-pointer active:scale-95"
@@ -736,15 +665,23 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
 
           <div className="h-4 w-px bg-gray-200" />
 
-          <div className="flex items-center space-x-2">
-            <LayoutGrid className="w-4 h-4 text-orange-600" />
-            <span className="text-xs font-extrabold text-gray-900">
-              Multi-View Mode
-            </span>
-            <span className="text-[10px] font-extrabold bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full">
-              {slots.length} / 4 Streams
-            </span>
-          </div>
+          {/* Toggle between 2x2 Grid View and Big Screen View */}
+          {bigScreenIndex !== null ? (
+            <button
+              onClick={() => setBigScreenIndex(null)}
+              className="flex items-center space-x-1.5 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Switch to 2x2 Grid</span>
+            </button>
+          ) : (
+            <div className="flex items-center space-x-1.5">
+              <LayoutGrid className="w-4 h-4 text-orange-600" />
+              <span className="text-xs font-extrabold text-gray-900">
+                2x2 Multi-View ({slots.length}/4)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right Actions */}
@@ -752,47 +689,104 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
           {slots.length < 4 && (
             <button
               onClick={() => setIsPickerOpen(true)}
-              className="inline-flex items-center space-x-1.5 text-xs font-bold text-white bg-black hover:bg-neutral-800 px-3.5 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
+              className="inline-flex items-center space-x-1 text-xs font-bold text-white bg-black hover:bg-neutral-800 px-3 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Game</span>
             </button>
           )}
-
-          <button
-            onClick={toggleFullscreen}
-            className="w-8 h-8 rounded-full bg-gray-50 hover:bg-gray-100 text-gray-700 flex items-center justify-center border border-gray-200 transition-colors"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Multi-View Fullscreen'}
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 
-      {/* Grid of Streams */}
-      <div className={`grid gap-3.5 ${getGridColsClass()}`}>
-        {slots.map((slot, idx) => (
-          <MultiViewTile
-            key={slot.id}
-            slot={slot}
-            index={idx}
-            isAudioActive={audioSlotIndex === idx}
-            onFocusAudio={() => setAudioSlotIndex(idx)}
-            canClose={slots.length > 1}
-            onClose={() => handleRemoveSlot(idx)}
-            onQualityChange={(q) => handleQualityChange(idx, q)}
-          />
-        ))}
+      {/* VIEW MODE 1: Big Screen Focus View (1 Big Screen on top, other 3 mini-tiles below) */}
+      {bigScreenIndex !== null && slots[bigScreenIndex] && (
+        <div className="space-y-3">
+          {/* Featured Big Screen Player */}
+          <div className="w-full">
+            <MultiViewTile
+              slot={slots[bigScreenIndex]}
+              index={bigScreenIndex}
+              isAudioActive={audioSlotIndex === bigScreenIndex}
+              onFocusAudio={() => setAudioSlotIndex(bigScreenIndex)}
+              onWatchBigScreen={() => {}}
+              canClose={slots.length > 1}
+              onClose={() => handleRemoveSlot(bigScreenIndex)}
+              isBigScreen={true}
+            />
+          </div>
 
-        {/* Add Stream Slot if < 4 active streams */}
-        {slots.length < 4 && (
-          <AddStreamCard
-            currentCount={slots.length}
-            maxStreams={4}
-            onClick={() => setIsPickerOpen(true)}
-          />
-        )}
-      </div>
+          {/* Other streams in mini strip below */}
+          {slots.length > 1 && (
+            <div>
+              <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
+                Other Active Streams (Tap to switch Big Screen)
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                {slots.map((slot, idx) => {
+                  if (idx === bigScreenIndex) return null;
+                  return (
+                    <div key={slot.id} className="relative">
+                      <MultiViewTile
+                        slot={slot}
+                        index={idx}
+                        isAudioActive={audioSlotIndex === idx}
+                        onFocusAudio={() => {
+                          setAudioSlotIndex(idx);
+                          setBigScreenIndex(idx);
+                        }}
+                        onWatchBigScreen={() => {
+                          setBigScreenIndex(idx);
+                          setAudioSlotIndex(idx);
+                        }}
+                        canClose={slots.length > 1}
+                        onClose={() => handleRemoveSlot(idx)}
+                      />
+                    </div>
+                  );
+                })}
+
+                {slots.length < 4 && (
+                  <AddStreamCard
+                    currentCount={slots.length}
+                    maxStreams={4}
+                    onClick={() => setIsPickerOpen(true)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* VIEW MODE 2: Quad 2x2 Grid View (Optimized for iPhone & Desktop: 2 on top, 2 on bottom) */}
+      {bigScreenIndex === null && (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
+          {slots.map((slot, idx) => (
+            <MultiViewTile
+              key={slot.id}
+              slot={slot}
+              index={idx}
+              isAudioActive={audioSlotIndex === idx}
+              onFocusAudio={() => setAudioSlotIndex(idx)}
+              onWatchBigScreen={() => {
+                setBigScreenIndex(idx);
+                setAudioSlotIndex(idx);
+              }}
+              canClose={slots.length > 1}
+              onClose={() => handleRemoveSlot(idx)}
+            />
+          ))}
+
+          {/* Add Stream Slot if < 4 active streams */}
+          {slots.length < 4 && (
+            <AddStreamCard
+              currentCount={slots.length}
+              maxStreams={4}
+              onClick={() => setIsPickerOpen(true)}
+            />
+          )}
+        </div>
+      )}
 
       {/* Game Selection Modal */}
       <GamePickerModal

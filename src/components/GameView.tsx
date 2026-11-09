@@ -270,23 +270,15 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames, onBa
             onQualityChange={setSelectedQuality}
           />
 
-          {/* Multi-View Mode Trigger Bar */}
-          <div className="flex items-center justify-between">
+          {/* Multi-View Mode Trigger */}
+          <div className="flex items-center justify-start pt-1">
             <button
               onClick={() => setIsMultiView(true)}
-              className="inline-flex items-center space-x-2 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200/90 hover:border-gray-300 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-2xl shadow-2xs transition-all cursor-pointer active:scale-95 group"
+              className="inline-flex items-center space-x-2 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200/90 hover:border-gray-300 font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl shadow-2xs transition-all cursor-pointer active:scale-95 group"
             >
-              <div className="w-5 h-5 rounded-lg bg-orange-50 group-hover:bg-orange-100 text-orange-600 flex items-center justify-center transition-colors">
-                <LayoutGrid className="w-3.5 h-3.5" />
-              </div>
+              <LayoutGrid className="w-4 h-4 text-orange-600" />
               <span>Multi-View Mode</span>
-              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full tracking-wide">
-                Up to 4 Streams
-              </span>
             </button>
-            <span className="text-xs text-gray-500 font-medium hidden sm:inline">
-              Watch up to 4 games at once
-            </span>
           </div>
         </>
       )}
