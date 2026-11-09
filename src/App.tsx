@@ -17,7 +17,7 @@ import { ProfileModal } from './components/ProfileModal.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { findTeamByQuery } from './data/nbaTeams.ts';
 import { isSmartTv } from './utils/tvDetector.ts';
-import { AlertCircle, RefreshCw, Trophy } from 'lucide-react';
+import { AlertCircle, RefreshCw, Trophy, Tv } from 'lucide-react';
 
 export const App: React.FC = () => {
   // Current sport state ('nba' | 'nfl')
@@ -445,6 +445,57 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const isTv = useMemo(() => isSmartTv(), []);
+  const [tvGameIndex, setTvGameIndex] = useState(0);
+
+  // TV D-Pad Spatial Navigation Controller for Home Scoreboard Grid (Samsung Smart TV)
+  useEffect(() => {
+    if (!isTv || selectedStream) return;
+
+    const handleHomeTvKeys = (e: KeyboardEvent) => {
+      const code = e.keyCode;
+
+      // Arrow Down: move to next game
+      if (code === 40) {
+        setTvGameIndex((prev) => {
+          const next = Math.min(allGames.length - 1, prev + 1);
+          const el = document.getElementById(`tv-game-row-${next}`);
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return next;
+        });
+        e.preventDefault();
+      }
+      // Arrow Up: move to previous game
+      else if (code === 38) {
+        setTvGameIndex((prev) => {
+          const next = Math.max(0, prev - 1);
+          const el = document.getElementById(`tv-game-row-${next}`);
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return next;
+        });
+        e.preventDefault();
+      }
+      // Arrow Left / Right: quick toggle between NBA and NFL
+      else if (code === 37 || code === 39) {
+        setCurrentSport((prev) => (prev === 'nba' ? 'nfl' : 'nba'));
+        setTvGameIndex(0);
+        e.preventDefault();
+      }
+      // Enter / OK on remote: Play the focused game immediately!
+      else if (code === 13) {
+        if (allGames[tvGameIndex]) {
+          handleWatchGame(allGames[tvGameIndex]);
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleHomeTvKeys);
+    return () => window.removeEventListener('keydown', handleHomeTvKeys);
+  }, [isTv, selectedStream, allGames, tvGameIndex, handleWatchGame]);
+
   // Direct admin routing via /admin or #/admin
   const isAdminPath = typeof window !== 'undefined' && (
     window.location.pathname === '/admin' || 
@@ -521,12 +572,26 @@ export const App: React.FC = () => {
             game={selectedGame}
             allGames={allGames}
             onBack={handleBackToHome}
+            onSelectGame={handleWatchGame}
           />
         ) : (
           <div 
             style={{ maxWidth: '896px', margin: '0 auto', width: '100%' }}
             className="max-w-4xl mx-auto space-y-2 sm:space-y-2.5"
           >
+            {/* Smart TV Remote Navigation Helper Banner */}
+            {isTv && (
+              <div className="bg-neutral-900 border border-orange-500/40 rounded-2xl px-4 py-2.5 flex items-center justify-between shadow-lg">
+                <div className="flex items-center space-x-2 text-xs font-bold text-white">
+                  <Tv className="w-4 h-4 text-orange-500" />
+                  <span>Samsung TV Remote Mode</span>
+                </div>
+                <div className="text-[11px] font-semibold text-gray-300">
+                  ▲ / ▼ Select Game • OK to Watch • ◄ / ► Switch Sport
+                </div>
+              </div>
+            )}
+
             {/* NBA-Style Interactive Date Navigation Carousel (Thinner & Pushed to Top) */}
             <DateNavigation
               selectedDate={selectedDate}
@@ -562,9 +627,11 @@ export const App: React.FC = () => {
             {!isLoading && !error && (
               <div className="space-y-2 sm:space-y-2.5">
                 {allGames.length > 0 ? (
-                  allGames.map((game) => (
+                  allGames.map((game, idx) => (
                     <GameRow
                       key={game.id}
+                      rowId={`tv-game-row-${idx}`}
+                      isTvFocused={isTv && tvGameIndex === idx}
                       game={game}
                       favoriteTeam={favoriteTeam}
                       isCountdownActive={isCountdownActive}

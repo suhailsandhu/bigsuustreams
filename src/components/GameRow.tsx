@@ -11,6 +11,8 @@ interface GameRowProps {
   onOpenBoxScore: (game: ScoreboardGame) => void;
   favoriteTeam?: SportsTeam | null;
   isCountdownActive?: boolean;
+  isTvFocused?: boolean;
+  rowId?: string;
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -59,7 +61,9 @@ export const GameRow: React.FC<GameRowProps> = ({
   onWatchHighlights,
   onOpenBoxScore,
   favoriteTeam,
-  isCountdownActive = false
+  isCountdownActive = false,
+  isTvFocused = false,
+  rowId
 }) => {
   const isLive = game.status.isLive;
   const isFinal = game.status.state === 'post';
@@ -120,12 +124,21 @@ export const GameRow: React.FC<GameRowProps> = ({
 
   return (
     <div
+      id={rowId}
+      tabIndex={0}
       onClick={handleRowClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          handleRowClick();
+        }
+      }}
       style={cardStyle}
       className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border transition-all p-2 sm:p-2.5 select-none cursor-pointer ${
-        isFavoriteGame
-          ? 'border-gray-200/90 shadow-2xs hover:shadow-md'
-          : 'bg-white border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300'
+        isTvFocused
+          ? 'ring-4 ring-orange-500 border-orange-500 scale-[1.02] shadow-2xl z-10 bg-orange-50/20'
+          : isFavoriteGame
+            ? 'border-gray-200/90 shadow-2xs hover:shadow-md'
+            : 'bg-white border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300'
       } ${
         isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
       }`}

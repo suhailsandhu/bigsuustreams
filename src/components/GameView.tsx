@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ArrowLeft, Share2, Check, Trophy, RefreshCw, Tv } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
 import { CourtsidePlayer } from './CourtsidePlayer';
 import { formatTipoffTime, fetchGameSummary } from '../services/api';
+import { isSmartTv, TV_KEYS } from '../utils/tvDetector';
 
 // Helper to highlight leader stats in green, highest turnovers in red, and +/- positive/negative
 function getStatHighlightClass(
@@ -84,9 +85,66 @@ interface GameViewProps {
   game?: ScoreboardGame | null;
   allGames?: ScoreboardGame[];
   onBack: () => void;
+  onSelectGame?: (game: ScoreboardGame) => void;
 }
 
-export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
+export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [], onBack, onSelectGame }) => {
+  const isTv = useMemo(() => isSmartTv(), []);
+  const [, setTvSwitcherIndex] = useState(0);
+
+  // Auto-scroll to top on mount so video is front-and-center without scrolling
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [stream.stream_key]);
+
+  // Samsung TV Remote Control listener (Back button & Channel carousel navigation)
+  useEffect(() => {
+    if (!isTv) return;
+
+    const handleTvKeys = (e: KeyboardEvent) => {
+      const code = e.keyCode;
+      // RETURN / BACK on Samsung remote (10009), Escape, Backspace
+      if (code === TV_KEYS.RETURN || code === TV_KEYS.ESCAPE || code === TV_KEYS.BACKSPACE) {
+        onBack();
+        e.preventDefault();
+        return;
+      }
+
+      // Quick-Switch Games Carousel Navigation
+      if (allGames.length > 1) {
+        if (code === TV_KEYS.LEFT) {
+          setTvSwitcherIndex((prev) => {
+            const next = Math.max(0, prev - 1);
+            const el = document.getElementById(`tv-switcher-${next}`);
+            el?.focus();
+            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            return next;
+          });
+          e.preventDefault();
+        } else if (code === TV_KEYS.RIGHT) {
+          setTvSwitcherIndex((prev) => {
+            const next = Math.min(allGames.length - 1, prev + 1);
+            const el = document.getElementById(`tv-switcher-${next}`);
+            el?.focus();
+            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            return next;
+          });
+          e.preventDefault();
+        } else if (code === TV_KEYS.ENTER) {
+          const activeEl = document.activeElement;
+          if (activeEl && activeEl.id && activeEl.id.startsWith('tv-switcher-')) {
+            const idx = parseInt(activeEl.id.replace('tv-switcher-', ''), 10);
+            if (allGames[idx] && onSelectGame) {
+              onSelectGame(allGames[idx]);
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleTvKeys);
+    return () => window.removeEventListener('keydown', handleTvKeys);
+  }, [isTv, allGames, onBack, onSelectGame]);
   // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
   const [selectedQuality, setSelectedQuality] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -258,6 +316,72 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
         selectedQuality={selectedQuality}
         onQualityChange={setSelectedQuality}
       />
+
+      {/* TV Quick-Switch Game Carousel (Fast channel flipper for Smart TV & Desktop) */}
+      {allGames && allGames.length > 1 && (
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 sm:p-4 shadow-lg space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center space-x-2">
+              <Tv className="w-4 h-4 text-orange-500" />
+              <span className="text-xs sm:text-sm font-extrabold text-white">
+                Live Channels Tonight
+              </span>
+              <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+                (Use Remote ◄ / ► to browse, OK to switch games instantly)
+              </span>
+            </div>
+            <div className="text-[11px] font-bold text-orange-400 bg-orange-950/60 border border-orange-500/30 px-2.5 py-0.5 rounded-full">
+              {allGames.length} Games Available
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2.5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+            {allGames.map((g, idx) => {
+              const isCurrent = g.stream?.streamKey === stream.stream_key || 
+                (game && game.id === g.id);
+              const awayName = g.awayTeam?.shortDisplayName || g.awayTeam?.name || 'Away';
+              const homeName = g.homeTeam?.shortDisplayName || g.homeTeam?.name || 'Home';
+              const isLive = g.status?.isLive;
+              const statusStr = isLive 
+                ? (g.status?.shortDetail || 'LIVE') 
+                : formatTipoffTime(g.stream?.streamData?.match_timestamp || 0);
+
+              return (
+                <button
+                  key={g.id}
+                  id={`tv-switcher-${idx}`}
+                  tabIndex={0}
+                  onClick={() => onSelectGame?.(g)}
+                  className={`shrink-0 flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isCurrent
+                      ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 scale-[1.02]'
+                      : 'bg-neutral-800 hover:bg-neutral-700 text-gray-200 border border-neutral-700/80 focus:ring-4 focus:ring-orange-500 focus:scale-105'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1">
+                    {g.awayTeam?.logo && (
+                      <img src={g.awayTeam.logo} alt="" className="w-4 h-4 object-contain" />
+                    )}
+                    <span className="font-extrabold">{awayName}</span>
+                    {isLive && <span className="tabular-nums text-gray-300">({g.awayTeam?.score})</span>}
+                  </div>
+                  <span className="text-gray-500 font-bold">@</span>
+                  <div className="flex items-center space-x-1">
+                    {g.homeTeam?.logo && (
+                      <img src={g.homeTeam.logo} alt="" className="w-4 h-4 object-contain" />
+                    )}
+                    <span className="font-extrabold">{homeName}</span>
+                    {isLive && <span className="tabular-nums text-gray-300">({g.homeTeam?.score})</span>}
+                  </div>
+                  <span className="text-[10px] bg-black/50 px-1.5 py-0.5 rounded text-orange-400 font-mono ml-1">
+                    {statusStr}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Matchup Header & Live Scoreboard Section (Symmetrical 3-Column Layout) */}
       <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">

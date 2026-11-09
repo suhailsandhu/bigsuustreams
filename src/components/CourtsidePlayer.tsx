@@ -769,8 +769,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           }}
         />
 
-        {/* Samsung TV / Smart TV Remote "Press OK to Play" Overlay */}
-        {(!isPlaying && !isLoading && !hasError && (isTv || tvAutoplayBlocked)) && (
+        {/* Samsung TV / Smart TV Remote "Press OK to Play" Overlay (Only if browser blocked autoplay) */}
+        {(!isPlaying && !isLoading && !hasError && tvAutoplayBlocked) && (
           <div 
             onClick={handleTvStartPlayback}
             className="absolute inset-0 z-25 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center cursor-pointer select-none group"
