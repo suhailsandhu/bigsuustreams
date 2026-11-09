@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Share2, Check, Trophy, RefreshCw, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
 import { CourtsidePlayer } from './CourtsidePlayer';
-import { MultiViewPlayer } from './MultiViewPlayer';
 import { formatTipoffTime, fetchGameSummary } from '../services/api';
 
 // Helper to highlight leader stats in green, highest turnovers in red, and +/- positive/negative
@@ -87,8 +86,7 @@ interface GameViewProps {
   onBack: () => void;
 }
 
-export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames, onBack }) => {
-  const [isMultiView, setIsMultiView] = useState(false);
+export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
   // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
   const [selectedQuality, setSelectedQuality] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -254,34 +252,12 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames, onBa
         </div>
       </div>
 
-      {/* Video Player Section: Multi-View Stage or Single Courtside Player */}
-      {isMultiView ? (
-        <MultiViewPlayer
-          initialStream={stream}
-          initialGame={game}
-          allGames={allGames}
-          onExit={() => setIsMultiView(false)}
-        />
-      ) : (
-        <>
-          <CourtsidePlayer
-            stream={stream}
-            selectedQuality={selectedQuality}
-            onQualityChange={setSelectedQuality}
-          />
-
-          {/* Multi-View Mode Trigger */}
-          <div className="flex items-center justify-start pt-1">
-            <button
-              onClick={() => setIsMultiView(true)}
-              className="inline-flex items-center space-x-2 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200/90 hover:border-gray-300 font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl shadow-2xs transition-all cursor-pointer active:scale-95 group"
-            >
-              <LayoutGrid className="w-4 h-4 text-orange-600" />
-              <span>Multi-View Mode</span>
-            </button>
-          </div>
-        </>
-      )}
+      {/* Video Player Section: Clean Courtside Player */}
+      <CourtsidePlayer
+        stream={stream}
+        selectedQuality={selectedQuality}
+        onQualityChange={setSelectedQuality}
+      />
 
       {/* Matchup Header & Live Scoreboard Section (Symmetrical 3-Column Layout) */}
       <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">

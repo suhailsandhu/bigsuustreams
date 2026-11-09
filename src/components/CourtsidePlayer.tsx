@@ -152,6 +152,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const watchdogTimerRef = useRef<any>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   // Autoplay with sound on automatically for everyone
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -167,27 +168,60 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
   // Automatic Picture-in-Picture on swipe-out / app switch for iPhone & Mobile
   useEffect(() => {
-    const handleVisibility = () => {
-      const video = videoRef.current;
-      if (!video) return;
-      if (document.visibilityState === 'hidden' && !video.paused) {
-        if ((video as any).webkitSetPresentationMode && (video as any).webkitSupportsPresentationMode?.('picture-in-picture')) {
+    const video = videoRef.current;
+    if (video) {
+      // Configure hardware-level iOS PiP flags
+      try {
+        video.playsInline = true;
+        // @ts-ignore
+        video.webkitPlaysInline = true;
+        // @ts-ignore
+        video.autoPictureInPicture = true;
+        video.disablePictureInPicture = false;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.setAttribute('autopictureinpicture', 'true');
+      } catch {}
+    }
+
+    const triggerPiP = () => {
+      const v = videoRef.current;
+      if (!v) return;
+
+      // Only enter PiP if the user was actively watching or stream is playing
+      if (isPlayingRef.current || !v.paused) {
+        // 1. Apple WebKit iOS Picture-in-Picture (Safari on iPhone & iPad)
+        if ((v as any).webkitSetPresentationMode && (v as any).webkitSupportsPresentationMode?.('picture-in-picture')) {
           try {
-            (video as any).webkitSetPresentationMode('picture-in-picture');
-          } catch {}
-        } else if (document.pictureInPictureEnabled && !document.pictureInPictureElement) {
+            if ((v as any).webkitPresentationMode !== 'picture-in-picture') {
+              (v as any).webkitSetPresentationMode('picture-in-picture');
+            }
+          } catch (e) {
+            console.warn('[iOS PiP] PresentationMode error:', e);
+          }
+        } 
+        // 2. W3C Standard Picture-in-Picture API (Chrome, Desktop Safari, Android)
+        else if (document.pictureInPictureEnabled && !document.pictureInPictureElement) {
           try {
-            video.requestPictureInPicture().catch(() => {});
+            v.requestPictureInPicture().catch(() => {});
           } catch {}
         }
       }
     };
 
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        triggerPiP();
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('pagehide', handleVisibility);
+    window.addEventListener('pagehide', triggerPiP);
+    window.addEventListener('blur', triggerPiP);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('pagehide', handleVisibility);
+      window.removeEventListener('pagehide', triggerPiP);
+      window.removeEventListener('blur', triggerPiP);
     };
   }, []);
 
@@ -659,7 +693,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
     try {
-      if (document.pictureInPictureElement) {
+      // 1. Apple WebKit (iOS Safari / iPadOS)
+      if ((video as any).webkitSetPresentationMode && (video as any).webkitSupportsPresentationMode?.('picture-in-picture')) {
+        const currentMode = (video as any).webkitPresentationMode;
+        (video as any).webkitSetPresentationMode(currentMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
+      } 
+      // 2. Standard W3C PiP
+      else if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
       } else if (document.pictureInPictureEnabled) {
         await video.requestPictureInPicture();
@@ -717,6 +757,16 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           x5-video-player-type="h5"
           className="w-full h-full object-contain cursor-pointer focus:outline-hidden"
           onClick={togglePlay}
+          onPlay={() => {
+            isPlayingRef.current = true;
+            setIsPlaying(true);
+          }}
+          onPause={() => {
+            if (document.visibilityState !== 'hidden') {
+              isPlayingRef.current = false;
+              setIsPlaying(false);
+            }
+          }}
         />
 
         {/* Samsung TV / Smart TV Remote "Press OK to Play" Overlay */}

@@ -430,7 +430,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         u.provider.toLowerCase().includes(q)
       );
     });
-  }, [stats?.registeredUsers, q, memberFilter]);
+  }, [stats?.registeredUsers, q, memberFilter, memberSortBy]);
 
   const filteredStreams = useMemo(() => {
     const streams = stats?.topStreams || [];

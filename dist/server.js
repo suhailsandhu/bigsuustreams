@@ -1140,9 +1140,26 @@ async function getNflScoreboard(dateStr) {
     const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
     const isLive = rawState === "in" || isStreamLive && rawState !== "post" || isPastScheduledTime && rawState !== "post" && Boolean(matchedStream);
     const state = rawState === "post" ? "post" : isLive ? "in" : rawState;
-    let displayDetail = statusType.detail || statusType.description || "";
+    const clock = event.status?.displayClock || "";
+    const period = event.status?.period || 0;
+    let quarterAndClock = statusType.shortDetail || "";
+    if (period > 0 && clock) {
+      const qPrefix = period <= 4 ? `Q${period}` : period === 5 ? "OT" : `OT${period - 4}`;
+      if (clock === "0:00" || clock === "0.0") {
+        quarterAndClock = `End of ${qPrefix}`;
+      } else {
+        quarterAndClock = `${qPrefix} ${clock}`;
+      }
+    } else if (statusType.description?.toLowerCase().includes("half") || statusType.shortDetail?.toLowerCase().includes("half")) {
+      quarterAndClock = "Halftime";
+    } else if (statusType.shortDetail && statusType.shortDetail !== "LIVE") {
+      quarterAndClock = statusType.shortDetail;
+    } else if (period > 0) {
+      quarterAndClock = `Q${period}`;
+    }
+    let displayDetail = statusType.detail || statusType.description || quarterAndClock || "";
     if (isLive) {
-      displayDetail = statusType.shortDetail || "LIVE";
+      displayDetail = quarterAndClock || statusType.shortDetail || "LIVE";
     } else if (state === "pre") {
       try {
         const gameDate = new Date(event.date);
@@ -1198,7 +1215,7 @@ async function getNflScoreboard(dateStr) {
       status: {
         state,
         detail: displayDetail,
-        shortDetail: isLive ? "LIVE" : statusType.shortDetail || displayDetail,
+        shortDetail: isLive ? quarterAndClock || "LIVE" : statusType.shortDetail || displayDetail,
         isLive,
         period: event.status?.period || (isLive ? 1 : 0),
         clock: event.status?.displayClock || ""
