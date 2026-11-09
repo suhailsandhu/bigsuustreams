@@ -8,7 +8,7 @@ interface SiteGateProps {
 
 const isPasscodeValid = (p: string) => {
   const c = p.trim().toLowerCase();
-  return c === '7777' || c === '77777';
+  return c === '7865';
 };
 
 export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => {
@@ -50,8 +50,8 @@ export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => 
       } else {
         // Fallback local check
         if (isPasscodeValid(clean)) {
-          localStorage.setItem('bigsuu_site_token', 'verified_7777');
-          sessionStorage.setItem('bigsuu_site_token', 'verified_7777');
+          localStorage.setItem('bigsuu_site_token', 'verified_7865');
+          sessionStorage.setItem('bigsuu_site_token', 'verified_7865');
           onUnlock();
         } else {
           setError(true);
@@ -61,8 +61,8 @@ export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => 
     } catch {
       // Offline fallback
       if (isPasscodeValid(clean)) {
-        localStorage.setItem('bigsuu_site_token', 'verified_7777');
-        sessionStorage.setItem('bigsuu_site_token', 'verified_7777');
+        localStorage.setItem('bigsuu_site_token', 'verified_7865');
+        sessionStorage.setItem('bigsuu_site_token', 'verified_7865');
         onUnlock();
       } else {
         setError(true);

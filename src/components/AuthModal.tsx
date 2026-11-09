@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Star, Tv } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, Star, Tv } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 
 interface AuthModalProps {
@@ -7,19 +7,27 @@ interface AuthModalProps {
   onSuccess: (user: any) => void;
   currentSport?: 'nba' | 'nfl';
   onOpenLegal?: (tab?: 'dmca' | 'disclaimer' | 'terms' | 'privacy') => void;
+  initialPasscodeMode?: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onSuccess,
-  onOpenLegal
+  onOpenLegal,
+  initialPasscodeMode = false
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   
-  // Quick Passcode State (Passcode: 7777)
-  const [showPasscodeMode, setShowPasscodeMode] = useState(false);
+  // Quick Passcode State (Passcode: 7865 - Accessible only via /quickaccess)
+  const [showPasscodeMode, setShowPasscodeMode] = useState(() => Boolean(initialPasscodeMode));
   const [quickPasscode, setQuickPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialPasscodeMode) {
+      setShowPasscodeMode(true);
+    }
+  }, [initialPasscodeMode]);
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -34,11 +42,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const isVipPasscode = (p: string) => {
     const c = (p || '').trim().toLowerCase();
-    return c === '7777' || c === '77777';
+    return c === '7865';
   };
 
   const vipUser = {
-    id: 'vip_7777',
+    id: 'vip_7865',
     username: 'vip_guest',
     displayName: 'VIP Member',
     email: 'vip@bigsuustreams.com',
@@ -48,9 +56,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleTvGuestEnter = () => {
-    localStorage.setItem('bigsuu_auth_token', 'token_7777');
+    localStorage.setItem('bigsuu_auth_token', 'token_7865');
     localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-    sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+    sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
     onSuccess(vipUser);
   };
 
@@ -66,9 +74,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setPasscodeError(null);
 
     if (isVipPasscode(clean)) {
-      localStorage.setItem('bigsuu_auth_token', 'token_7777');
+      localStorage.setItem('bigsuu_auth_token', 'token_7865');
       localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-      sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+      sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
       setLoading(false);
       onSuccess(vipUser);
       return;
@@ -84,15 +92,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         const user = data.user || vipUser;
-        localStorage.setItem('bigsuu_auth_token', data.token || 'verified_7777');
+        localStorage.setItem('bigsuu_auth_token', data.token || 'verified_7865');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
-        sessionStorage.setItem('bigsuu_auth_token', data.token || 'verified_7777');
+        sessionStorage.setItem('bigsuu_auth_token', data.token || 'verified_7865');
         onSuccess(user);
       } else {
-        setPasscodeError('Incorrect passcode. Access denied. (Passcode: 7777)');
+        setPasscodeError('Incorrect passcode. Access denied.');
       }
     } catch {
-      setPasscodeError('Incorrect passcode. Access denied. (Passcode: 7777)');
+      setPasscodeError('Incorrect passcode. Access denied.');
     } finally {
       setLoading(false);
     }
@@ -111,7 +119,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setError('Please enter a valid email address');
         return;
       }
-      if (!password || (password.length < 4 && password !== '7777')) {
+      if (!password || (password.length < 4 && password !== '7865')) {
         setError('Password must be at least 4 characters');
         return;
       }
@@ -129,10 +137,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      // Fast-path login for 7777 / 77777 VIP password
+      // Fast-path login for 7865 VIP password
       if (isVipPasscode(password)) {
         const vipUser = {
-          id: 'vip_7777',
+          id: 'vip_7865',
           username: username.trim() || 'vip_guest',
           displayName: username.trim() || 'VIP Member',
           email: email.trim() || 'vip@bigsuustreams.com',
@@ -140,9 +148,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           isVip: true,
           membership: 'vip'
         };
-        localStorage.setItem('bigsuu_auth_token', 'token_7777');
+        localStorage.setItem('bigsuu_auth_token', 'token_7865');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-        sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+        sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
         onSuccess(vipUser);
         return;
       }
@@ -175,10 +183,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         sessionStorage.setItem('bigsuu_auth_token', data.token);
         onSuccess(data.user);
       } else {
-        // Fallback for 7777 / 77777 password
+        // Fallback for 7865 password
         if (isVipPasscode(password)) {
           const vipUser = {
-            id: 'vip_7777',
+            id: 'vip_7865',
             username: username.trim() || 'vip_guest',
             displayName: username.trim() || 'VIP Member',
             email: email.trim() || 'vip@bigsuustreams.com',
@@ -186,9 +194,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             isVip: true,
             membership: 'vip'
           };
-          localStorage.setItem('bigsuu_auth_token', 'token_7777');
+          localStorage.setItem('bigsuu_auth_token', 'token_7865');
           localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-          sessionStorage.setItem('bigsuu_auth_token', 'token_7777');
+          sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
           onSuccess(vipUser);
         } else {
           setError(data.error || 'Authentication failed. Please check your credentials.');
@@ -217,22 +225,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       {/* iOS-Style Modal Card / Bottom Sheet */}
       <div className="relative w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[94vh] transition-all">
         
-        {/* Top Header Row with Minimalist Yellow Key Outline Button */}
-        <div className="flex items-center justify-between px-6 pt-4 pb-1">
+        {/* Top Header Handle (Key icon removed - accessible only via /quickaccess) */}
+        <div className="flex items-center justify-center px-6 pt-4 pb-1">
           <div className="w-10 h-1 bg-gray-300 rounded-full sm:hidden" />
-          <button
-            type="button"
-            onClick={() => {
-              setShowPasscodeMode(!showPasscodeMode);
-              setError(null);
-              setPasscodeError(null);
-            }}
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-transparent hover:bg-amber-50/50 border border-amber-400 hover:border-amber-500 text-amber-500 transition active:scale-90 flex items-center justify-center cursor-pointer ml-auto"
-            title={showPasscodeMode ? 'Switch to Account Login' : 'Quick Passcode'}
-            aria-label="Passcode Key"
-          >
-            <KeyRound className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 stroke-[2.2]" />
-          </button>
         </div>
 
         <div className="p-6 sm:p-8 pt-3 overflow-y-auto">
@@ -263,7 +258,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* QUICK PASSCODE MODE (Passcode: 7777)                      */}
+          {/* QUICK PASSCODE MODE (Passcode: 7865)                      */}
           {/* ========================================================= */}
           {showPasscodeMode ? (
             <div className="space-y-4 animate-in fade-in zoom-in-95 duration-150 py-2">

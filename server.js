@@ -18,7 +18,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 // Bulletproof Port: Node runs on 3000 behind Nginx (port 80/443 belongs to Nginx)
 const PORT = process.env.PORT && process.env.PORT !== '80' ? process.env.PORT : 3000;
-const SITE_PASSCODE = process.env.SITE_PASSCODE || '7777';
+const SITE_PASSCODE = process.env.SITE_PASSCODE || '7865';
 
 // Disable Express fingerprinting header
 app.disable('x-powered-by');
@@ -225,15 +225,15 @@ app.post('/api/user/preferences', (req, res) => {
   res.json({ success: true });
 });
 
-// Passcode gate support (Passcode 7777)
+// Passcode gate support (Passcode 7865)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || '').trim().toLowerCase();
-  if (clean === '7777' || clean === '77777') {
-    const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString('base64');
+  if (clean === '7865') {
+    const token = Buffer.from(`bigsuu_${Date.now()}_7865`).toString('base64');
     const user = { 
-      id: 'vip_7777', 
-      username: 'vip_guest', 
+      id: 'vip_7865', 
+      username: 'vip_member', 
       displayName: 'VIP Member', 
       email: 'vip@bigsuustreams.com',
       role: 'vip',
@@ -303,14 +303,16 @@ function requireSiteAccess(req, res, next) {
 
   const token = rawToken.trim();
 
-  // 1. VIP Passcode validation (passcode 7777 tokens)
+  // Explicitly REJECT all revoked 7777 tokens and old guest passes
+  if (token.includes('7777') || token.includes('verified_7777') || token.includes('token_7777')) {
+    return res.status(401).json({ error: 'VIP Passcode has changed. Please enter the new passcode.' });
+  }
+
+  // 1. VIP Passcode validation (passcode 7865 tokens)
   if (
-    token.includes('7777') ||
-    token.startsWith('bigsuu_') ||
-    token.startsWith('verified_') ||
-    token.startsWith('local_token_') ||
-    token.startsWith('google_token_') ||
-    token.startsWith('token_7777')
+    token.includes('7865') ||
+    token.startsWith('token_7865') ||
+    token.startsWith('verified_7865')
   ) {
     return next();
   }
@@ -867,8 +869,8 @@ if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html')
   distPath = __dirname;
 }
 
-// Explicit Admin route direct access (compatible with Express 5 path-to-regexp)
-app.get(/^\/(admin|stats)/, (req, res) => {
+// Explicit Admin and QuickAccess route direct access (compatible with Express 5 path-to-regexp)
+app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(distPath, 'index.html'));
 });

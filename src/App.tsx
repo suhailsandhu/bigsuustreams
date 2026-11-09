@@ -23,30 +23,38 @@ export const App: React.FC = () => {
   // Current sport state ('nba' | 'nfl')
   const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>('nba');
 
-  // iOS-style Account Authentication state (auto-bypassed with VIP Guest pass on Smart TVs)
+  // iOS-style Account Authentication state (auto-kick all 7777 VIP passes immediately)
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
       const stored = localStorage.getItem('bigsuu_auth_user');
       const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
-      if (token && stored) {
-        return JSON.parse(stored);
+      
+      // PURGE: Immediately kick off all 7777 VIP passes, old guests, and expired VIP sessions
+      if (
+        !token ||
+        token.includes('7777') || 
+        token.includes('verified_7777') || 
+        stored?.includes('7777') || 
+        stored?.includes('vip_guest') || 
+        stored?.includes('smart_tv_viewer') ||
+        stored?.includes('vip@bigsuustreams.com')
+      ) {
+        localStorage.removeItem('bigsuu_auth_token');
+        localStorage.removeItem('bigsuu_auth_user');
+        sessionStorage.removeItem('bigsuu_auth_token');
+        localStorage.removeItem('bigsuu_site_token');
+        sessionStorage.removeItem('bigsuu_site_token');
+        sessionStorage.removeItem('bigsuu_admin_authorized');
+        sessionStorage.removeItem('bigsuu_admin_pin');
+        return null;
       }
-      // Smart TV living room optimization: grant automatic VIP pass
-      if (typeof window !== 'undefined' && isSmartTv()) {
-        const tvUser = {
-          id: 'vip_7777',
-          username: 'smart_tv_viewer',
-          displayName: 'Smart TV VIP',
-          email: 'tv@bigsuustreams.com',
-          role: 'vip',
-          isVip: true,
-          membership: 'vip'
-        };
-        try {
-          localStorage.setItem('bigsuu_auth_user', JSON.stringify(tvUser));
-          localStorage.setItem('bigsuu_auth_token', 'token_7777');
-        } catch {}
-        return tvUser;
+
+      if (token && stored) {
+        const u = JSON.parse(stored);
+        if (u.id === 'vip_7777' || u.username === 'vip_guest' || u.username === 'smart_tv_viewer') {
+          return null;
+        }
+        return u;
       }
       return null;
     } catch {
@@ -58,8 +66,28 @@ export const App: React.FC = () => {
     localStorage.removeItem('bigsuu_auth_token');
     localStorage.removeItem('bigsuu_auth_user');
     sessionStorage.removeItem('bigsuu_auth_token');
+    localStorage.removeItem('bigsuu_site_token');
+    sessionStorage.removeItem('bigsuu_site_token');
+    sessionStorage.removeItem('bigsuu_admin_authorized');
+    sessionStorage.removeItem('bigsuu_admin_pin');
     setCurrentUser(null);
   };
+
+  // Active Purge: Immediately kick off anyone with old 7777 or revoked passes
+  useEffect(() => {
+    const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
+    const stored = localStorage.getItem('bigsuu_auth_user');
+    if (
+      token?.includes('7777') || 
+      token?.includes('verified_7777') || 
+      stored?.includes('7777') || 
+      stored?.includes('vip_guest') || 
+      stored?.includes('smart_tv_viewer') ||
+      stored?.includes('vip@bigsuustreams.com')
+    ) {
+      handleLogout();
+    }
+  }, []);
 
   // Self-healing account sync: ensures registered member accounts are persisted permanently on server
   useEffect(() => {
@@ -248,12 +276,19 @@ export const App: React.FC = () => {
   const selectedStreamRef = useRef(selectedStream);
   selectedStreamRef.current = selectedStream;
 
-  // Direct admin routing via URL /admin or hash #/admin
-  const checkAdminRoute = useCallback(() => {
-    const p = window.location.pathname;
-    const h = window.location.hash;
+  // State for direct /quickaccess route
+  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
+
+  // Direct special routing via URL /admin or /quickaccess
+  const checkSpecialRoutes = useCallback(() => {
+    const p = (window.location.pathname || '').toLowerCase();
+    const h = (window.location.hash || '').toLowerCase();
     if (p === '/admin' || p === '/stats' || h === '#/admin' || h === '#admin' || h === '#/stats' || h === '#stats') {
       setShowStatsModal(true);
+      return true;
+    }
+    if (p === '/quickaccess' || p === '/quick-access' || h === '#/quickaccess' || h === '#quickaccess') {
+      setIsQuickAccessOpen(true);
       return true;
     }
     return false;
@@ -261,7 +296,7 @@ export const App: React.FC = () => {
 
   // Hash-based routing for direct links and admin
   const handleHashChange = useCallback(async () => {
-    if (checkAdminRoute()) return;
+    if (checkSpecialRoutes()) return;
 
     const hash = window.location.hash;
     if (hash.startsWith('#/game/')) {
@@ -292,19 +327,19 @@ export const App: React.FC = () => {
       setSelectedStream(null);
       setSelectedGame(null);
     }
-  }, [handleWatchHighlights, checkAdminRoute]);
+  }, [handleWatchHighlights, checkSpecialRoutes]);
 
   useEffect(() => {
-    checkAdminRoute();
+    checkSpecialRoutes();
     window.addEventListener('hashchange', handleHashChange);
-    window.addEventListener('popstate', checkAdminRoute);
+    window.addEventListener('popstate', checkSpecialRoutes);
     // Check initial hash
     handleHashChange();
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
-      window.removeEventListener('popstate', checkAdminRoute);
+      window.removeEventListener('popstate', checkSpecialRoutes);
     };
-  }, [handleHashChange, checkAdminRoute]);
+  }, [handleHashChange, checkSpecialRoutes]);
 
   // Synchronize selectedGame whenever scoreboard or stream changes
   useEffect(() => {
@@ -602,7 +637,14 @@ export const App: React.FC = () => {
         <AuthModal
           isOpen={true}
           currentSport={currentSport}
-          onSuccess={(user) => setCurrentUser(user)}
+          initialPasscodeMode={isQuickAccessOpen}
+          onSuccess={(user) => {
+            setCurrentUser(user);
+            setIsQuickAccessOpen(false);
+            if (window.location.pathname.includes('quickaccess')) {
+              window.history.pushState(null, '', '/');
+            }
+          }}
           onOpenLegal={(tab) => {
             setLegalTab(tab || 'dmca');
             setShowLegalModal(true);
@@ -761,6 +803,26 @@ export const App: React.FC = () => {
         onClose={() => setBoxScoreGame(null)}
         onWatchGame={handleWatchGame}
       />
+
+      {/* Direct /quickaccess Modal */}
+      {isQuickAccessOpen && (
+        <AuthModal
+          isOpen={true}
+          initialPasscodeMode={true}
+          currentSport={currentSport}
+          onSuccess={(user) => {
+            setCurrentUser(user);
+            setIsQuickAccessOpen(false);
+            if (window.location.pathname.includes('quickaccess')) {
+              window.history.pushState(null, '', '/');
+            }
+          }}
+          onOpenLegal={(tab) => {
+            setLegalTab(tab || 'dmca');
+            setShowLegalModal(true);
+          }}
+        />
+      )}
 
       {/* Live Admin Analytics & Activity Telemetry Modal (Accessible ONLY via /admin directly) */}
       <AdminStatsModal

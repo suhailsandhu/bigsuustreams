@@ -60,6 +60,13 @@ class AuthService {
   constructor() {
     this.ensureDataStore();
     this.loadUsers();
+    // Wipe any old 7777 VIP sessions and users from memory/store
+    for (const [id, user] of this.users.entries()) {
+      if (id.includes('7777') || user.username === 'vip_guest' || user.username === 'smart_tv_viewer' || user.email?.includes('7777')) {
+        this.users.delete(id);
+      }
+    }
+    this.sessions.clear();
   }
 
   private ensureDataStore() {
@@ -401,7 +408,7 @@ class AuthService {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new Error('Please provide a valid email address');
     }
-    if (!password || (password.length < 4 && password !== '7777')) {
+    if (!password || (password.length < 4 && password !== '7865')) {
       throw new Error('Password must be at least 4 characters long');
     }
 
@@ -459,7 +466,7 @@ class AuthService {
       }
     }
 
-    if ((password === '7777' || password === '77777') && !foundUser) {
+    if (password === '7865' && !foundUser) {
       foundUser = {
         id: 'user_vip_' + (clean.replace(/[^a-z0-9]/g, '') || 'fan'),
         username: clean || 'vip_member',
@@ -471,7 +478,7 @@ class AuthService {
         favoriteTeams: []
       };
       this.users.set(foundUser.id, foundUser);
-    } else if (password !== '7777' && password !== '77777') {
+    } else if (password !== '7865') {
       if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
         throw new Error('Invalid username/email or password');
       }

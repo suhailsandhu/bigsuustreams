@@ -88,7 +88,7 @@ class AnalyticsTracker {
   private streamStats = new Map<string, { name: string; views: number }>();
   private recentActivity: ActivityEvent[] = [];
   private hourlyPageViews: number[] = new Array(24).fill(0);
-  private adminPin = process.env.ADMIN_PIN || '7777';
+  private adminPin = process.env.ADMIN_PIN || '7865';
   private persistStateTimeout: any = null;
   private analyticsConfig: {
     umamiWebsiteId: string;
@@ -466,12 +466,10 @@ class AnalyticsTracker {
   public verifyPin(pin: any): boolean {
     const trimmed = String(pin || '').trim();
     return (
-      trimmed === '7777' ||
-      trimmed === '77777' ||
-      trimmed === 'suhail7865' ||
+      trimmed === '7865' ||
       trimmed === this.adminPin ||
       trimmed === String(process.env.ADMIN_PIN || '') ||
-      trimmed === String(process.env.SITE_PASSCODE || '7777')
+      trimmed === String(process.env.SITE_PASSCODE || '7865')
     );
   }
 

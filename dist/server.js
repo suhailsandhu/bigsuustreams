@@ -1386,6 +1386,12 @@ var AuthService = class {
   constructor() {
     this.ensureDataStore();
     this.loadUsers();
+    for (const [id, user] of this.users.entries()) {
+      if (id.includes("7777") || user.username === "vip_guest" || user.username === "smart_tv_viewer" || user.email?.includes("7777")) {
+        this.users.delete(id);
+      }
+    }
+    this.sessions.clear();
   }
   ensureDataStore() {
     try {
@@ -1689,7 +1695,7 @@ var AuthService = class {
     if (!cleanEmail || !cleanEmail.includes("@")) {
       throw new Error("Please provide a valid email address");
     }
-    if (!password || password.length < 4 && password !== "7777") {
+    if (!password || password.length < 4 && password !== "7865") {
       throw new Error("Password must be at least 4 characters long");
     }
     for (const u of this.users.values()) {
@@ -1738,7 +1744,7 @@ var AuthService = class {
         break;
       }
     }
-    if ((password === "7777" || password === "77777") && !foundUser) {
+    if (password === "7865" && !foundUser) {
       foundUser = {
         id: "user_vip_" + (clean.replace(/[^a-z0-9]/g, "") || "fan"),
         username: clean || "vip_member",
@@ -1750,7 +1756,7 @@ var AuthService = class {
         favoriteTeams: []
       };
       this.users.set(foundUser.id, foundUser);
-    } else if (password !== "7777" && password !== "77777") {
+    } else if (password !== "7865") {
       if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
         throw new Error("Invalid username/email or password");
       }
@@ -1964,7 +1970,7 @@ var AnalyticsTracker = class {
   streamStats = /* @__PURE__ */ new Map();
   recentActivity = [];
   hourlyPageViews = new Array(24).fill(0);
-  adminPin = process.env.ADMIN_PIN || "7777";
+  adminPin = process.env.ADMIN_PIN || "7865";
   persistStateTimeout = null;
   analyticsConfig = {
     umamiWebsiteId: "",
@@ -2274,7 +2280,7 @@ var AnalyticsTracker = class {
   }
   verifyPin(pin) {
     const trimmed = String(pin || "").trim();
-    return trimmed === "7777" || trimmed === "77777" || trimmed === "suhail7865" || trimmed === this.adminPin || trimmed === String(process.env.ADMIN_PIN || "") || trimmed === String(process.env.SITE_PASSCODE || "7777");
+    return trimmed === "7865" || trimmed === this.adminPin || trimmed === String(process.env.ADMIN_PIN || "") || trimmed === String(process.env.SITE_PASSCODE || "7865");
   }
   getStats() {
     this.cleanup();
@@ -3102,7 +3108,7 @@ var __filename = fileURLToPath(import.meta.url);
 var __dirname = path3.dirname(__filename);
 var app = express();
 var PORT = process.env.PORT && process.env.PORT !== "80" ? process.env.PORT : 3e3;
-var SITE_PASSCODE = process.env.SITE_PASSCODE || "7777";
+var SITE_PASSCODE = process.env.SITE_PASSCODE || "7865";
 app.disable("x-powered-by");
 app.use(applySecurityHeaders);
 app.use(cors());
@@ -3285,11 +3291,11 @@ app.post("/api/user/preferences", (req, res) => {
 app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || "").trim().toLowerCase();
-  if (clean === "7777" || clean === "77777") {
-    const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString("base64");
+  if (clean === "7865") {
+    const token = Buffer.from(`bigsuu_${Date.now()}_7865`).toString("base64");
     const user = {
-      id: "vip_7777",
-      username: "vip_guest",
+      id: "vip_7865",
+      username: "vip_member",
       displayName: "VIP Member",
       email: "vip@bigsuustreams.com",
       role: "vip",
@@ -3758,7 +3764,7 @@ var distPath = path3.join(__dirname, "dist");
 if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
   distPath = __dirname;
 }
-app.get(/^\/(admin|stats)/, (req, res) => {
+app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   res.sendFile(path3.join(distPath, "index.html"));
 });

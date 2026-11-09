@@ -184,12 +184,12 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
     setLoading(true);
     setError(null);
 
-    // Fast-path client unlock for 7777 / 77777
-    if (cleanPin === '7777' || cleanPin === '77777') {
+    // Fast-path client unlock for 7865
+    if (cleanPin === '7865') {
       sessionStorage.setItem('bigsuu_admin_authorized', 'true');
-      sessionStorage.setItem('bigsuu_admin_pin', '7777');
+      sessionStorage.setItem('bigsuu_admin_pin', '7865');
       setIsAuthorized(true);
-      fetchStats('7777');
+      fetchStats('7865');
       setLoading(false);
       return;
     }
@@ -211,11 +211,11 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         setError(data.error || 'Invalid Admin Passcode');
       }
     } catch {
-      if (cleanPin === '7777' || cleanPin === '77777') {
+      if (cleanPin === '7865') {
         sessionStorage.setItem('bigsuu_admin_authorized', 'true');
-        sessionStorage.setItem('bigsuu_admin_pin', '7777');
+        sessionStorage.setItem('bigsuu_admin_pin', '7865');
         setIsAuthorized(true);
-        fetchStats('7777');
+        fetchStats('7865');
       } else {
         setError('Invalid Admin Passcode.');
       }
@@ -226,7 +226,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
 
   // Fetch full stats payload and autonomous health summary
   const fetchStats = useCallback(async (customPin?: string) => {
-    const authPin = customPin || sessionStorage.getItem('bigsuu_admin_pin') || '7777';
+    const authPin = customPin || sessionStorage.getItem('bigsuu_admin_pin') || '7865';
 
     setIsRefreshing(true);
     try {
@@ -250,7 +250,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
             setUmamiHost(data.config.umamiHost);
           }
         }
-      } else if (res.status === 401 && authPin !== '7777') {
+      } else if (res.status === 401 && authPin !== '7865') {
         setIsAuthorized(false);
         sessionStorage.removeItem('bigsuu_admin_authorized');
       }
@@ -316,7 +316,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   };
 
   const handleSaveUmami = () => {
-    const authPin = sessionStorage.getItem('bigsuu_admin_pin') || '7777';
+    const authPin = sessionStorage.getItem('bigsuu_admin_pin') || '7865';
     const success = setUmamiConfig(umamiWebsiteId, umamiHost, authPin);
     if (success) {
       setUmamiSavedNotice(true);

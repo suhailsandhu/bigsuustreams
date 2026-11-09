@@ -8,7 +8,7 @@ function isOwnerOrAdmin(): boolean {
     const raw = localStorage.getItem('bigsuu_auth_user');
     if (raw) {
       const u = JSON.parse(raw);
-      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_7777' || u.username === 'admin') return true;
+      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_7865' || u.username === 'admin') return true;
     }
   } catch {
     // ignore
@@ -188,7 +188,7 @@ if (typeof window !== 'undefined') {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              pin: sessionStorage.getItem('bigsuu_admin_pin') || '7777',
+              pin: sessionStorage.getItem('bigsuu_admin_pin') || '7865',
               umamiWebsiteId: localId,
               umamiHost: localHost
             })
@@ -250,7 +250,7 @@ export function setUmamiConfig(websiteId: string, host?: string, pin?: string): 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pin: pin || sessionStorage.getItem('bigsuu_admin_pin') || '7777',
+        pin: pin || sessionStorage.getItem('bigsuu_admin_pin') || '7865',
         umamiWebsiteId: cleanId,
         umamiHost: cleanHost
       })
