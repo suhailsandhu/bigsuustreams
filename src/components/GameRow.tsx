@@ -38,7 +38,7 @@ function formatTipoff(dateStr?: string, fallback = 'Scheduled'): string {
       // ignore
     }
   }
-  return fallback;
+  return fallback.replace(/^played\s+at\s+/i, '').replace(/^(today|tomorrow)\s+at\s+/i, '').trim() || 'Scheduled';
 }
 
 // Calculates remaining minutes until this game starts
@@ -302,18 +302,18 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
       )}
 
-      {/* For Live Games: Single 'Watch Live' Action Button (or Stream Live when time has arrived) */}
+      {/* For Live Games: Sleek 'Watch Live' Action Button */}
       {isStreamLiveNow && !isFinal && (
-        <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
+        <div className="pt-1.5 mt-1.5 border-t border-gray-100 flex items-center justify-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onWatchGame(game);
             }}
-            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
+            className="px-3.5 py-1 rounded-full bg-black hover:bg-neutral-800 text-white text-[11px] font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
           >
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <Play className="w-3.5 h-3.5 fill-current" />
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <Play className="w-3 h-3 fill-current" />
             <span>Watch Live</span>
           </button>
         </div>

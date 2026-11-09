@@ -135,16 +135,10 @@ export function formatTipoffTime(timestampSec: number): string {
   const now = new Date();
 
   const isToday = date.toDateString() === now.toDateString();
-  const tomorrow = new Date();
-  tomorrow.setDate(now.getDate() + 1);
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
-
   const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 
   if (isToday) {
-    return `Today at ${timeStr}`;
-  } else if (isTomorrow) {
-    return `Tomorrow at ${timeStr}`;
+    return timeStr;
   } else {
     const dateStr = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
     return `${dateStr} • ${timeStr}`;

@@ -293,9 +293,9 @@ export async function getScoreboard(dateStr?: string): Promise<ScoreboardRespons
     const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
     const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
 
+    // A game can ONLY be live if ESPN reports 'in' OR if it is past scheduled start time and stream is live
     const isLive = rawState === 'in' || 
-      (isStreamLive && (rawState as string) !== 'post') || 
-      (isPastScheduledTime && (rawState as string) !== 'post' && Boolean(matchedStream));
+      (isPastScheduledTime && (rawState as string) !== 'post' && (isStreamLive || Boolean(matchedStream)));
 
     const state: 'pre' | 'in' | 'post' = (rawState as string) === 'post' ? 'post' : (isLive ? 'in' : rawState);
 
@@ -748,7 +748,13 @@ export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResp
       });
     }
 
-    if (!matchedStream) {
+    const statusType = event.status?.type || {};
+    const rawState = (statusType.state || 'pre') as 'pre' | 'in' | 'post';
+    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
+    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+
+    // Only fallback to RedZone if the game is actually today and in progress / past kickoff
+    if (!matchedStream && (rawState === 'in' || (isPastScheduledTime && rawState !== 'post'))) {
       matchedStream = streamsList.find((s: any) => normalizeName(s.stream_key).includes('redzone'));
     }
 
@@ -758,13 +764,10 @@ export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResp
       (Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src: any) => src.live === true || src.is_live === true)) ||
       (typeof matchedStream?.viewers === 'number' && matchedStream.viewers > 10)
     );
-    const statusType = event.status?.type || {};
-    const rawState = (statusType.state || 'pre') as 'pre' | 'in' | 'post';
-    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
-    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+
+    // A game can ONLY be live if ESPN reports 'in' OR if it is past scheduled kickoff and stream is live
     const isLive = rawState === 'in' || 
-      (isStreamLive && (rawState as string) !== 'post') ||
-      (isPastScheduledTime && (rawState as string) !== 'post' && Boolean(matchedStream));
+      (isPastScheduledTime && (rawState as string) !== 'post' && (isStreamLive || Boolean(matchedStream)));
     const state: 'pre' | 'in' | 'post' = (rawState as string) === 'post' ? 'post' : (isLive ? 'in' : rawState);
 
     // Parse football quarter and live game clock

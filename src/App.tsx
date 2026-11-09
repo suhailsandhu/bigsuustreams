@@ -320,6 +320,79 @@ export const App: React.FC = () => {
     }
   }, [selectedStream, allGames]);
 
+  // Cross-sport live games so NBA & NFL live streams are suggested together
+  const [crossSportLiveGames, setCrossSportLiveGames] = useState<ScoreboardGame[]>([]);
+
+  // Dark Mode Theme State with LocalStorage persistence
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bss_theme');
+      if (saved) return saved === 'dark';
+    }
+    return false;
+  });
+
+  const toggleTheme = useCallback(() => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bss_theme', next ? 'dark' : 'light');
+        if (next) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [isDarkMode]);
+
+  // Fetch the OTHER sport's live games so users can see all live NBA and NFL games in the quick-switcher
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchCrossSport = async () => {
+      try {
+        const todayStr = getTodayDateString();
+        const otherData = currentSport === 'nfl'
+          ? await fetchScoreboard(todayStr)
+          : await fetchNflScoreboard(todayStr);
+        if (!isCancelled && otherData?.games) {
+          const liveOnly = otherData.games.filter((g) => Boolean(g.status?.isLive));
+          setCrossSportLiveGames(liveOnly);
+        }
+      } catch {
+        // non-blocking
+      }
+    };
+
+    fetchCrossSport();
+    const interval = setInterval(fetchCrossSport, 20000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentSport]);
+
+  // Combined games for Other Live Games switcher
+  const combinedLiveGames = useMemo(() => {
+    const map = new Map<string, ScoreboardGame>();
+    allGames.forEach((g) => map.set(g.id, g));
+    crossSportLiveGames.forEach((g) => {
+      if (!map.has(g.id)) map.set(g.id, g);
+    });
+    return Array.from(map.values());
+  }, [allGames, crossSportLiveGames]);
+
   // Load scoreboard data for selectedDate with silent background auto-refresh
   const loadScoreboardData = useCallback(async (dateStr: string, silent = false, sport: 'nba' | 'nfl' = currentSport) => {
     if (!silent) {
@@ -362,6 +435,8 @@ export const App: React.FC = () => {
 
   const handleWatchGame = async (game: ScoreboardGame) => {
     setSelectedGame(game);
+    const isNflGame = game.league === 'NFL' || (game as any).sport === 'nfl';
+    setCurrentSport(isNflGame ? 'nfl' : 'nba');
     if (game.stream?.streamData) {
       setSelectedStream(game.stream.streamData);
       window.location.hash = `#/game/${game.stream.streamKey}`;
@@ -544,16 +619,18 @@ export const App: React.FC = () => {
 
   return (
     <div 
-      style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column' }}
-      className="min-h-screen bg-[#f8f9fa] flex flex-col text-gray-900 selection:bg-orange-500/20 selection:text-orange-900"
+      style={{ minHeight: '100vh', backgroundColor: isDarkMode ? '#0a0a0c' : '#f8fafc', display: 'flex', flexDirection: 'column' }}
+      className={`min-h-screen flex flex-col ${isDarkMode ? 'dark bg-[#0a0a0c] text-white' : 'bg-[#f8f9fa] text-gray-900'} selection:bg-orange-500/20 selection:text-orange-900 transition-colors`}
     >
-      {/* Top White Header with Sport Logo and Switcher */}
+      {/* Top Header with Sport Logo, Switcher, and Dark Mode Toggle */}
       <Header
         onNavigateHome={handleBackToHome}
         currentSport={currentSport}
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenProfile={() => setShowProfileModal(true)}
+        isDarkMode={isDarkMode}
+        onToggleTheme={toggleTheme}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);
@@ -562,22 +639,22 @@ export const App: React.FC = () => {
       />
 
       <main 
-        style={{ width: '100%', maxWidth: '1024px', margin: '0 auto', flex: '1 1 auto' }}
-        className="flex-1 w-full mx-auto px-2.5 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-6"
+        style={{ width: '100%', maxWidth: isTv ? '1024px' : '1400px', margin: '0 auto', flex: '1 1 auto' }}
+        className="flex-1 w-full mx-auto px-2.5 sm:px-4 lg:px-6 pt-2 sm:pt-3 pb-6 max-w-7xl"
       >
         {/* If a game stream or highlight is currently active, render the GameView */}
         {selectedStream ? (
           <GameView
             stream={selectedStream}
             game={selectedGame}
-            allGames={allGames}
+            allGames={combinedLiveGames}
             onBack={handleBackToHome}
             onSelectGame={handleWatchGame}
           />
         ) : (
           <div 
-            style={{ maxWidth: isTv ? '896px' : '1024px', margin: '0 auto', width: '100%' }}
-            className={`mx-auto space-y-2 sm:space-y-2.5 ${isTv ? 'max-w-4xl' : 'max-w-5xl'}`}
+            style={{ maxWidth: isTv ? '896px' : '1400px', margin: '0 auto', width: '100%' }}
+            className={`mx-auto space-y-2 sm:space-y-2.5 ${isTv ? 'max-w-4xl' : 'max-w-7xl'}`}
           >
             {/* Smart TV Remote Navigation Helper Banner */}
             {isTv && (

@@ -97,10 +97,14 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [stream.stream_key]);
 
-  // Only games that are ON RIGHT NOW (live broadcasts)
-  const liveGamesNow = useMemo(() => {
-    return allGames.filter((g) => Boolean(g.status?.isLive));
-  }, [allGames]);
+  // Only other games that are ON RIGHT NOW (excluding the currently playing game/stream)
+  const otherLiveGames = useMemo(() => {
+    return allGames.filter((g) => {
+      if (!g.status?.isLive) return false;
+      const isCurrent = g.stream?.streamKey === stream.stream_key || (game && game.id === g.id);
+      return !isCurrent;
+    });
+  }, [allGames, stream.stream_key, game]);
 
   // Samsung TV Remote Control listener (Back button & Channel carousel navigation)
   useEffect(() => {
@@ -116,7 +120,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
       }
 
       // Quick-Switch Games Carousel Navigation for LIVE games
-      if (liveGamesNow.length > 1) {
+      if (otherLiveGames.length > 1) {
         if (code === TV_KEYS.LEFT) {
           setTvSwitcherIndex((prev) => {
             const next = Math.max(0, prev - 1);
@@ -128,7 +132,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
           e.preventDefault();
         } else if (code === TV_KEYS.RIGHT) {
           setTvSwitcherIndex((prev) => {
-            const next = Math.min(liveGamesNow.length - 1, prev + 1);
+            const next = Math.min(otherLiveGames.length - 1, prev + 1);
             const el = document.getElementById(`tv-switcher-${next}`);
             el?.focus();
             el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -139,8 +143,8 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
           const activeEl = document.activeElement;
           if (activeEl && activeEl.id && activeEl.id.startsWith('tv-switcher-')) {
             const idx = parseInt(activeEl.id.replace('tv-switcher-', ''), 10);
-            if (liveGamesNow[idx] && onSelectGame) {
-              onSelectGame(liveGamesNow[idx]);
+            if (otherLiveGames[idx] && onSelectGame) {
+              onSelectGame(otherLiveGames[idx]);
             }
           }
         }
@@ -149,7 +153,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
 
     window.addEventListener('keydown', handleTvKeys);
     return () => window.removeEventListener('keydown', handleTvKeys);
-  }, [isTv, liveGamesNow, onBack, onSelectGame]);
+  }, [isTv, otherLiveGames, onBack, onSelectGame]);
   // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
   const [selectedQuality, setSelectedQuality] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -322,26 +326,24 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         onQualityChange={setSelectedQuality}
       />
 
-      {/* Live Channels Quick-Switcher (Clean White Card Carousel - Only Games Live Right Now) */}
-      {liveGamesNow.length > 0 && (
-        <div className="bg-white border border-gray-200/90 rounded-2xl p-3 sm:p-4 shadow-xs space-y-2.5">
+      {/* Other Live Games Quick-Switcher (Clean White Card Carousel - Only OTHER Live Games) */}
+      {otherLiveGames.length > 0 && (
+        <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-4.5 shadow-xs space-y-3">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center space-x-2">
-              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-              <span className="text-xs sm:text-sm font-extrabold text-gray-900 tracking-tight">
-                Live Games
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+              <span className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+                Other Live Games
               </span>
             </div>
             <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
-              {liveGamesNow.length} Live Now
+              {otherLiveGames.length} Other Live
             </div>
           </div>
 
           <div className="overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex items-center space-x-2.5 w-fit mx-auto">
-            {liveGamesNow.map((g, idx) => {
-              const isCurrent = g.stream?.streamKey === stream.stream_key || 
-                (game && game.id === g.id);
+            <div className="flex items-center space-x-3 w-fit mx-auto">
+            {otherLiveGames.map((g, idx) => {
               const awayName = g.awayTeam?.shortDisplayName || g.awayTeam?.name || 'Away';
               const homeName = g.homeTeam?.shortDisplayName || g.homeTeam?.name || 'Home';
               const awayScore = g.awayTeam?.score ?? 0;
@@ -354,50 +356,41 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                   id={`tv-switcher-${idx}`}
                   tabIndex={0}
                   onClick={() => onSelectGame?.(g)}
-                  className={`shrink-0 flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-w-[200px] sm:min-w-[220px] transition-all cursor-pointer text-left ${
-                    isCurrent
-                      ? 'bg-emerald-50/60 border-2 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20'
-                      : 'bg-white hover:bg-gray-50 border border-gray-200/90 hover:border-gray-400 shadow-2xs hover:shadow-xs focus:ring-3 focus:ring-orange-500 focus:border-orange-500 focus:outline-none focus:scale-[1.02]'
-                  }`}
+                  className="shrink-0 flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl min-w-[270px] sm:min-w-[310px] transition-all cursor-pointer text-left bg-white hover:bg-gray-50 border border-gray-200/90 hover:border-gray-400 shadow-2xs hover:shadow-xs focus:ring-3 focus:ring-orange-500 focus:border-orange-500 focus:outline-none focus:scale-[1.02]"
                 >
                   {/* Top Matchup Header with Scores */}
                   <div className="flex items-center justify-between w-full space-x-2">
                     {/* Away Team */}
-                    <div className="flex items-center space-x-1.5 min-w-0">
+                    <div className="flex items-center space-x-2 min-w-0">
                       {g.awayTeam?.logo && (
-                        <img src={g.awayTeam.logo} alt="" className="w-5 h-5 object-contain shrink-0" />
+                        <img src={g.awayTeam.logo} alt="" className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0" />
                       )}
-                      <span className="text-xs font-black text-gray-900 truncate">{awayName}</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{awayName}</span>
                     </div>
-                    <span className="text-xs font-black tabular-nums text-gray-900">{awayScore}</span>
+                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{awayScore}</span>
                   </div>
 
-                  <div className="flex items-center justify-between w-full space-x-2 mt-1">
+                  <div className="flex items-center justify-between w-full space-x-2 mt-2">
                     {/* Home Team */}
-                    <div className="flex items-center space-x-1.5 min-w-0">
+                    <div className="flex items-center space-x-2 min-w-0">
                       {g.homeTeam?.logo && (
-                        <img src={g.homeTeam.logo} alt="" className="w-5 h-5 object-contain shrink-0" />
+                        <img src={g.homeTeam.logo} alt="" className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0" />
                       )}
-                      <span className="text-xs font-black text-gray-900 truncate">{homeName}</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{homeName}</span>
                     </div>
-                    <span className="text-xs font-black tabular-nums text-gray-900">{homeScore}</span>
+                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{homeScore}</span>
                   </div>
 
-                  {/* Card Bottom Quarter & Watching Status */}
-                  <div className="flex items-center justify-between pt-2 mt-1.5 border-t border-gray-100 text-[10px] font-bold">
-                    <span className="inline-flex items-center space-x-1 text-red-600">
+                  {/* Card Bottom Quarter & Switch Stream */}
+                  <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-gray-100 text-[11px] font-bold">
+                    <span className="inline-flex items-center space-x-1.5 text-red-600">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
                       <span>{quarterClock}</span>
                     </span>
-                    {isCurrent ? (
-                      <span className="text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md font-extrabold text-[9px] uppercase tracking-wider">
-                        Watching Now
-                      </span>
-                    ) : (
-                      <span className="text-gray-500 hover:text-black text-[9px]">
-                        Switch Stream →
-                      </span>
-                    )}
+                    <span className="text-gray-500 hover:text-black text-[10px] sm:text-[11px] font-semibold flex items-center space-x-0.5">
+                      <span>Switch Stream</span>
+                      <span>→</span>
+                    </span>
                   </div>
                 </button>
               );

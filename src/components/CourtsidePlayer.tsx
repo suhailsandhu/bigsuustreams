@@ -4,7 +4,7 @@ import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle,
-  Layers, Tv
+  Settings, Check, Tv
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
 
@@ -165,6 +165,28 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const isTv = useMemo(() => isSmartTv(), []);
   const isSamsung = useMemo(() => isSamsungSmartTv(), []);
   const [tvAutoplayBlocked, setTvAutoplayBlocked] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(false); // Default OFF for everybody
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [settingsSubmenu, setSettingsSubmenu] = useState<'main' | 'quality' | 'captions'>('main');
+
+  // Sync captions on/off with HLS and native video text tracks
+  useEffect(() => {
+    if (hlsRef.current) {
+      if (captionsEnabled) {
+        if (hlsRef.current.subtitleTracks && hlsRef.current.subtitleTracks.length > 0) {
+          hlsRef.current.subtitleTrack = 0;
+        }
+      } else {
+        hlsRef.current.subtitleTrack = -1;
+      }
+    }
+    const video = videoRef.current;
+    if (video && video.textTracks) {
+      for (let i = 0; i < video.textTracks.length; i++) {
+        video.textTracks[i].mode = captionsEnabled ? 'showing' : 'disabled';
+      }
+    }
+  }, [captionsEnabled]);
 
   // Automatic Picture-in-Picture on swipe-out / app switch for iPhone & Mobile
   useEffect(() => {
@@ -689,26 +711,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     }
   };
 
-  const togglePiP = async () => {
-    const video = videoRef.current;
-    if (!video) return;
-    try {
-      // 1. Apple WebKit (iOS Safari / iPadOS)
-      if ((video as any).webkitSetPresentationMode && (video as any).webkitSupportsPresentationMode?.('picture-in-picture')) {
-        const currentMode = (video as any).webkitPresentationMode;
-        (video as any).webkitSetPresentationMode(currentMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
-      } 
-      // 2. Standard W3C PiP
-      else if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else if (document.pictureInPictureEnabled) {
-        await video.requestPictureInPicture();
-      }
-    } catch (err) {
-      console.warn('PiP error:', err);
-    }
-  };
-
   return (
     <div className="w-full flex flex-col space-y-2.5">
       {/* Top Header Status */}
@@ -905,15 +907,125 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                 </button>
               </div>
 
-              {/* Right: PiP & Fullscreen */}
-              <div className="flex items-center space-x-0.5">
-                <button
-                  onClick={togglePiP}
-                  className="text-gray-600 hover:text-black p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-                  title="Picture in Picture"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                </button>
+              {/* Right: Settings Wheel & Fullscreen */}
+              <div className="flex items-center space-x-1">
+                {/* Settings Wheel */}
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSettingsMenu((prev) => !prev);
+                      setSettingsSubmenu('main');
+                    }}
+                    className={`p-1 rounded-lg transition cursor-pointer ${
+                      showSettingsMenu ? 'bg-gray-200 text-black' : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                    }`}
+                    title="Player Settings"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Settings Popover */}
+                  {showSettingsMenu && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute bottom-full right-0 mb-2 w-48 bg-white/98 backdrop-blur-md border border-gray-200 rounded-xl shadow-xl py-1.5 px-1 z-30 text-xs font-semibold text-gray-800"
+                    >
+                      {settingsSubmenu === 'main' && (
+                        <div className="space-y-0.5">
+                          {/* Quality selector */}
+                          <button
+                            onClick={() => setSettingsSubmenu('quality')}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-left cursor-pointer"
+                          >
+                            <span className="text-gray-600 font-medium">Quality</span>
+                            <span className="text-[11px] font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {selectedQuality} ›
+                            </span>
+                          </button>
+
+                          {/* Captions toggle */}
+                          <button
+                            onClick={() => setSettingsSubmenu('captions')}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-left cursor-pointer"
+                          >
+                            <span className="text-gray-600 font-medium">Captions</span>
+                            <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                              captionsEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {captionsEnabled ? 'On ›' : 'Off ›'}
+                            </span>
+                          </button>
+                        </div>
+                      )}
+
+                      {settingsSubmenu === 'quality' && (
+                        <div>
+                          <button
+                            onClick={() => setSettingsSubmenu('main')}
+                            className="w-full flex items-center space-x-1 px-2.5 py-1 text-[11px] text-gray-500 hover:text-gray-900 border-b border-gray-100 mb-1 cursor-pointer"
+                          >
+                            <span>‹ Back</span>
+                          </button>
+                          <div className="space-y-0.5">
+                            {availableQualities.map((q) => (
+                              <button
+                                key={q}
+                                onClick={() => {
+                                  onQualityChange(q);
+                                  setShowSettingsMenu(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left cursor-pointer ${
+                                  selectedQuality === q ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                <span>{q}</span>
+                                {selectedQuality === q && <Check className="w-3 h-3" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {settingsSubmenu === 'captions' && (
+                        <div>
+                          <button
+                            onClick={() => setSettingsSubmenu('main')}
+                            className="w-full flex items-center space-x-1 px-2.5 py-1 text-[11px] text-gray-500 hover:text-gray-900 border-b border-gray-100 mb-1 cursor-pointer"
+                          >
+                            <span>‹ Back</span>
+                          </button>
+                          <div className="space-y-0.5">
+                            <button
+                              onClick={() => {
+                                setCaptionsEnabled(false);
+                                setShowSettingsMenu(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left cursor-pointer ${
+                                !captionsEnabled ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              <span>Off (Default)</span>
+                              {!captionsEnabled && <Check className="w-3 h-3" />}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCaptionsEnabled(true);
+                                setShowSettingsMenu(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left cursor-pointer ${
+                                captionsEnabled ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              <span>On</span>
+                              {captionsEnabled && <Check className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   onClick={toggleFullscreen}

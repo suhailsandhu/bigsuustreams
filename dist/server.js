@@ -744,7 +744,7 @@ async function getScoreboard(dateStr) {
     const rawState = statusType.state || "pre";
     const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
     const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
-    const isLive = rawState === "in" || isStreamLive && rawState !== "post" || isPastScheduledTime && rawState !== "post" && Boolean(matchedStream);
+    const isLive = rawState === "in" || isPastScheduledTime && rawState !== "post" && (isStreamLive || Boolean(matchedStream));
     const state = rawState === "post" ? "post" : isLive ? "in" : rawState;
     const fallbackKey = `${slugify(awayTeam.displayName || awayTeam.name)}-vs-${slugify(homeTeam.displayName || homeTeam.name)}`;
     const effectiveStreamKey = matchedStream?.stream_key || fallbackKey;
@@ -1128,17 +1128,17 @@ async function getNflScoreboard(dateStr) {
         return streamKeyNorm.includes(homeNorm) || streamKeyNorm.includes(awayNorm);
       });
     }
-    if (!matchedStream) {
+    const statusType = event.status?.type || {};
+    const rawState = statusType.state || "pre";
+    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
+    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
+    if (!matchedStream && (rawState === "in" || isPastScheduledTime && rawState !== "post")) {
       matchedStream = streamsList.find((s) => normalizeName(s.stream_key).includes("redzone"));
     }
     const isStreamLive = Boolean(
       matchedStream?.is_live || Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0 || Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src) => src.live === true || src.is_live === true) || typeof matchedStream?.viewers === "number" && matchedStream.viewers > 10
     );
-    const statusType = event.status?.type || {};
-    const rawState = statusType.state || "pre";
-    const gameTimeMs = event.date ? new Date(event.date).getTime() : 0;
-    const isPastScheduledTime = gameTimeMs > 0 && Date.now() >= gameTimeMs;
-    const isLive = rawState === "in" || isStreamLive && rawState !== "post" || isPastScheduledTime && rawState !== "post" && Boolean(matchedStream);
+    const isLive = rawState === "in" || isPastScheduledTime && rawState !== "post" && (isStreamLive || Boolean(matchedStream));
     const state = rawState === "post" ? "post" : isLive ? "in" : rawState;
     const clock = event.status?.displayClock || "";
     const period = event.status?.period || 0;
