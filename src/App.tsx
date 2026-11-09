@@ -73,8 +73,21 @@ export const App: React.FC = () => {
     setCurrentUser(null);
   };
 
-  // Active Purge: Immediately kick off anyone with old 7777 or revoked passes
+  // Active Purge: Immediately kick off anyone with old passes, previous admin sessions, or 7777 credentials
   useEffect(() => {
+    try {
+      if (localStorage.getItem('bss_kick_epoch_v4') !== '7865_purged') {
+        sessionStorage.removeItem('bigsuu_admin_authorized');
+        sessionStorage.removeItem('bigsuu_admin_pin');
+        localStorage.removeItem('bigsuu_admin_authorized');
+        localStorage.removeItem('bigsuu_admin_pin');
+        localStorage.removeItem('bigsuu_admin_bypass');
+        localStorage.removeItem('bss_theme');
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('bss_kick_epoch_v4', '7865_purged');
+      }
+    } catch {}
+
     const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
     const stored = localStorage.getItem('bigsuu_auth_user');
     if (
@@ -87,6 +100,8 @@ export const App: React.FC = () => {
     ) {
       handleLogout();
     }
+    // Always enforce pure light mode
+    document.documentElement.classList.remove('dark');
   }, []);
 
   // Self-healing account sync: ensures registered member accounts are persisted permanently on server
@@ -358,40 +373,6 @@ export const App: React.FC = () => {
   // Cross-sport live games so NBA & NFL live streams are suggested together
   const [crossSportLiveGames, setCrossSportLiveGames] = useState<ScoreboardGame[]>([]);
 
-  // Dark Mode Theme State with LocalStorage persistence
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bss_theme');
-      if (saved) return saved === 'dark';
-    }
-    return false;
-  });
-
-  const toggleTheme = useCallback(() => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('bss_theme', next ? 'dark' : 'light');
-        if (next) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      }
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  }, [isDarkMode]);
-
   // Fetch the OTHER sport's live games so users can see all live NBA and NFL games in the quick-switcher
   useEffect(() => {
     let isCancelled = false;
@@ -661,18 +642,16 @@ export const App: React.FC = () => {
 
   return (
     <div 
-      style={{ minHeight: '100vh', backgroundColor: isDarkMode ? '#0a0a0c' : '#f8fafc', display: 'flex', flexDirection: 'column' }}
-      className={`min-h-screen flex flex-col ${isDarkMode ? 'dark bg-[#0a0a0c] text-white' : 'bg-[#f8f9fa] text-gray-900'} selection:bg-orange-500/20 selection:text-orange-900 transition-colors`}
+      style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column' }}
+      className="min-h-screen flex flex-col bg-[#f8f9fa] text-gray-900 selection:bg-orange-500/20 selection:text-orange-900"
     >
-      {/* Top Header with Sport Logo, Switcher, and Dark Mode Toggle */}
+      {/* Top Header with Sport Logo and Switcher */}
       <Header
         onNavigateHome={handleBackToHome}
         currentSport={currentSport}
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenProfile={() => setShowProfileModal(true)}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);

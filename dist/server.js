@@ -1138,7 +1138,7 @@ async function getNflScoreboard(dateStr) {
     const isStreamLive = Boolean(
       matchedStream?.is_live || Array.isArray(matchedStream?.live_sources) && matchedStream.live_sources.length > 0 || Array.isArray(matchedStream?.sources) && matchedStream.sources.some((src) => src.live === true || src.is_live === true) || typeof matchedStream?.viewers === "number" && matchedStream.viewers > 10
     );
-    const isLive = rawState === "in" || isPastScheduledTime && rawState !== "post" && (isStreamLive || Boolean(matchedStream));
+    const isLive = rawState === "in" || isPastScheduledTime && rawState !== "pre" && rawState !== "post" && isStreamLive;
     const state = rawState === "post" ? "post" : isLive ? "in" : rawState;
     const clock = event.status?.displayClock || "";
     const period = event.status?.period || 0;
@@ -1869,6 +1869,9 @@ var AuthService = class {
   removeSession(token) {
     this.sessions.delete(token);
   }
+  clearAllSessions() {
+    this.sessions.clear();
+  }
   syncExistingUser(user) {
     const id = user.id || `u_${Date.now()}`;
     const existing = this.users.get(id);
@@ -2281,6 +2284,11 @@ var AnalyticsTracker = class {
   verifyPin(pin) {
     const trimmed = String(pin || "").trim();
     return trimmed === "7865" || trimmed === this.adminPin || trimmed === String(process.env.ADMIN_PIN || "") || trimmed === String(process.env.SITE_PASSCODE || "7865");
+  }
+  clearActiveSessions() {
+    this.activeSessions.clear();
+    this.recentActivity = [];
+    this.persistAnalyticsState();
   }
   getStats() {
     this.cleanup();
@@ -3760,6 +3768,15 @@ app.post("/api/admin/health/audit", async (req, res) => {
     res.status(500).json({ error: err && err.message || "Health audit failed" });
   }
 });
+app.post("/api/admin/kick-all", (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.body?.pin || req.query?.pin;
+  if (!analyticsService.verifyPin(pin)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  authService.clearAllSessions();
+  analyticsService.clearActiveSessions();
+  res.json({ success: true, message: "All online visitors and active sessions have been kicked off." });
+});
 var distPath = path3.join(__dirname, "dist");
 if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
   distPath = __dirname;
@@ -3795,6 +3812,9 @@ async function runAutoSync() {
 runAutoSync();
 setInterval(runAutoSync, 45e3);
 autonomousWatchdog.start();
+authService.clearAllSessions();
+analyticsService.clearActiveSessions();
+console.log("\u26A1 [Admin] Purged all active sessions and online viewers on boot.");
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);
 });

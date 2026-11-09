@@ -88,6 +88,17 @@ interface GameViewProps {
   onSelectGame?: (game: ScoreboardGame) => void;
 }
 
+// Filter for games that are truly live right now (exclude upcoming, scheduled, or final games)
+const isGameActuallyLive = (g: ScoreboardGame): boolean => {
+  if (!g.status?.isLive) return false;
+  if (g.status?.state === 'pre' || g.status?.state === 'post') return false;
+  const detail = (g.status?.shortDetail || g.status?.detail || '').toUpperCase();
+  if (detail.includes(' AM') || detail.includes(' PM') || detail.includes(' ET') || detail.includes(' EST') || detail.includes(' CST') || detail.includes(' PST') || /\d+\/\d+/.test(detail)) {
+    return false;
+  }
+  return true;
+};
+
 export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [], onBack, onSelectGame }) => {
   const isTv = useMemo(() => isSmartTv(), []);
   const [, setTvSwitcherIndex] = useState(0);
@@ -97,14 +108,15 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [stream.stream_key]);
 
-  // Only other games that are ON RIGHT NOW (excluding the currently playing game/stream)
-  const otherLiveGames = useMemo(() => {
-    return allGames.filter((g) => {
-      if (!g.status?.isLive) return false;
-      const isCurrent = g.stream?.streamKey === stream.stream_key || (game && game.id === g.id);
-      return !isCurrent;
-    });
-  }, [allGames, stream.stream_key, game]);
+  // All games that are live right now, including the currently active stream/game
+  const liveGamesNow = useMemo(() => {
+    const list = allGames.filter(isGameActuallyLive);
+    // Ensure the current game is included if available
+    if (game && !list.some((g) => g.id === game.id)) {
+      list.unshift(game);
+    }
+    return list;
+  }, [allGames, game]);
 
   // Samsung TV Remote Control listener (Back button & Channel carousel navigation)
   useEffect(() => {
@@ -120,7 +132,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
       }
 
       // Quick-Switch Games Carousel Navigation for LIVE games
-      if (otherLiveGames.length > 1) {
+      if (liveGamesNow.length > 1) {
         if (code === TV_KEYS.LEFT) {
           setTvSwitcherIndex((prev) => {
             const next = Math.max(0, prev - 1);
@@ -132,7 +144,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
           e.preventDefault();
         } else if (code === TV_KEYS.RIGHT) {
           setTvSwitcherIndex((prev) => {
-            const next = Math.min(otherLiveGames.length - 1, prev + 1);
+            const next = Math.min(liveGamesNow.length - 1, prev + 1);
             const el = document.getElementById(`tv-switcher-${next}`);
             el?.focus();
             el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -143,8 +155,8 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
           const activeEl = document.activeElement;
           if (activeEl && activeEl.id && activeEl.id.startsWith('tv-switcher-')) {
             const idx = parseInt(activeEl.id.replace('tv-switcher-', ''), 10);
-            if (otherLiveGames[idx] && onSelectGame) {
-              onSelectGame(otherLiveGames[idx]);
+            if (liveGamesNow[idx] && onSelectGame) {
+              onSelectGame(liveGamesNow[idx]);
             }
           }
         }
@@ -153,7 +165,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
 
     window.addEventListener('keydown', handleTvKeys);
     return () => window.removeEventListener('keydown', handleTvKeys);
-  }, [isTv, otherLiveGames, onBack, onSelectGame]);
+  }, [isTv, liveGamesNow, onBack, onSelectGame]);
   // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
   const [selectedQuality, setSelectedQuality] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -326,71 +338,89 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         onQualityChange={setSelectedQuality}
       />
 
-      {/* Other Live Games Quick-Switcher (Clean White Card Carousel - Only OTHER Live Games) */}
-      {otherLiveGames.length > 0 && (
-        <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-4.5 shadow-xs space-y-3">
+      {/* Live Games Quick-Switcher (Bigger Cards, Light Green Highlight for Current Game) */}
+      {liveGamesNow.length > 0 && (
+        <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
           <div className="flex items-center justify-between px-1">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
               <span className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
-                Other Live Games
+                Live Games
               </span>
             </div>
-            <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
-              {otherLiveGames.length} Other Live
+            <div className="text-[11px] sm:text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-0.5 rounded-full">
+              {liveGamesNow.length} Live Now
             </div>
           </div>
 
-          <div className="overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex items-center space-x-3 w-fit mx-auto">
-            {otherLiveGames.map((g, idx) => {
+          <div className="overflow-x-auto pb-1.5 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center justify-center space-x-3.5 sm:space-x-5 w-fit mx-auto min-w-full sm:min-w-0">
+            {liveGamesNow.map((g, idx) => {
               const awayName = g.awayTeam?.shortDisplayName || g.awayTeam?.name || 'Away';
               const homeName = g.homeTeam?.shortDisplayName || g.homeTeam?.name || 'Home';
               const awayScore = g.awayTeam?.score ?? 0;
               const homeScore = g.homeTeam?.score ?? 0;
               const quarterClock = g.status?.shortDetail || g.status?.detail || 'LIVE';
+              const isCurrent = g.stream?.streamKey === stream.stream_key || (game && game.id === g.id);
 
               return (
                 <button
                   key={g.id}
                   id={`tv-switcher-${idx}`}
                   tabIndex={0}
-                  onClick={() => onSelectGame?.(g)}
-                  className="shrink-0 flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl min-w-[270px] sm:min-w-[310px] transition-all cursor-pointer text-left bg-white hover:bg-gray-50 border border-gray-200/90 hover:border-gray-400 shadow-2xs hover:shadow-xs focus:ring-3 focus:ring-orange-500 focus:border-orange-500 focus:outline-none focus:scale-[1.02]"
+                  onClick={() => {
+                    if (!isCurrent) {
+                      onSelectGame?.(g);
+                    }
+                  }}
+                  className={`shrink-0 flex flex-col justify-between p-4 sm:p-5 rounded-2xl min-w-[320px] sm:min-w-[380px] md:min-w-[420px] transition-all text-left shadow-2xs hover:shadow-xs focus:ring-3 focus:ring-emerald-500 focus:outline-none focus:scale-[1.02] cursor-pointer ${
+                    isCurrent
+                      ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-sm ring-3 ring-emerald-500/25'
+                      : 'bg-white hover:bg-gray-50 border border-gray-200/90 hover:border-gray-300'
+                  }`}
                 >
                   {/* Top Matchup Header with Scores */}
-                  <div className="flex items-center justify-between w-full space-x-2">
+                  <div className="flex items-center justify-between w-full space-x-3">
                     {/* Away Team */}
-                    <div className="flex items-center space-x-2 min-w-0">
+                    <div className="flex items-center space-x-2.5 min-w-0">
                       {g.awayTeam?.logo && (
-                        <img src={g.awayTeam.logo} alt="" className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0" />
+                        <img src={g.awayTeam.logo} alt="" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 drop-shadow-2xs" />
                       )}
-                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{awayName}</span>
+                      <span className="text-sm sm:text-base font-extrabold text-gray-900 truncate">{awayName}</span>
                     </div>
-                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{awayScore}</span>
+                    <span className="text-sm sm:text-xl font-black tabular-nums text-gray-900">{awayScore}</span>
                   </div>
 
-                  <div className="flex items-center justify-between w-full space-x-2 mt-2">
+                  <div className="flex items-center justify-between w-full space-x-3 mt-3">
                     {/* Home Team */}
-                    <div className="flex items-center space-x-2 min-w-0">
+                    <div className="flex items-center space-x-2.5 min-w-0">
                       {g.homeTeam?.logo && (
-                        <img src={g.homeTeam.logo} alt="" className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0" />
+                        <img src={g.homeTeam.logo} alt="" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 drop-shadow-2xs" />
                       )}
-                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{homeName}</span>
+                      <span className="text-sm sm:text-base font-extrabold text-gray-900 truncate">{homeName}</span>
                     </div>
-                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{homeScore}</span>
+                    <span className="text-sm sm:text-xl font-black tabular-nums text-gray-900">{homeScore}</span>
                   </div>
 
-                  {/* Card Bottom Quarter & Switch Stream */}
-                  <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-gray-100 text-[11px] font-bold">
+                  {/* Card Bottom Quarter & Switch Stream / Watching Now Badge */}
+                  <div className={`flex items-center justify-between pt-3 mt-3 border-t text-xs font-bold ${
+                    isCurrent ? 'border-emerald-200/80' : 'border-gray-100'
+                  }`}>
                     <span className="inline-flex items-center space-x-1.5 text-red-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-                      <span>{quarterClock}</span>
+                      <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                      <span className="text-xs sm:text-sm font-extrabold">{quarterClock}</span>
                     </span>
-                    <span className="text-gray-500 hover:text-black text-[10px] sm:text-[11px] font-semibold flex items-center space-x-0.5">
-                      <span>Switch Stream</span>
-                      <span>→</span>
-                    </span>
+                    {isCurrent ? (
+                      <span className="inline-flex items-center space-x-1.5 text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        <span>Watching Now</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 hover:text-black text-xs font-semibold flex items-center space-x-1">
+                        <span>Switch Stream</span>
+                        <span>→</span>
+                      </span>
+                    )}
                   </div>
                 </button>
               );

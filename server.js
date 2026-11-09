@@ -863,6 +863,17 @@ app.post('/api/admin/health/audit', async (req, res) => {
   }
 });
 
+// Force kick-off for all active sessions & online users
+app.post('/api/admin/kick-all', (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.body?.pin || req.query?.pin;
+  if (!analyticsService.verifyPin(pin)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  authService.clearAllSessions();
+  analyticsService.clearActiveSessions();
+  res.json({ success: true, message: 'All online visitors and active sessions have been kicked off.' });
+});
+
 // Detect dist directory whether running from root or dist/
 let distPath = path.join(__dirname, 'dist');
 if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html'))) {
@@ -921,6 +932,11 @@ setInterval(runAutoSync, 45000);
 
 // Start autonomous background watchdog (pregame stream preparation & health monitor)
 autonomousWatchdog.start();
+
+// Purge all old active sessions and online viewers on startup
+authService.clearAllSessions();
+analyticsService.clearActiveSessions();
+console.log('⚡ [Admin] Purged all active sessions and online viewers on boot.');
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);

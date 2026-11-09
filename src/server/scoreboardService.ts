@@ -765,9 +765,9 @@ export async function getNflScoreboard(dateStr?: string): Promise<ScoreboardResp
       (typeof matchedStream?.viewers === 'number' && matchedStream.viewers > 10)
     );
 
-    // A game can ONLY be live if ESPN reports 'in' OR if it is past scheduled kickoff and stream is live
+    // A game can ONLY be live if ESPN reports 'in' OR if it is past scheduled kickoff and rawState is not 'pre' and stream is confirmed live
     const isLive = rawState === 'in' || 
-      (isPastScheduledTime && (rawState as string) !== 'post' && (isStreamLive || Boolean(matchedStream)));
+      (isPastScheduledTime && rawState !== 'pre' && (rawState as string) !== 'post' && isStreamLive);
     const state: 'pre' | 'in' | 'post' = (rawState as string) === 'post' ? 'post' : (isLive ? 'in' : rawState);
 
     // Parse football quarter and live game clock

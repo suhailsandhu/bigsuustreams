@@ -608,6 +608,10 @@ class AuthService {
     this.sessions.delete(token);
   }
 
+  public clearAllSessions() {
+    this.sessions.clear();
+  }
+
   public syncExistingUser(user: Partial<UserAccount>): UserAccount {
     const id = user.id || `u_${Date.now()}`;
     const existing = this.users.get(id);

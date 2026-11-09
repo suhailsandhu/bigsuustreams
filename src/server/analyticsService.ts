@@ -473,6 +473,12 @@ class AnalyticsTracker {
     );
   }
 
+  public clearActiveSessions() {
+    this.activeSessions.clear();
+    this.recentActivity = [];
+    this.persistAnalyticsState();
+  }
+
   public getStats() {
     this.cleanup();
     const now = Date.now();
