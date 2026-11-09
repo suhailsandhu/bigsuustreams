@@ -576,8 +576,8 @@ export const App: React.FC = () => {
           />
         ) : (
           <div 
-            style={{ maxWidth: '896px', margin: '0 auto', width: '100%' }}
-            className="max-w-4xl mx-auto space-y-2 sm:space-y-2.5"
+            style={{ maxWidth: isTv ? '896px' : '1024px', margin: '0 auto', width: '100%' }}
+            className={`mx-auto space-y-2 sm:space-y-2.5 ${isTv ? 'max-w-4xl' : 'max-w-5xl'}`}
           >
             {/* Smart TV Remote Navigation Helper Banner */}
             {isTv && (
@@ -600,7 +600,7 @@ export const App: React.FC = () => {
 
             {/* Loading Skeleton */}
             {isLoading && (
-              <div className="space-y-2 sm:space-y-2.5">
+              <div className={isTv ? "space-y-2 sm:space-y-2.5" : "grid grid-cols-1 md:grid-cols-2 gap-3"}>
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="h-28 rounded-2xl bg-white border border-gray-200 animate-pulse shadow-xs" />
                 ))}
@@ -625,7 +625,7 @@ export const App: React.FC = () => {
 
             {/* Games List (Scoreboard & Live Feeds & Highlights) */}
             {!isLoading && !error && (
-              <div className="space-y-2 sm:space-y-2.5">
+              <div className={isTv ? "space-y-2 sm:space-y-2.5" : "grid grid-cols-1 md:grid-cols-2 gap-3"}>
                 {allGames.length > 0 ? (
                   allGames.map((game, idx) => (
                     <GameRow
@@ -641,7 +641,7 @@ export const App: React.FC = () => {
                     />
                   ))
                 ) : (
-                  <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center shadow-xs">
+                  <div className={`bg-white border border-gray-200 rounded-2xl p-12 text-center shadow-xs ${!isTv ? 'md:col-span-2' : ''}`}>
                     <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <h3 className="text-lg font-bold text-gray-900 mb-1">
                       No {currentSport.toUpperCase()} Games Scheduled

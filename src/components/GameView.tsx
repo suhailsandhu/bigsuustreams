@@ -329,7 +329,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
             <div className="flex items-center space-x-2">
               <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
               <span className="text-xs sm:text-sm font-extrabold text-gray-900 tracking-tight">
-                Live Games On Right Now
+                Live Games
               </span>
             </div>
             <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
@@ -337,7 +337,8 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
             </div>
           </div>
 
-          <div className="flex items-center space-x-2.5 overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center space-x-2.5 w-fit mx-auto">
             {liveGamesNow.map((g, idx) => {
               const isCurrent = g.stream?.streamKey === stream.stream_key || 
                 (game && game.id === g.id);
@@ -401,6 +402,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       )}

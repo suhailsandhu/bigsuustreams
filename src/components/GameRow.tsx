@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Trophy, Film, Clock } from 'lucide-react';
+import { Play, Trophy, Clock } from 'lucide-react';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
 import type { SportsTeam } from '../data/nbaTeams.ts';
 
@@ -133,7 +133,7 @@ export const GameRow: React.FC<GameRowProps> = ({
         }
       }}
       style={cardStyle}
-      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border transition-all p-2 sm:p-2.5 select-none cursor-pointer ${
+      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border transition-all p-2 sm:p-2.5 select-none cursor-pointer flex flex-col justify-between h-full ${
         isTvFocused
           ? 'ring-4 ring-orange-500 border-orange-500 scale-[1.02] shadow-2xl z-10 bg-orange-50/20'
           : isFavoriteGame
@@ -319,25 +319,6 @@ export const GameRow: React.FC<GameRowProps> = ({
         </div>
       )}
 
-      {/* For Completed Games: 'Watch Highlights' Button for NBA and NFL */}
-      {isFinal && (
-        <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onWatchHighlights) {
-                onWatchHighlights(game);
-              } else {
-                onWatchGame(game);
-              }
-            }}
-            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition active:scale-98 cursor-pointer"
-          >
-            <Film className="w-3.5 h-3.5" />
-            <span>Watch Highlights</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };
