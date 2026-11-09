@@ -5,20 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node scripts/postprocess-css.mjs && esbuild server.js --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "typecheck": "tsc -b",
+    "build": "node scripts/build.mjs",
     "start": "node dist/server.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.3.0",
-    "hls.js": "^1.7.4",
-    "lucide-react": "^1.66.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
-  },
-  "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -27,11 +20,19 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-legacy": "^8.2.4",
     "@vitejs/plugin-react": "^6.1.2",
+    "cors": "^2.8.6",
     "esbuild": "^0.28.2",
-    "oxlint": "^1.89.0",
+    "express": "^5.3.0",
+    "hls.js": "^1.7.4",
+    "lucide-react": "^1.66.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.3",
     "terser": "^5.51.2",
     "typescript": "~7.0.2",
     "vite": "^8.3.5"
+  },
+  "devDependencies": {
+    "oxlint": "^1.89.0"
   }
 }

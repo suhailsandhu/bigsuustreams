@@ -8,7 +8,7 @@ interface SiteGateProps {
 
 const isPasscodeValid = (p: string) => {
   const c = p.trim().toLowerCase();
-  return c === '7777' || c === '77777' || c === '2222' || c === 'lebronisthegoat';
+  return c === '7777' || c === '77777';
 };
 
 export const SiteGate: React.FC<SiteGateProps> = ({ onUnlock, onOpenLegal }) => {

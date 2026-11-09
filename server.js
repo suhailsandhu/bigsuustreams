@@ -225,11 +225,11 @@ app.post('/api/user/preferences', (req, res) => {
   res.json({ success: true });
 });
 
-// Passcode gate support (Passcode 7777 / 2222)
+// Passcode gate support (Passcode 7777)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || '').trim().toLowerCase();
-  if (clean === '7777' || clean === '77777' || clean === '2222' || clean === 'lebronisthegoat') {
+  if (clean === '7777' || clean === '77777') {
     const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString('base64');
     const user = { 
       id: 'vip_7777', 
@@ -303,17 +303,14 @@ function requireSiteAccess(req, res, next) {
 
   const token = rawToken.trim();
 
-  // 1. VIP Passcode validation (passcode 7777 / 2222 tokens)
+  // 1. VIP Passcode validation (passcode 7777 tokens)
   if (
     token.includes('7777') ||
-    token.includes('2222') ||
-    token.includes('lebronisthegoat') ||
     token.startsWith('bigsuu_') ||
     token.startsWith('verified_') ||
     token.startsWith('local_token_') ||
     token.startsWith('google_token_') ||
-    token.startsWith('token_7777') ||
-    token.startsWith('token_2222')
+    token.startsWith('token_7777')
   ) {
     return next();
   }

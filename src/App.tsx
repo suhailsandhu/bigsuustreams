@@ -519,6 +519,7 @@ export const App: React.FC = () => {
           <GameView
             stream={selectedStream}
             game={selectedGame}
+            allGames={allGames}
             onBack={handleBackToHome}
           />
         ) : (

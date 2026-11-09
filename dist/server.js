@@ -2265,7 +2265,7 @@ var AnalyticsTracker = class {
   }
   verifyPin(pin) {
     const trimmed = String(pin || "").trim();
-    return trimmed === "7777" || trimmed === "77777" || trimmed === "2222" || trimmed === "suhail7865" || trimmed === this.adminPin || trimmed === String(process.env.ADMIN_PIN || "") || trimmed === String(process.env.SITE_PASSCODE || "7777");
+    return trimmed === "7777" || trimmed === "77777" || trimmed === "suhail7865" || trimmed === this.adminPin || trimmed === String(process.env.ADMIN_PIN || "") || trimmed === String(process.env.SITE_PASSCODE || "7777");
   }
   getStats() {
     this.cleanup();
@@ -3276,7 +3276,7 @@ app.post("/api/user/preferences", (req, res) => {
 app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || "").trim().toLowerCase();
-  if (clean === "7777" || clean === "77777" || clean === "2222" || clean === "lebronisthegoat") {
+  if (clean === "7777" || clean === "77777") {
     const token = Buffer.from(`bigsuu_${Date.now()}_7777`).toString("base64");
     const user = {
       id: "vip_7777",

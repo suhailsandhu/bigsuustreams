@@ -183,8 +183,8 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
     setLoading(true);
     setError(null);
 
-    // Fast-path client unlock for 7777 / 77777 / 2222
-    if (cleanPin === '7777' || cleanPin === '77777' || cleanPin === '2222') {
+    // Fast-path client unlock for 7777 / 77777
+    if (cleanPin === '7777' || cleanPin === '77777') {
       sessionStorage.setItem('bigsuu_admin_authorized', 'true');
       sessionStorage.setItem('bigsuu_admin_pin', '7777');
       setIsAuthorized(true);
@@ -210,7 +210,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         setError(data.error || 'Invalid Admin Passcode');
       }
     } catch {
-      if (cleanPin === '7777' || cleanPin === '77777' || cleanPin === '2222') {
+      if (cleanPin === '7777' || cleanPin === '77777') {
         sessionStorage.setItem('bigsuu_admin_authorized', 'true');
         sessionStorage.setItem('bigsuu_admin_pin', '7777');
         setIsAuthorized(true);

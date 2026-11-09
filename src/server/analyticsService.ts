@@ -477,7 +477,6 @@ class AnalyticsTracker {
     return (
       trimmed === '7777' ||
       trimmed === '77777' ||
-      trimmed === '2222' ||
       trimmed === 'suhail7865' ||
       trimmed === this.adminPin ||
       trimmed === String(process.env.ADMIN_PIN || '') ||

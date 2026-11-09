@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Share2, Check, Trophy, RefreshCw, LayoutGrid } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
 import { CourtsidePlayer } from './CourtsidePlayer';
+import { MultiViewPlayer } from './MultiViewPlayer';
 import { formatTipoffTime, fetchGameSummary } from '../services/api';
 
 // Helper to highlight leader stats in green, highest turnovers in red, and +/- positive/negative
@@ -82,10 +83,12 @@ function getStatHighlightClass(
 interface GameViewProps {
   stream: Stream;
   game?: ScoreboardGame | null;
+  allGames?: ScoreboardGame[];
   onBack: () => void;
 }
 
-export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
+export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames, onBack }) => {
+  const [isMultiView, setIsMultiView] = useState(false);
   // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
   const [selectedQuality, setSelectedQuality] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -251,12 +254,42 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, onBack }) => {
         </div>
       </div>
 
-      {/* Primary Video Player Component */}
-      <CourtsidePlayer
-        stream={stream}
-        selectedQuality={selectedQuality}
-        onQualityChange={setSelectedQuality}
-      />
+      {/* Video Player Section: Multi-View Stage or Single Courtside Player */}
+      {isMultiView ? (
+        <MultiViewPlayer
+          initialStream={stream}
+          initialGame={game}
+          allGames={allGames}
+          onExit={() => setIsMultiView(false)}
+        />
+      ) : (
+        <>
+          <CourtsidePlayer
+            stream={stream}
+            selectedQuality={selectedQuality}
+            onQualityChange={setSelectedQuality}
+          />
+
+          {/* Multi-View Mode Trigger Bar */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setIsMultiView(true)}
+              className="inline-flex items-center space-x-2 bg-white hover:bg-gray-50 text-gray-900 border border-gray-200/90 hover:border-gray-300 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-2xl shadow-2xs transition-all cursor-pointer active:scale-95 group"
+            >
+              <div className="w-5 h-5 rounded-lg bg-orange-50 group-hover:bg-orange-100 text-orange-600 flex items-center justify-center transition-colors">
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </div>
+              <span>Multi-View Mode</span>
+              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full tracking-wide">
+                Up to 4 Streams
+              </span>
+            </button>
+            <span className="text-xs text-gray-500 font-medium hidden sm:inline">
+              Watch up to 4 games at once
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Matchup Header & Live Scoreboard Section (Symmetrical 3-Column Layout) */}
       <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">

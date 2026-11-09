@@ -8,7 +8,7 @@ function isOwnerOrAdmin(): boolean {
     const raw = localStorage.getItem('bigsuu_auth_user');
     if (raw) {
       const u = JSON.parse(raw);
-      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_7777' || u.id === 'vip_2222' || u.username === 'admin') return true;
+      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_7777' || u.username === 'admin') return true;
     }
   } catch {
     // ignore
