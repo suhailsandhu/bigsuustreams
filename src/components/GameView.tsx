@@ -331,9 +331,6 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
               <span className="text-xs sm:text-sm font-extrabold text-gray-900 tracking-tight">
                 Live Games On Right Now
               </span>
-              <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">
-                • Use remote ◄ / ► to browse, OK to switch
-              </span>
             </div>
             <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
               {liveGamesNow.length} Live Now
