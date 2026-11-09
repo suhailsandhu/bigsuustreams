@@ -6,11 +6,6 @@ import { authService } from './authService.ts';
 
 declare const process: any;
 
-const EXCLUDED_EMAILS = [
-  (process.env.ADMIN_EMAIL || '').trim().toLowerCase(),
-  'owner@bss.internal',
-  'vip@bss.internal'
-].filter(Boolean);
 const DATA_DIR = path.join(process.cwd(), 'data');
 const VISITORS_FILE = path.join(DATA_DIR, 'visitors.json');
 const ANALYTICS_STATE_FILE = path.join(DATA_DIR, 'analytics_history.json');
@@ -307,7 +302,7 @@ class AnalyticsTracker {
   }
 
   private cleanup() {
-    const cutoff = Date.now() - 60000; // 60 seconds inactivity
+    const cutoff = Date.now() - 180000; // 3 minutes inactivity (aligned 100% with Umami Cloud active window)
     for (const [id, session] of this.activeSessions.entries()) {
       if (session.lastPing < cutoff) {
         this.activeSessions.delete(id);
@@ -342,19 +337,15 @@ class AnalyticsTracker {
       sessionDuration?: number;
       quality?: string;
       isInitial?: boolean;
+      isAdmin?: boolean;
     },
     clientIp?: string
   ) {
-    // 1. FILTER OWNER/ADMIN TRAFFIC: Ignore if user matches configured admin email
-    const email = (payload.userEmail || '').trim().toLowerCase();
-    if (email && EXCLUDED_EMAILS.includes(email)) {
-      return;
-    }
-
     this.resetDailyIfNewDay();
 
+    const email = (payload.userEmail || '').trim().toLowerCase();
     const device = this.normalizeDevice(payload.device || '');
-    const deviceTag = payload.deviceTag || device;
+    const deviceTag = payload.deviceTag || (payload.isAdmin ? `${device} [Admin]` : device);
     const deviceId = payload.deviceId || sessionId;
     const clientHash = `${clientIp || 'client'}_${sessionId}`;
     const isNewToday = !this.uniqueVisitorsToday.has(clientHash);
@@ -487,7 +478,7 @@ class AnalyticsTracker {
   public getStats() {
     this.cleanup();
     const now = Date.now();
-    const cutoff = now - 60000;
+    const cutoff = now - 180000; // 3 minutes live window matching Umami Cloud
 
     let liveVisitors = 0;
     let liveWatchers = 0;

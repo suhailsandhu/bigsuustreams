@@ -1903,11 +1903,6 @@ var AuthService = class {
 var authService = new AuthService();
 
 // src/server/analyticsService.ts
-var EXCLUDED_EMAILS = [
-  (process.env.ADMIN_EMAIL || "").trim().toLowerCase(),
-  "owner@bss.internal",
-  "vip@bss.internal"
-].filter(Boolean);
 var DATA_DIR2 = path2.join(process.cwd(), "data");
 var VISITORS_FILE = path2.join(DATA_DIR2, "visitors.json");
 var ANALYTICS_STATE_FILE = path2.join(DATA_DIR2, "analytics_history.json");
@@ -2138,7 +2133,7 @@ var AnalyticsTracker = class {
     }
   }
   cleanup() {
-    const cutoff = Date.now() - 6e4;
+    const cutoff = Date.now() - 18e4;
     for (const [id, session] of this.activeSessions.entries()) {
       if (session.lastPing < cutoff) {
         this.activeSessions.delete(id);
@@ -2154,13 +2149,10 @@ var AnalyticsTracker = class {
     return "Other";
   }
   recordPing(sessionId, payload, clientIp) {
-    const email = (payload.userEmail || "").trim().toLowerCase();
-    if (email && EXCLUDED_EMAILS.includes(email)) {
-      return;
-    }
     this.resetDailyIfNewDay();
+    const email = (payload.userEmail || "").trim().toLowerCase();
     const device = this.normalizeDevice(payload.device || "");
-    const deviceTag = payload.deviceTag || device;
+    const deviceTag = payload.deviceTag || (payload.isAdmin ? `${device} [Admin]` : device);
     const deviceId = payload.deviceId || sessionId;
     const clientHash = `${clientIp || "client"}_${sessionId}`;
     const isNewToday = !this.uniqueVisitorsToday.has(clientHash);
@@ -2270,7 +2262,7 @@ var AnalyticsTracker = class {
   getStats() {
     this.cleanup();
     const now = Date.now();
-    const cutoff = now - 6e4;
+    const cutoff = now - 18e4;
     let liveVisitors = 0;
     let liveWatchers = 0;
     const currentWatchersByStream = /* @__PURE__ */ new Map();

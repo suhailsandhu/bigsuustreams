@@ -173,6 +173,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [liveViewMode, setLiveViewMode] = useState<'cards' | 'table'>('table');
   const [selectedUser, setSelectedUser] = useState<RegisteredUser | null>(null);
   const [memberFilter, setMemberFilter] = useState<'all' | 'online' | 'google' | 'direct'>('all');
+  const [memberSortBy, setMemberSortBy] = useState<'createdAt' | 'lastOnline' | 'watchTime' | 'lastActive'>('createdAt');
 
   // Authenticate Admin PIN
   const handleAuth = async (e?: React.FormEvent) => {
@@ -291,7 +292,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
       fetchStats();
       const interval = setInterval(() => {
         fetchStats();
-      }, 15000);
+      }, 3000); // 3-second rapid heartbeat for 100% live telemetry with Umami
       return () => clearInterval(interval);
     }
   }, [isOpen, isAuthorized, fetchStats]);
@@ -387,8 +388,26 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
       users = users.filter(u => u.provider === 'local');
     }
 
-    // Always sort members in order of when they signed up (newest first)
+    // Sort members based on selected criteria
     users.sort((a, b) => {
+      if (memberSortBy === 'lastOnline') {
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+        const timeA = new Date(a.stats?.lastOnline || a.lastLogin || 0).getTime();
+        const timeB = new Date(b.stats?.lastOnline || b.lastLogin || 0).getTime();
+        return timeB - timeA;
+      }
+      if (memberSortBy === 'watchTime') {
+        const wtA = a.stats?.totalWatchSeconds || 0;
+        const wtB = b.stats?.totalWatchSeconds || 0;
+        return wtB - wtA;
+      }
+      if (memberSortBy === 'lastActive') {
+        const timeA = new Date(a.stats?.lastOnline || a.lastLogin || a.createdAt || 0).getTime();
+        const timeB = new Date(b.stats?.lastOnline || b.lastLogin || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      }
+      // Default: createdAt (Account Created - newest first)
       const timeA = new Date(a.createdAt || 0).getTime();
       const timeB = new Date(b.createdAt || 0).getTime();
       return timeB - timeA;
@@ -1231,6 +1250,34 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                         }`}
                       >
                         {filterKey === 'all' ? 'All' : filterKey === 'online' ? 'Online Now' : filterKey === 'google' ? 'Google Auth' : 'Direct'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sort Bar (Sort by Last Online, Account Created, Watch Time, Last Active) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-neutral-50/80 rounded-xl border border-neutral-200/70 text-xs">
+                  <div className="flex items-center space-x-1.5 text-neutral-500 font-semibold text-[11px]">
+                    <span>Sort Members By:</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { key: 'createdAt', label: 'Account Created' },
+                      { key: 'lastOnline', label: 'Last Online' },
+                      { key: 'watchTime', label: 'Watch Time' },
+                      { key: 'lastActive', label: 'Last Active' }
+                    ].map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() => setMemberSortBy(s.key as any)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          memberSortBy === s.key
+                            ? 'bg-neutral-900 text-white shadow-2xs'
+                            : 'bg-white text-neutral-600 hover:text-neutral-900 border border-neutral-200 hover:bg-neutral-100'
+                        }`}
+                      >
+                        {s.label}
                       </button>
                     ))}
                   </div>

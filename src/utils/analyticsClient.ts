@@ -379,7 +379,16 @@ export function trackPageView(streamKey?: string, gameName?: string) {
   if (!pingInterval) {
     pingInterval = setInterval(() => {
       sendPing(false);
-    }, 20000); // 20s heartbeat
+    }, 6000); // 6s heartbeat for instant real-time sync with Umami
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', () => sendPing(false));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          sendPing(false);
+        }
+      });
+    }
   }
 }
 
@@ -397,17 +406,14 @@ export function updateCurrentStream(streamKey?: string, gameName?: string) {
 }
 
 function sendPing(isInitial: boolean) {
-  // OWNER EXCLUSION: If from admin / owner session, exclude completely from analytics
-  if (isOwnerOrAdmin()) {
-    return;
-  }
-
+  const isAdmin = isOwnerOrAdmin();
   const user = getLoggedInUser();
 
   const sessionId = getSessionId();
   const deviceId = getDeviceId();
   const visitCount = getVisitCount();
   const { category, tag } = detectDetailedDevice();
+  const deviceTag = isAdmin ? `${tag} [Admin]` : tag;
   const path = window.location.hash || '/';
   const timezone = getTimezone();
   const sessionDuration = getSessionDurationSeconds();
@@ -421,7 +427,7 @@ function sendPing(isInitial: boolean) {
       deviceId,
       visitCount,
       device: category,
-      deviceTag: tag,
+      deviceTag,
       userId: user?.id,
       userEmail: user?.email,
       username: user?.username,
@@ -432,7 +438,8 @@ function sendPing(isInitial: boolean) {
       timezone,
       sessionDuration,
       quality,
-      isInitial
+      isInitial,
+      isAdmin
     }),
     keepalive: true
   }).catch(() => {

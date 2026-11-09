@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Hls from 'hls.js';
 import { 
   Volume2, VolumeX, X, Plus, Maximize2, ArrowLeft, 
-  RefreshCw, AlertCircle, LayoutGrid, Check, Trophy, Search, Tv
+  RefreshCw, AlertCircle, LayoutGrid, Check, Trophy, Search, Tv, RotateCw
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
-import { isSmartTv, getTvHlsConfig } from '../utils/tvDetector.ts';
+import { isSmartTv, getMultiViewHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
 import { formatTipoffTime } from '../services/api.ts';
 
 interface MultiStreamSlot {
@@ -24,12 +24,13 @@ interface MultiViewPlayerProps {
 }
 
 // ============================================================================
-// Single Multi-View Stream Tile Component
+// Single Multi-View Stream Tile Component (Ultra-fast Loading Engine)
 // ============================================================================
 const MultiViewTile: React.FC<{
   slot: MultiStreamSlot;
   index: number;
   isAudioActive: boolean;
+  isFocused?: boolean;
   onFocusAudio: () => void;
   onWatchBigScreen: () => void;
   onClose?: () => void;
@@ -39,6 +40,7 @@ const MultiViewTile: React.FC<{
   slot,
   index,
   isAudioActive,
+  isFocused = false,
   onFocusAudio,
   onWatchBigScreen,
   onClose,
@@ -72,7 +74,7 @@ const MultiViewTile: React.FC<{
     }
   }, [isAudioActive]);
 
-  // Load HLS Stream with Bulletproof Concurrent iOS Safari & Desktop Support
+  // Load HLS Stream with Sub-Second Start & Smart TV Hardware Acceleration
   const loadStream = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -89,21 +91,30 @@ const MultiViewTile: React.FC<{
     const tokenParam = token ? `?t=${encodeURIComponent(token)}` : '';
     const isNfl = stream.category === 'football' || stream.league === 'NFL' || stream.name.toLowerCase().includes('nfl');
     const sportPrefix = isNfl ? 'football' : 'basketball';
-    const targetUrl = `/api/${sportPrefix}/hls/${stream.stream_key}/${quality}.m3u8${tokenParam}`;
+    // Use 720p for fast lightweight loading in 2x2 grid, 1080p when big screen
+    const targetQuality = isBigScreen ? '1080p' : (quality || '720p');
+    const targetUrl = `/api/${sportPrefix}/hls/${stream.stream_key}/${targetQuality}.m3u8${tokenParam}`;
 
-    // Desktop Chrome, Firefox, Edge, Android (MSE Support)
+    // Desktop Chrome, Firefox, Edge, Android, Smart TVs (MSE Support)
     if (Hls.isSupported()) {
-      const tvConfig = getTvHlsConfig(isTv);
+      const mvConfig = getMultiViewHlsConfig(isTv);
       const hls = new Hls({
-        enableWorker: tvConfig.enableWorker,
-        lowLatencyMode: false,
-        backBufferLength: 10,
-        maxBufferLength: 15,
-        maxMaxBufferLength: 25,
-        maxBufferSize: 25 * 1024 * 1024,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 5,
+        enableWorker: mvConfig.enableWorker,
+        lowLatencyMode: true,
+        backBufferLength: mvConfig.backBufferLength,
+        maxBufferLength: isBigScreen ? 12 : mvConfig.maxBufferLength,
+        maxMaxBufferLength: isBigScreen ? 20 : mvConfig.maxMaxBufferLength,
+        maxBufferSize: isBigScreen ? 15 * 1024 * 1024 : mvConfig.maxBufferSize,
+        liveSyncDurationCount: isBigScreen ? 2 : mvConfig.liveSyncDurationCount,
+        liveMaxLatencyDurationCount: mvConfig.liveMaxLatencyDurationCount,
+        initialLiveManifestSize: 1, // Start on 1st manifest immediately
+        startLevel: isBigScreen ? -1 : 0, // Instant start on low bitrate, then step up smoothly
+        capLevelToPlayerSize: !isBigScreen, // Free TV hardware decoders from over-rendering
         maxBufferHole: 0.5,
+        nudgeOffset: mvConfig.nudgeOffset,
+        nudgeMaxRetry: mvConfig.nudgeMaxRetry,
+        fragLoadingTimeOut: mvConfig.fragLoadingTimeOut,
+        manifestLoadingTimeOut: mvConfig.manifestLoadingTimeOut,
         xhrSetup: (xhr) => {
           if (token) {
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -118,12 +129,19 @@ const MultiViewTile: React.FC<{
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
         video.muted = !isAudioActive;
-        video.play().catch(() => {
-          video.muted = true;
-          video.play().catch(() => {
-            setIsLoading(false);
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            video.muted = true;
+            video.play().catch(() => {
+              setIsLoading(false);
+            });
           });
-        });
+        }
+      });
+
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        setIsLoading(false);
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -140,26 +158,33 @@ const MultiViewTile: React.FC<{
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // iPhone / iPad / Safari Native HLS:
-      // In iOS Safari, concurrent videos must explicitly have muted=true on DOM creation to avoid autoplay blocking
       video.muted = !isAudioActive;
+      video.playsInline = true;
+      video.preload = 'auto';
       video.src = targetUrl;
       video.load();
 
       const onCanPlay = () => {
         setIsLoading(false);
-        video.play().catch(() => {
-          video.muted = true;
-          video.play().catch(() => {});
-        });
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            video.muted = true;
+            video.play().catch(() => {});
+          });
+        }
       };
 
       video.addEventListener('canplay', onCanPlay, { once: true });
-      video.addEventListener('loadedmetadata', () => setIsLoading(false), { once: true });
+      video.addEventListener('loadedmetadata', () => {
+        setIsLoading(false);
+        video.play().catch(() => {});
+      }, { once: true });
     } else {
       setHasError(true);
       setIsLoading(false);
     }
-  }, [stream.stream_key, stream.category, stream.league, stream.name, quality, isAudioActive, isTv]);
+  }, [stream.stream_key, stream.category, stream.league, stream.name, quality, isAudioActive, isTv, isBigScreen]);
 
   useEffect(() => {
     loadStream();
@@ -176,8 +201,8 @@ const MultiViewTile: React.FC<{
     return (
       <div 
         onClick={onFocusAudio}
-        className={`relative aspect-video bg-black rounded-2xl overflow-hidden shadow-md transition-all ${
-          isAudioActive ? 'ring-2 ring-emerald-500' : 'border border-gray-200'
+        className={`relative aspect-video w-full bg-black rounded-2xl overflow-hidden shadow-md transition-all ${
+          isFocused ? 'ring-4 ring-orange-500 scale-[1.01]' : isAudioActive ? 'ring-2 ring-emerald-500' : 'border border-gray-800'
         }`}
       >
         <iframe
@@ -187,21 +212,21 @@ const MultiViewTile: React.FC<{
           className="w-full h-full border-0 pointer-events-none"
         />
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-20 pointer-events-auto">
-          <div className="flex items-center space-x-1.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-white text-[10px] font-bold">
+          <div className="flex items-center space-x-1.5 bg-black/90 px-2.5 py-1 rounded-full border border-white/10 text-white text-[11px] font-bold">
             <span>{team1Name} @ {team2Name}</span>
           </div>
           <div className="flex items-center space-x-1.5">
             <button
               onClick={(e) => { e.stopPropagation(); onWatchBigScreen(); }}
-              className="bg-black/70 hover:bg-black text-white px-2 py-1 rounded-full text-[10px] font-bold flex items-center space-x-1"
+              className="bg-black/80 hover:bg-black text-white px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center space-x-1 border border-white/10"
             >
-              <Maximize2 className="w-3 h-3" />
+              <Maximize2 className="w-3 h-3 text-orange-400" />
               <span>Big Screen</span>
             </button>
             {canClose && onClose && (
               <button
                 onClick={(e) => { e.stopPropagation(); onClose(); }}
-                className="w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                className="w-7 h-7 rounded-full bg-black/80 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -215,13 +240,16 @@ const MultiViewTile: React.FC<{
   return (
     <div
       onClick={onFocusAudio}
-      className={`group relative aspect-video bg-neutral-950 rounded-2xl overflow-hidden shadow-md select-none cursor-pointer transition-all duration-200 ${
-        isAudioActive 
-          ? 'ring-2 ring-emerald-500 shadow-emerald-500/20' 
-          : 'border border-gray-800 hover:border-gray-600'
+      tabIndex={0}
+      className={`group relative aspect-video w-full bg-neutral-950 rounded-2xl overflow-hidden select-none cursor-pointer transition-all duration-150 transform-gpu ${
+        isFocused 
+          ? 'ring-4 ring-orange-500 scale-[1.01] shadow-2xl z-10' 
+          : isAudioActive 
+            ? 'ring-2 ring-emerald-500 shadow-lg shadow-emerald-500/20' 
+            : 'border border-gray-800/80 hover:border-gray-600'
       }`}
     >
-      {/* Video Element with iOS Safari concurrency attributes */}
+      {/* Video Element with iOS Safari concurrency & TV attributes */}
       <video
         ref={videoRef}
         playsInline
@@ -236,12 +264,12 @@ const MultiViewTile: React.FC<{
         className="w-full h-full object-contain bg-black"
       />
 
-      {/* Loading Overlay */}
+      {/* Instant Fast Loading Spinner */}
       {isLoading && (
-        <div className="absolute inset-0 bg-neutral-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-10 pointer-events-none">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
-          <span className="text-[10px] font-bold text-white uppercase tracking-wider mt-1.5">
-            Connecting Stream {index + 1}...
+        <div className="absolute inset-0 bg-neutral-950/70 flex flex-col items-center justify-center z-10 pointer-events-none">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+          <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider mt-2 bg-black/70 px-2 py-0.5 rounded-full">
+            Loading Stream {index + 1}...
           </span>
         </div>
       )}
@@ -249,39 +277,44 @@ const MultiViewTile: React.FC<{
       {/* Error Overlay */}
       {hasError && !isLoading && (
         <div className="absolute inset-0 bg-neutral-950/90 flex flex-col items-center justify-center p-3 text-center z-10">
-          <AlertCircle className="w-5 h-5 text-orange-500 mb-1" />
-          <span className="text-[11px] font-bold text-white">Stream Initializing</span>
+          <AlertCircle className="w-6 h-6 text-orange-500 mb-1" />
+          <span className="text-xs font-bold text-white">Stream Connecting</span>
           <button
             onClick={(e) => { e.stopPropagation(); loadStream(); }}
-            className="mt-1.5 inline-flex items-center space-x-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-full transition-colors"
+            className="mt-2 inline-flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>Retry</span>
           </button>
         </div>
       )}
 
-      {/* Top Header Overlay Bar */}
+      {/* Top Header Overlay Bar (High contrast for Living Room TV & Mobile) */}
       <div className="absolute top-1.5 left-1.5 right-1.5 sm:top-2 sm:left-2 sm:right-2 flex items-center justify-between z-20 pointer-events-auto">
         {/* Left: Team Matchup & Score */}
-        <div className="flex items-center space-x-1 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-white shadow-xs max-w-[60%]">
+        <div className="flex items-center space-x-1.5 bg-black/85 px-2.5 py-1 rounded-full border border-white/15 text-white shadow-md max-w-[65%]">
           {game?.awayTeam?.logo && (
-            <img src={game.awayTeam.logo} alt="" className="w-3 h-3 object-contain" />
+            <img src={game.awayTeam.logo} alt="" className="w-3.5 h-3.5 object-contain" />
           )}
-          <span className="text-[10px] sm:text-[11px] font-black truncate">
+          <span className="text-[10px] sm:text-xs font-black truncate">
             {team1Name} {isLive && awayScore > 0 ? awayScore : ''}
           </span>
           <span className="text-[9px] text-gray-400 font-bold">@</span>
           {game?.homeTeam?.logo && (
-            <img src={game.homeTeam.logo} alt="" className="w-3 h-3 object-contain" />
+            <img src={game.homeTeam.logo} alt="" className="w-3.5 h-3.5 object-contain" />
           )}
-          <span className="text-[10px] sm:text-[11px] font-black truncate">
+          <span className="text-[10px] sm:text-xs font-black truncate">
             {team2Name} {isLive && homeScore > 0 ? homeScore : ''}
           </span>
+          {statusDetail && (
+            <span className="text-[9px] text-gray-400 font-bold ml-1 hidden sm:inline">
+              • {statusDetail}
+            </span>
+          )}
         </div>
 
         {/* Right: Audio Focus, Big Screen Expand, Close */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1.5">
           {/* Audio Focus Toggle Button */}
           <button
             onClick={(e) => {
@@ -289,21 +322,21 @@ const MultiViewTile: React.FC<{
               onFocusAudio();
             }}
             title={isAudioActive ? 'Sound playing from this stream' : 'Click to listen to this stream'}
-            className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold flex items-center space-x-1 transition-all active:scale-95 ${
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-extrabold flex items-center space-x-1.5 transition-all active:scale-95 cursor-pointer ${
               isAudioActive
-                ? 'bg-emerald-600 text-white shadow-emerald-500/30'
-                : 'bg-black/70 hover:bg-black text-gray-300 border border-white/10'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                : 'bg-black/80 hover:bg-black text-gray-300 border border-white/15'
             }`}
           >
             {isAudioActive ? (
               <>
-                <Volume2 className="w-3 h-3 animate-pulse text-white" />
-                <span className="font-extrabold hidden sm:inline">Listening</span>
+                <Volume2 className="w-3.5 h-3.5 animate-pulse text-white" />
+                <span>Audio Active</span>
               </>
             ) : (
               <>
-                <VolumeX className="w-3 h-3 text-gray-400" />
-                <span className="hidden sm:inline">Listen</span>
+                <VolumeX className="w-3.5 h-3.5 text-gray-400" />
+                <span>Listen</span>
               </>
             )}
           </button>
@@ -316,9 +349,9 @@ const MultiViewTile: React.FC<{
                 onWatchBigScreen();
               }}
               title="Watch in Big Screen"
-              className="bg-black/70 hover:bg-black text-white/90 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold flex items-center space-x-1 border border-white/10 transition-colors"
+              className="bg-black/80 hover:bg-black text-white/95 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-extrabold flex items-center space-x-1 border border-white/15 transition-colors cursor-pointer"
             >
-              <Tv className="w-3 h-3 text-orange-400" />
+              <Tv className="w-3.5 h-3.5 text-orange-400" />
               <span className="hidden sm:inline">Big Screen</span>
             </button>
           )}
@@ -331,27 +364,27 @@ const MultiViewTile: React.FC<{
                 onClose();
               }}
               title="Remove stream"
-              className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-black/70 hover:bg-red-600 text-gray-300 hover:text-white flex items-center justify-center border border-white/10 transition-colors"
+              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/80 hover:bg-red-600 text-gray-300 hover:text-white flex items-center justify-center border border-white/15 transition-colors cursor-pointer"
             >
-              <X className="w-3 h-3" />
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Bottom Hint on Tap/Hover */}
-      <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <span className="text-[8px] sm:text-[9px] font-bold text-white/80 bg-black/60 px-1.5 py-0.5 rounded-md">
-          {stream.league || 'NBA'} • Tap for sound
+      {/* Bottom Hint for Sound & Expand */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <span className="text-[9px] sm:text-[10px] font-bold text-white/90 bg-black/75 px-2 py-0.5 rounded-md">
+          {stream.league || 'NBA'} • Click for sound
         </span>
         <button
           onClick={(e) => {
             e.stopPropagation();
             onWatchBigScreen();
           }}
-          className="pointer-events-auto text-[8px] sm:text-[9px] font-bold text-orange-400 bg-black/70 hover:bg-black px-1.5 py-0.5 rounded-md flex items-center space-x-0.5"
+          className="pointer-events-auto text-[9px] sm:text-[10px] font-bold text-orange-400 bg-black/80 hover:bg-black px-2 py-0.5 rounded-md flex items-center space-x-1"
         >
-          <Maximize2 className="w-2.5 h-2.5" />
+          <Maximize2 className="w-3 h-3" />
           <span>Expand</span>
         </button>
       </div>
@@ -366,19 +399,23 @@ const AddStreamCard: React.FC<{
   currentCount: number;
   maxStreams: number;
   onClick: () => void;
-}> = ({ currentCount, maxStreams, onClick }) => {
+  isFocused?: boolean;
+}> = ({ currentCount, maxStreams, onClick, isFocused = false }) => {
   return (
     <button
       onClick={onClick}
-      className="relative aspect-video rounded-2xl border-2 border-dashed border-gray-300 hover:border-gray-400 bg-white/60 hover:bg-white text-gray-600 hover:text-gray-900 flex flex-col items-center justify-center p-3 sm:p-6 transition-all duration-200 group cursor-pointer shadow-2xs hover:shadow-sm"
+      tabIndex={0}
+      className={`relative aspect-video w-full rounded-2xl border-2 border-dashed border-gray-400 hover:border-white bg-neutral-900/60 hover:bg-neutral-900 text-gray-300 hover:text-white flex flex-col items-center justify-center p-3 sm:p-6 transition-all duration-150 group cursor-pointer ${
+        isFocused ? 'ring-4 ring-orange-500 border-solid border-orange-500 scale-[1.01]' : ''
+      }`}
     >
-      <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-gray-100 group-hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-transform group-hover:scale-110 mb-1.5 sm:mb-2">
-        <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+      <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-transform group-hover:scale-110 mb-1.5 sm:mb-2">
+        <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
-      <span className="text-xs sm:text-sm font-extrabold text-gray-900 group-hover:text-black">
+      <span className="text-xs sm:text-sm font-black text-white">
         Add Game
       </span>
-      <span className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5">
+      <span className="text-[10px] sm:text-xs text-gray-400 font-medium mt-0.5">
         Stream {currentCount + 1} of {maxStreams}
       </span>
     </button>
@@ -413,29 +450,29 @@ const GamePickerModal: React.FC<{
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white border border-gray-200 rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+      <div className="bg-neutral-900 border border-gray-700 rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-gray-800 flex items-center justify-between">
           <div>
-            <h3 className="text-sm sm:text-base font-extrabold text-gray-900">
+            <h3 className="text-sm sm:text-base font-extrabold text-white">
               Add Game to Multi-View
             </h3>
-            <p className="text-[11px] sm:text-xs text-gray-500 font-medium mt-0.5">
+            <p className="text-[11px] sm:text-xs text-gray-400 font-medium mt-0.5">
               Select any live or scheduled game to watch simultaneously.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Filter & Search */}
-        <div className="p-3 sm:p-4 border-b border-gray-100 bg-gray-50/50 space-y-2.5">
+        <div className="p-3 sm:p-4 border-b border-gray-800 bg-neutral-950/50 space-y-2.5">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -443,7 +480,7 @@ const GamePickerModal: React.FC<{
               placeholder="Search team or matchup..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-hidden focus:border-gray-400 shadow-2xs"
+              className="w-full bg-neutral-800 border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-white placeholder:text-gray-400 focus:outline-hidden focus:border-orange-500 shadow-2xs"
             />
           </div>
 
@@ -454,8 +491,8 @@ const GamePickerModal: React.FC<{
                 onClick={() => setSportFilter(s)}
                 className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase transition-all cursor-pointer ${
                   sportFilter === s
-                    ? 'bg-black text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'bg-neutral-800 text-gray-300 hover:bg-neutral-700 border border-gray-700'
                 }`}
               >
                 {s === 'all' ? 'All Games' : s}
@@ -479,24 +516,24 @@ const GamePickerModal: React.FC<{
               return (
                 <div
                   key={game.id}
-                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50/70 transition-all bg-white"
+                  className="flex items-center justify-between p-3 rounded-2xl border border-gray-800 hover:border-gray-700 hover:bg-neutral-800/80 transition-all bg-neutral-900"
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 p-1 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-neutral-800 border border-gray-700 p-1 flex items-center justify-center shrink-0">
                       {game.awayTeam?.logo ? (
                         <img src={game.awayTeam.logo} alt="" className="w-full h-full object-contain" />
                       ) : (
-                        <Trophy className="w-3.5 h-3.5 text-gray-400" />
+                        <Trophy className="w-4 h-4 text-gray-400" />
                       )}
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center space-x-1.5">
-                        <span className="text-xs font-extrabold text-gray-900 truncate">
+                        <span className="text-xs font-extrabold text-white truncate">
                           {awayName}
                         </span>
                         <span className="text-xs text-gray-400 font-bold">@</span>
-                        <span className="text-xs font-extrabold text-gray-900 truncate">
+                        <span className="text-xs font-extrabold text-white truncate">
                           {homeName}
                         </span>
                       </div>
@@ -505,15 +542,15 @@ const GamePickerModal: React.FC<{
                           {game.league || 'NBA'}
                         </span>
                         {isLive ? (
-                          <span className="inline-flex items-center space-x-1 text-[9px] font-extrabold text-red-600">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                          <span className="inline-flex items-center space-x-1 text-[9px] font-extrabold text-red-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                             <span>{game.status?.shortDetail || 'LIVE'}</span>
                             <span className="tabular-nums font-black ml-1">
                               ({game.awayTeam?.score} - {game.homeTeam?.score})
                             </span>
                           </span>
                         ) : (
-                          <span className="text-[9px] font-medium text-gray-500">
+                          <span className="text-[9px] font-medium text-gray-400">
                             {game.status?.shortDetail || 'Scheduled'}
                           </span>
                         )}
@@ -523,8 +560,8 @@ const GamePickerModal: React.FC<{
 
                   <div>
                     {isAlreadyActive ? (
-                      <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
-                        <Check className="w-3 h-3" />
+                      <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-gray-400 bg-neutral-800 px-3 py-1.5 rounded-full border border-gray-700">
+                        <Check className="w-3 h-3 text-emerald-400" />
                         <span>Watching</span>
                       </span>
                     ) : (
@@ -533,9 +570,9 @@ const GamePickerModal: React.FC<{
                           onSelectGame(game);
                           onClose();
                         }}
-                        className="inline-flex items-center space-x-1 text-[11px] font-bold text-white bg-black hover:bg-neutral-800 px-3 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
+                        className="inline-flex items-center space-x-1 text-[11px] font-bold text-white bg-orange-600 hover:bg-orange-500 px-3.5 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                         <span>Add</span>
                       </button>
                     )}
@@ -567,6 +604,43 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [audioSlotIndex, setAudioSlotIndex] = useState(0);
   const [bigScreenIndex, setBigScreenIndex] = useState<number | null>(null);
+  const [tvFocusIndex, setTvFocusIndex] = useState(0);
+
+  // Detect mobile & iPhone for full-screen landscape court presentation
+  const isIPhone = typeof navigator !== 'undefined' && /iPhone|iPod|iPad/i.test(navigator.userAgent);
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || isIPhone);
+  const [isLandscape, setIsLandscape] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth > window.innerHeight;
+  });
+
+  // Track window orientation
+  useEffect(() => {
+    const handleOrientation = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleOrientation);
+    window.addEventListener('orientationchange', handleOrientation);
+
+    // Auto-request landscape orientation & fullscreen on iPhone / mobile
+    if (isMobile) {
+      try {
+        // @ts-ignore
+        if (screen.orientation && typeof screen.orientation.lock === 'function') {
+          // @ts-ignore
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch {}
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleOrientation);
+      window.removeEventListener('orientationchange', handleOrientation);
+    };
+  }, [isMobile]);
 
   // Up to 4 active stream slots
   const [slots, setSlots] = useState<MultiStreamSlot[]>([
@@ -578,6 +652,58 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
     }
   ]);
 
+  // Remote Control (Smart TV D-Pad & Keyboard navigation)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const code = e.keyCode;
+
+      // RETURN / BACK on Samsung Tizen & LG TV remotes, Escape, Backspace
+      if (code === TV_KEYS.RETURN || code === TV_KEYS.ESCAPE || code === TV_KEYS.BACKSPACE) {
+        if (isPickerOpen) {
+          setIsPickerOpen(false);
+          e.preventDefault();
+          return;
+        }
+        if (bigScreenIndex !== null) {
+          setBigScreenIndex(null);
+          e.preventDefault();
+          return;
+        }
+        onExit();
+        e.preventDefault();
+        return;
+      }
+
+      // ARROW KEYS (D-PAD Navigation across 2x2 grid)
+      if (code === TV_KEYS.LEFT) {
+        setTvFocusIndex((prev) => Math.max(0, prev - 1));
+        e.preventDefault();
+      } else if (code === TV_KEYS.RIGHT) {
+        setTvFocusIndex((prev) => Math.min(slots.length - 1, prev + 1));
+        e.preventDefault();
+      } else if (code === TV_KEYS.UP) {
+        setTvFocusIndex((prev) => (prev >= 2 ? prev - 2 : prev));
+        e.preventDefault();
+      } else if (code === TV_KEYS.DOWN) {
+        setTvFocusIndex((prev) => (prev + 2 < slots.length ? prev + 2 : prev));
+        e.preventDefault();
+      } else if (code === TV_KEYS.ENTER) {
+        // ENTER activates audio or toggles Big Screen
+        if (tvFocusIndex >= 0 && tvFocusIndex < slots.length) {
+          if (audioSlotIndex !== tvFocusIndex) {
+            setAudioSlotIndex(tvFocusIndex);
+          } else {
+            setBigScreenIndex(bigScreenIndex === tvFocusIndex ? null : tvFocusIndex);
+          }
+        }
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [slots.length, tvFocusIndex, audioSlotIndex, bigScreenIndex, isPickerOpen, onExit]);
+
   // Remove a slot
   const handleRemoveSlot = (index: number) => {
     if (slots.length <= 1) return;
@@ -588,7 +714,7 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
     }
     if (bigScreenIndex !== null) {
       if (bigScreenIndex === index) {
-        setBigScreenIndex(null); // return to quad grid if the big screen tile was removed
+        setBigScreenIndex(null);
       } else if (bigScreenIndex > index) {
         setBigScreenIndex(bigScreenIndex - 1);
       }
@@ -601,11 +727,9 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
 
     let streamObj: Stream;
 
-    // 1. Direct streamData if already matched
     if (game.stream?.streamData) {
       streamObj = game.stream.streamData;
     } else {
-      // 2. Build reliable stream object for playback
       const isNfl = game.league === 'NFL' || game.id?.startsWith('nfl_');
       const awayName = game.awayTeam?.displayName || game.awayTeam?.name || 'Away';
       const homeName = game.homeTeam?.displayName || game.homeTeam?.name || 'Home';
@@ -651,34 +775,41 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
   const activeStreamKeys = slots.map((s) => s.stream.stream_key);
 
   return (
-    <div ref={containerRef} className="w-full space-y-3">
-      {/* Top Multi-View Control Header */}
-      <div className="flex items-center justify-between bg-white border border-gray-200/90 rounded-2xl px-3 sm:px-4 py-2.5 shadow-2xs">
+    <div 
+      ref={containerRef} 
+      className={`w-full ${
+        isMobile 
+          ? 'fixed inset-0 z-50 bg-black flex flex-col w-screen h-screen overflow-hidden p-1.5' 
+          : 'space-y-3'
+      }`}
+    >
+      {/* Top Multi-View Control Header (Clean, minimalist, TV & iPhone optimized) */}
+      <div className="flex items-center justify-between bg-neutral-900 border border-gray-800 rounded-2xl px-3 sm:px-4 py-2 shadow-md shrink-0">
         <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             onClick={onExit}
-            className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full transition-colors cursor-pointer active:scale-95"
+            className="flex items-center space-x-1.5 text-xs font-bold text-gray-200 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors cursor-pointer active:scale-95"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Single View</span>
           </button>
 
-          <div className="h-4 w-px bg-gray-200" />
+          <div className="h-4 w-px bg-gray-700" />
 
           {/* Toggle between 2x2 Grid View and Big Screen View */}
           {bigScreenIndex !== null ? (
             <button
               onClick={() => setBigScreenIndex(null)}
-              className="flex items-center space-x-1.5 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 text-xs font-extrabold text-orange-400 bg-orange-950/60 hover:bg-orange-900/60 border border-orange-500/40 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Switch to 2x2 Grid</span>
             </button>
           ) : (
             <div className="flex items-center space-x-1.5">
-              <LayoutGrid className="w-4 h-4 text-orange-600" />
-              <span className="text-xs font-extrabold text-gray-900">
-                2x2 Multi-View ({slots.length}/4)
+              <LayoutGrid className="w-4 h-4 text-orange-500" />
+              <span className="text-xs font-extrabold text-white">
+                2x2 Court View ({slots.length}/4)
               </span>
             </div>
           )}
@@ -686,10 +817,18 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center space-x-2">
+          {/* iPhone Portrait Warning Hint */}
+          {isMobile && !isLandscape && (
+            <div className="hidden sm:flex items-center space-x-1 text-[11px] font-bold text-orange-400 bg-orange-950/60 px-2.5 py-1 rounded-full border border-orange-500/30">
+              <RotateCw className="w-3 h-3 animate-spin" />
+              <span>Rotate Landscape for Fullscreen</span>
+            </div>
+          )}
+
           {slots.length < 4 && (
             <button
               onClick={() => setIsPickerOpen(true)}
-              className="inline-flex items-center space-x-1 text-xs font-bold text-white bg-black hover:bg-neutral-800 px-3 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
+              className="inline-flex items-center space-x-1 text-xs font-extrabold text-white bg-orange-600 hover:bg-orange-500 px-3.5 py-1.5 rounded-full transition-all cursor-pointer active:scale-95 shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Game</span>
@@ -700,13 +839,14 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
 
       {/* VIEW MODE 1: Big Screen Focus View (1 Big Screen on top, other 3 mini-tiles below) */}
       {bigScreenIndex !== null && slots[bigScreenIndex] && (
-        <div className="space-y-3">
+        <div className="flex-1 flex flex-col space-y-2 overflow-y-auto min-h-0">
           {/* Featured Big Screen Player */}
-          <div className="w-full">
+          <div className="w-full flex-1 min-h-0 flex items-center justify-center">
             <MultiViewTile
               slot={slots[bigScreenIndex]}
               index={bigScreenIndex}
               isAudioActive={audioSlotIndex === bigScreenIndex}
+              isFocused={tvFocusIndex === bigScreenIndex}
               onFocusAudio={() => setAudioSlotIndex(bigScreenIndex)}
               onWatchBigScreen={() => {}}
               canClose={slots.length > 1}
@@ -717,11 +857,11 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
 
           {/* Other streams in mini strip below */}
           {slots.length > 1 && (
-            <div>
-              <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
+            <div className="shrink-0 pb-1">
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">
                 Other Active Streams (Tap to switch Big Screen)
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {slots.map((slot, idx) => {
                   if (idx === bigScreenIndex) return null;
                   return (
@@ -730,6 +870,7 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
                         slot={slot}
                         index={idx}
                         isAudioActive={audioSlotIndex === idx}
+                        isFocused={tvFocusIndex === idx}
                         onFocusAudio={() => {
                           setAudioSlotIndex(idx);
                           setBigScreenIndex(idx);
@@ -749,6 +890,7 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
                   <AddStreamCard
                     currentCount={slots.length}
                     maxStreams={4}
+                    isFocused={tvFocusIndex === slots.length}
                     onClick={() => setIsPickerOpen(true)}
                   />
                 )}
@@ -758,32 +900,46 @@ export const MultiViewPlayer: React.FC<MultiViewPlayerProps> = ({
         </div>
       )}
 
-      {/* VIEW MODE 2: Quad 2x2 Grid View (Optimized for iPhone & Desktop: 2 on top, 2 on bottom) */}
+      {/* VIEW MODE 2: Quad 2x2 Grid View (2 on Top, 2 on Bottom on iPhone and Desktop) */}
       {bigScreenIndex === null && (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
+        <div 
+          className={`grid grid-cols-2 ${
+            isMobile 
+              ? 'flex-1 grid-rows-2 gap-1.5 w-full h-full min-h-0' 
+              : 'gap-2.5 sm:gap-3.5'
+          }`}
+        >
           {slots.map((slot, idx) => (
-            <MultiViewTile
-              key={slot.id}
-              slot={slot}
-              index={idx}
-              isAudioActive={audioSlotIndex === idx}
-              onFocusAudio={() => setAudioSlotIndex(idx)}
-              onWatchBigScreen={() => {
-                setBigScreenIndex(idx);
-                setAudioSlotIndex(idx);
-              }}
-              canClose={slots.length > 1}
-              onClose={() => handleRemoveSlot(idx)}
-            />
+            <div 
+              key={slot.id} 
+              className={isMobile ? 'w-full h-full flex items-center justify-center min-h-0' : ''}
+            >
+              <MultiViewTile
+                slot={slot}
+                index={idx}
+                isAudioActive={audioSlotIndex === idx}
+                isFocused={tvFocusIndex === idx}
+                onFocusAudio={() => setAudioSlotIndex(idx)}
+                onWatchBigScreen={() => {
+                  setBigScreenIndex(idx);
+                  setAudioSlotIndex(idx);
+                }}
+                canClose={slots.length > 1}
+                onClose={() => handleRemoveSlot(idx)}
+              />
+            </div>
           ))}
 
           {/* Add Stream Slot if < 4 active streams */}
           {slots.length < 4 && (
-            <AddStreamCard
-              currentCount={slots.length}
-              maxStreams={4}
-              onClick={() => setIsPickerOpen(true)}
-            />
+            <div className={isMobile ? 'w-full h-full flex items-center justify-center min-h-0' : ''}>
+              <AddStreamCard
+                currentCount={slots.length}
+                maxStreams={4}
+                isFocused={tvFocusIndex === slots.length}
+                onClick={() => setIsPickerOpen(true)}
+              />
+            </div>
           )}
         </div>
       )}
