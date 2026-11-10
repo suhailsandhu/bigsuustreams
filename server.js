@@ -874,6 +874,52 @@ app.post('/api/admin/kick-all', (req, res) => {
   res.json({ success: true, message: 'All online visitors and active sessions have been kicked off.' });
 });
 
+// Maintenance / Updating State Tracker
+let isUpdating = false;
+const MAINTENANCE_FILE = path.join(__dirname, '.bss_updating');
+
+function checkIsUpdating() {
+  return isUpdating || fs.existsSync(MAINTENANCE_FILE);
+}
+
+// Ensure stale maintenance flag is purged on boot
+try {
+  if (fs.existsSync(MAINTENANCE_FILE)) {
+    fs.unlinkSync(MAINTENANCE_FILE);
+  }
+} catch {}
+
+// System Status Endpoint (Ultra-fast healthcheck used by client to detect updates/maintenance)
+app.get('/api/system-status', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const updating = checkIsUpdating();
+  res.status(200).json({
+    status: updating ? 'updating' : 'ok',
+    updating: updating,
+    message: updating ? 'Website is updating. Check back in two minutes.' : 'System operational'
+  });
+});
+
+// Admin Maintenance Mode Switch: allows manually toggling "Website is updating" screen
+app.post('/api/admin/maintenance', (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.body?.pin || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid Admin PIN' });
+  }
+
+  const enabled = Boolean(req.body?.enabled ?? true);
+  isUpdating = enabled;
+  try {
+    if (enabled) {
+      fs.writeFileSync(MAINTENANCE_FILE, Date.now().toString());
+    } else {
+      if (fs.existsSync(MAINTENANCE_FILE)) fs.unlinkSync(MAINTENANCE_FILE);
+    }
+  } catch {}
+
+  res.json({ success: true, updating: isUpdating, message: isUpdating ? 'Website is updating screen enabled' : 'Maintenance mode disabled' });
+});
+
 // Automated Remote Deployment Endpoint: Enables 1-click & Agent-driven Zero-Touch VPS updates
 app.post('/api/admin/deploy', async (req, res) => {
   const pin = req.headers['x-admin-pin'] || req.body?.pin || req.query?.pin;
@@ -881,12 +927,21 @@ app.post('/api/admin/deploy', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized: Invalid Admin PIN' });
   }
 
-  res.json({ success: true, message: 'Deployment initiated. Pulling latest code from GitHub and restarting PM2...' });
+  // 1. Instantly trigger updating screen for all connected clients
+  isUpdating = true;
+  try {
+    fs.writeFileSync(MAINTENANCE_FILE, Date.now().toString());
+  } catch {}
 
-  // Execute git pull & pm2 restart in background after response
+  res.json({
+    success: true,
+    message: 'Deployment initiated. Website is updating screen activated.'
+  });
+
+  // 2. Wait 2.5 seconds so all clients receive update event and display the update screen before PM2 restarts
   setTimeout(() => {
     import('child_process').then(({ exec }) => {
-      exec('cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && pm2 restart all && pm2 save', (error, stdout, stderr) => {
+      exec('cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && rm -f .bss_updating dist/.bss_updating && pm2 restart all && pm2 save', (error, stdout, stderr) => {
         if (error) {
           console.error('[Auto-Deploy] Deployment failed:', error, stderr);
         } else {
@@ -896,7 +951,7 @@ app.post('/api/admin/deploy', async (req, res) => {
     }).catch(err => {
       console.error('[Auto-Deploy] Failed to load child_process:', err);
     });
-  }, 500);
+  }, 2500);
 });
 
 // Detect dist directory whether running from root or dist/
@@ -908,6 +963,16 @@ if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html')
 // Explicit Admin and QuickAccess route direct access (compatible with Express 5 path-to-regexp)
 app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Dedicated /updating route
+app.get('/updating', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const updatingHtml = path.join(distPath, 'updating.html');
+  if (fs.existsSync(updatingHtml)) {
+    return res.sendFile(updatingHtml);
+  }
   res.sendFile(path.join(distPath, 'index.html'));
 });
 

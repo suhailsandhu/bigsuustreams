@@ -387,6 +387,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         console.warn('HLS.js event error:', data.type, data.details);
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('bss_check_status'));
+        }
         if (data.fatal) {
           if (retryCountRef.current < (isTv ? 2 : 4)) {
             retryCountRef.current += 1;

@@ -14,6 +14,7 @@ import { AdminStatsModal } from './components/AdminStatsModal.tsx';
 import { AuthModal } from './components/AuthModal.tsx';
 import { LegalModal } from './components/LegalModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
+import { UpdatingScreen } from './components/UpdatingScreen.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { findTeamByQuery } from './data/nbaTeams.ts';
 import { isSmartTv } from './utils/tvDetector.ts';
@@ -132,6 +133,62 @@ export const App: React.FC = () => {
   // VIP Member Profile modal & custom settings reactivity
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [settingsTick, setSettingsTick] = useState(0);
+
+  // Website is Updating / Maintenance State
+  const [isSiteUpdating, setIsSiteUpdating] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/updating')) {
+      return true;
+    }
+    return false;
+  });
+
+  // Automated Site Update / Maintenance Heartbeat
+  useEffect(() => {
+    let failureCount = 0;
+
+    const checkSystemStatus = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        const res = await fetch('/api/system-status', {
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.updating === true) {
+            setIsSiteUpdating(true);
+            failureCount = 0;
+          } else if (isSiteUpdating && data?.updating === false) {
+            window.location.reload();
+          } else {
+            failureCount = 0;
+          }
+        } else if (res.status === 502 || res.status === 503) {
+          setIsSiteUpdating(true);
+        }
+      } catch {
+        // If consecutive network pings fail while site is live, server is restarting
+        failureCount++;
+        if (failureCount >= 2) {
+          setIsSiteUpdating(true);
+        }
+      }
+    };
+
+    const handleCheckTrigger = () => checkSystemStatus();
+    window.addEventListener('bss_check_status', handleCheckTrigger);
+
+    const interval = setInterval(checkSystemStatus, 3000);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('bss_check_status', handleCheckTrigger);
+    };
+  }, [isSiteUpdating]);
 
   // Anti-reverse-engineering & client-side security guards
   useEffect(() => {
@@ -831,6 +888,11 @@ export const App: React.FC = () => {
           setShowInstallModal(false);
         }}
       />
+
+      {/* Website is Updating Screen (Triggered during VPS deploy / server maintenance) */}
+      {isSiteUpdating && (
+        <UpdatingScreen onBackOnline={() => window.location.reload()} />
+      )}
     </div>
   );
 };

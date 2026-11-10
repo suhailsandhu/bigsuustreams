@@ -3818,15 +3818,60 @@ app.post("/api/admin/kick-all", (req, res) => {
   analytics.clearActiveSessions();
   res.json({ success: true, message: "All online visitors and active sessions have been kicked off." });
 });
+var isUpdating = false;
+var MAINTENANCE_FILE = path3.join(__dirname, ".bss_updating");
+function checkIsUpdating() {
+  return isUpdating || fs3.existsSync(MAINTENANCE_FILE);
+}
+try {
+  if (fs3.existsSync(MAINTENANCE_FILE)) {
+    fs3.unlinkSync(MAINTENANCE_FILE);
+  }
+} catch {
+}
+app.get("/api/system-status", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  const updating = checkIsUpdating();
+  res.status(200).json({
+    status: updating ? "updating" : "ok",
+    updating,
+    message: updating ? "Website is updating. Check back in two minutes." : "System operational"
+  });
+});
+app.post("/api/admin/maintenance", (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.body?.pin || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: "Unauthorized: Invalid Admin PIN" });
+  }
+  const enabled = Boolean(req.body?.enabled ?? true);
+  isUpdating = enabled;
+  try {
+    if (enabled) {
+      fs3.writeFileSync(MAINTENANCE_FILE, Date.now().toString());
+    } else {
+      if (fs3.existsSync(MAINTENANCE_FILE)) fs3.unlinkSync(MAINTENANCE_FILE);
+    }
+  } catch {
+  }
+  res.json({ success: true, updating: isUpdating, message: isUpdating ? "Website is updating screen enabled" : "Maintenance mode disabled" });
+});
 app.post("/api/admin/deploy", async (req, res) => {
   const pin = req.headers["x-admin-pin"] || req.body?.pin || req.query?.pin;
   if (!analytics.verifyPin(pin)) {
     return res.status(401).json({ error: "Unauthorized: Invalid Admin PIN" });
   }
-  res.json({ success: true, message: "Deployment initiated. Pulling latest code from GitHub and restarting PM2..." });
+  isUpdating = true;
+  try {
+    fs3.writeFileSync(MAINTENANCE_FILE, Date.now().toString());
+  } catch {
+  }
+  res.json({
+    success: true,
+    message: "Deployment initiated. Website is updating screen activated."
+  });
   setTimeout(() => {
     import("child_process").then(({ exec }) => {
-      exec("cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && pm2 restart all && pm2 save", (error, stdout, stderr) => {
+      exec("cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && rm -f .bss_updating dist/.bss_updating && pm2 restart all && pm2 save", (error, stdout, stderr) => {
         if (error) {
           console.error("[Auto-Deploy] Deployment failed:", error, stderr);
         } else {
@@ -3836,7 +3881,7 @@ app.post("/api/admin/deploy", async (req, res) => {
     }).catch((err) => {
       console.error("[Auto-Deploy] Failed to load child_process:", err);
     });
-  }, 500);
+  }, 2500);
 });
 var distPath = path3.join(__dirname, "dist");
 if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
@@ -3844,6 +3889,14 @@ if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.htm
 }
 app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path3.join(distPath, "index.html"));
+});
+app.get("/updating", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  const updatingHtml = path3.join(distPath, "updating.html");
+  if (fs3.existsSync(updatingHtml)) {
+    return res.sendFile(updatingHtml);
+  }
   res.sendFile(path3.join(distPath, "index.html"));
 });
 app.get("/sw.js", (req, res) => {
