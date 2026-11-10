@@ -3818,6 +3818,26 @@ app.post("/api/admin/kick-all", (req, res) => {
   analytics.clearActiveSessions();
   res.json({ success: true, message: "All online visitors and active sessions have been kicked off." });
 });
+app.post("/api/admin/deploy", async (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.body?.pin || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: "Unauthorized: Invalid Admin PIN" });
+  }
+  res.json({ success: true, message: "Deployment initiated. Pulling latest code from GitHub and restarting PM2..." });
+  setTimeout(() => {
+    import("child_process").then(({ exec }) => {
+      exec("cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && pm2 restart all && pm2 save", (error, stdout, stderr) => {
+        if (error) {
+          console.error("[Auto-Deploy] Deployment failed:", error, stderr);
+        } else {
+          console.log("[Auto-Deploy] Deployed successfully:", stdout);
+        }
+      });
+    }).catch((err) => {
+      console.error("[Auto-Deploy] Failed to load child_process:", err);
+    });
+  }, 500);
+});
 var distPath = path3.join(__dirname, "dist");
 if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
   distPath = __dirname;
