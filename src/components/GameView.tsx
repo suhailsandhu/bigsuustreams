@@ -338,23 +338,18 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         onQualityChange={setSelectedQuality}
       />
 
-      {/* Live Games Quick-Switcher (Bigger Cards, Light Green Highlight for Current Game) */}
+      {/* Live Games Quick-Switcher (Compact 2-3 Games Visible with Smooth Horizontal Scroll) */}
       {liveGamesNow.length > 0 && (
-        <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center space-x-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-              <span className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
-                Live Games
-              </span>
-            </div>
-            <div className="text-[11px] sm:text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-0.5 rounded-full">
-              {liveGamesNow.length} Live Now
-            </div>
+        <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-2.5">
+          <div className="flex items-center space-x-2 px-0.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+            <span className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+              Live Games
+            </span>
           </div>
 
-          <div className="overflow-x-auto pb-1.5 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex items-center justify-center space-x-3.5 sm:space-x-5 w-fit mx-auto min-w-full sm:min-w-0">
+          <div className="overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
+            <div className="flex items-center space-x-3 w-max px-0.5">
             {liveGamesNow.map((g, idx) => {
               const awayName = g.awayTeam?.shortDisplayName || g.awayTeam?.name || 'Away';
               const homeName = g.homeTeam?.shortDisplayName || g.homeTeam?.name || 'Home';
@@ -373,51 +368,50 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                       onSelectGame?.(g);
                     }
                   }}
-                  className={`shrink-0 flex flex-col justify-between p-4 sm:p-5 rounded-2xl min-w-[320px] sm:min-w-[380px] md:min-w-[420px] transition-all text-left shadow-2xs hover:shadow-xs focus:ring-3 focus:ring-emerald-500 focus:outline-none focus:scale-[1.02] cursor-pointer ${
+                  className={`shrink-0 flex flex-col justify-between p-3 sm:p-3.5 rounded-xl min-w-[220px] sm:min-w-[250px] md:min-w-[270px] max-w-[280px] transition-all text-left shadow-2xs hover:shadow-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none focus:scale-[1.02] cursor-pointer ${
                     isCurrent
-                      ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-sm ring-3 ring-emerald-500/25'
+                      ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-sm ring-2 ring-emerald-500/25'
                       : 'bg-white hover:bg-gray-50 border border-gray-200/90 hover:border-gray-300'
                   }`}
                 >
-                  {/* Top Matchup Header with Scores */}
-                  <div className="flex items-center justify-between w-full space-x-3">
-                    {/* Away Team */}
-                    <div className="flex items-center space-x-2.5 min-w-0">
+                  {/* Away Team */}
+                  <div className="flex items-center justify-between w-full space-x-2">
+                    <div className="flex items-center space-x-2 min-w-0">
                       {g.awayTeam?.logo && (
-                        <img src={g.awayTeam.logo} alt="" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 drop-shadow-2xs" />
+                        <img src={g.awayTeam.logo} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0 drop-shadow-2xs" />
                       )}
-                      <span className="text-sm sm:text-base font-extrabold text-gray-900 truncate">{awayName}</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{awayName}</span>
                     </div>
-                    <span className="text-sm sm:text-xl font-black tabular-nums text-gray-900">{awayScore}</span>
+                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{awayScore}</span>
                   </div>
 
-                  <div className="flex items-center justify-between w-full space-x-3 mt-3">
-                    {/* Home Team */}
-                    <div className="flex items-center space-x-2.5 min-w-0">
+                  {/* Home Team */}
+                  <div className="flex items-center justify-between w-full space-x-2 mt-2">
+                    <div className="flex items-center space-x-2 min-w-0">
                       {g.homeTeam?.logo && (
-                        <img src={g.homeTeam.logo} alt="" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 drop-shadow-2xs" />
+                        <img src={g.homeTeam.logo} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0 drop-shadow-2xs" />
                       )}
-                      <span className="text-sm sm:text-base font-extrabold text-gray-900 truncate">{homeName}</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{homeName}</span>
                     </div>
-                    <span className="text-sm sm:text-xl font-black tabular-nums text-gray-900">{homeScore}</span>
+                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{homeScore}</span>
                   </div>
 
                   {/* Card Bottom Quarter & Switch Stream / Watching Now Badge */}
-                  <div className={`flex items-center justify-between pt-3 mt-3 border-t text-xs font-bold ${
+                  <div className={`flex items-center justify-between pt-2 mt-2 border-t text-[11px] font-bold ${
                     isCurrent ? 'border-emerald-200/80' : 'border-gray-100'
                   }`}>
-                    <span className="inline-flex items-center space-x-1.5 text-red-600">
-                      <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                      <span className="text-xs sm:text-sm font-extrabold">{quarterClock}</span>
+                    <span className="inline-flex items-center space-x-1 text-red-600">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                      <span className="text-[11px] sm:text-xs font-extrabold">{quarterClock}</span>
                     </span>
                     {isCurrent ? (
-                      <span className="inline-flex items-center space-x-1.5 text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      <span className="inline-flex items-center space-x-1 text-[10px] sm:text-[11px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                         <span>Watching Now</span>
                       </span>
                     ) : (
-                      <span className="text-gray-500 hover:text-black text-xs font-semibold flex items-center space-x-1">
-                        <span>Switch Stream</span>
+                      <span className="text-gray-500 hover:text-black text-[10px] sm:text-[11px] font-semibold flex items-center space-x-0.5">
+                        <span>Switch</span>
                         <span>→</span>
                       </span>
                     )}
