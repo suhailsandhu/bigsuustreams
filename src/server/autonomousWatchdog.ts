@@ -1,5 +1,6 @@
 import { getScoreboard, getNflScoreboard } from './scoreboardService.ts';
-import { resolveHlsStream, streamTargetMap, getSortedHealthyMirrors, recordMirrorSuccess, recordMirrorFailure } from './streamService.ts';
+import { getBasketballStreams, getFootballStreams, resolveHlsStream, streamTargetMap, getSortedHealthyMirrors, recordMirrorSuccess, recordMirrorFailure } from './streamService.ts';
+import { getTodayDateString } from '../utils/date.ts';
 
 export interface PregameWatchlistItem {
   gameId: string;
@@ -164,7 +165,7 @@ class AutonomousWatchdog {
       isLive: boolean;
     }[] = [];
 
-    // 1. Fetch NBA Schedule
+    // 1. Fetch NBA Schedule & Active Streams
     try {
       const nbaData = await getScoreboard();
       for (const g of nbaData.games || []) {
@@ -180,14 +181,29 @@ class AutonomousWatchdog {
           isLive: g.status?.state === 'in' || Boolean(g.status?.isLive) || Boolean(g.stream?.isLive)
         });
       }
+      const nbaStreamsData = await getBasketballStreams().catch(() => ({ streams: [] }));
+      for (const s of nbaStreamsData.streams || []) {
+        if (!candidateGames.some(c => c.streamKey === s.stream_key)) {
+          candidateGames.push({
+            gameId: s.id,
+            name: s.name,
+            sport: 'nba',
+            date: new Date(s.match_timestamp * 1000).toISOString(),
+            streamKey: s.stream_key,
+            startTimeUnix: s.match_timestamp,
+            isLive: Boolean(s.is_live)
+          });
+        }
+      }
     } catch (err: any) {
       this.services.nbaScoreboard.status = 'degraded';
       this.services.nbaScoreboard.message = err?.message;
     }
 
-    // 2. Fetch NFL Schedule
+    // 2. Fetch NFL Schedule & Active Streams
     try {
-      const nflData = await getNflScoreboard();
+      const todayStr = getTodayDateString();
+      const nflData = await getNflScoreboard(todayStr);
       for (const g of nflData.games || []) {
         const streamKey = g.stream?.streamKey || `${g.awayTeam?.name || ''}-vs-${g.homeTeam?.name || ''}`.toLowerCase().replace(/\s+/g, '-');
         const startUnix = Math.floor(new Date(g.date).getTime() / 1000);
@@ -200,6 +216,20 @@ class AutonomousWatchdog {
           startTimeUnix: startUnix,
           isLive: g.status?.state === 'in' || Boolean(g.status?.isLive) || Boolean(g.stream?.isLive)
         });
+      }
+      const footballStreamsData = await getFootballStreams().catch(() => ({ streams: [] }));
+      for (const s of footballStreamsData.streams || []) {
+        if (!candidateGames.some(c => c.streamKey === s.stream_key)) {
+          candidateGames.push({
+            gameId: s.id,
+            name: s.name,
+            sport: 'nfl',
+            date: new Date(s.match_timestamp * 1000).toISOString(),
+            streamKey: s.stream_key,
+            startTimeUnix: s.match_timestamp,
+            isLive: Boolean(s.is_live)
+          });
+        }
       }
     } catch (err: any) {
       this.services.nflScoreboard.status = 'degraded';
@@ -436,7 +466,7 @@ class AutonomousWatchdog {
 
       const buf = Buffer.from(await res.arrayBuffer());
       let syncOffset = -1;
-      for (let i = 0; i < Math.min(buf.length - 188, 512); i++) {
+      for (let i = 0; i < Math.min(buf.length - 188, 1024); i++) {
         if (buf[i] === 0x47 && buf[i + 188] === 0x47) {
           if (i + 376 < buf.length && buf[i + 376] !== 0x47) continue;
           syncOffset = i;

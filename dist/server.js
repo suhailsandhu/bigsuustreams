@@ -7,9 +7,8 @@ import { fileURLToPath } from "url";
 
 // src/server/streamService.ts
 var MIRROR_URLS = [
-  "https://streamfree.top",
   "https://strmfree.st",
-  "https://strmfree.to"
+  "https://streamfree.top"
 ];
 var mirrorRegistry = new Map(
   MIRROR_URLS.map((url) => [
@@ -273,6 +272,8 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
   let pathPrefix = "/live/";
   let isExternal = false;
   let externalUrl = "";
+  let activeVariantSuffix = quality;
+  let rawM3u8Text = "";
   const now = Date.now();
   const cachedTarget = tokenCacheMap.get(streamKey);
   if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
@@ -282,74 +283,132 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
     pathPrefix = cachedTarget.pathPrefix;
     isExternal = Boolean(cachedTarget.isExternal);
     externalUrl = cachedTarget.externalUrl || "";
-  } else {
-    let embedRes = null;
-    let successfulMirror = mirrors[0] || "https://streamfree.top";
-    const sportCandidates = sportCategory === "football" ? ["football", "basketball"] : ["basketball", "football"];
-    for (const mirror of mirrors) {
+    activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
+    if (!isExternal) {
+      const qKey2 = activeVariantSuffix.replace(/\d+$/, "");
+      const p2 = tokens[qKey2] || tokens[quality] || Object.values(tokens)[0];
+      const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
+      const v = `${streamKey}${activeVariantSuffix}`;
+      const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr2}`;
       try {
-        const candidateQualities = [quality, "1080p", "720p", "2160p"];
+        const res = await fetch(fastUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          }
+        });
+        if (res.ok) {
+          const txt = await res.text();
+          if (txt.includes("#EXTM3U")) {
+            rawM3u8Text = txt;
+          }
+        }
+      } catch {
+      }
+    }
+  }
+  if (!rawM3u8Text && !isExternal) {
+    const candidateSuffixes = [];
+    candidateSuffixes.push(quality, `${quality}2`, `${quality}3`);
+    try {
+      const listGetter = sportCategory === "football" ? getFootballStreams : getBasketballStreams;
+      const streamsData = await listGetter().catch(() => ({ streams: [] }));
+      const matchStream = (streamsData.streams || []).find((s) => s.stream_key === streamKey || s.id === streamKey);
+      if (matchStream && Array.isArray(matchStream.sources)) {
+        for (const src of matchStream.sources) {
+          const u = src.url || "";
+          const v = u.split("/").pop()?.split("?")[0];
+          if (v && v.startsWith(streamKey)) {
+            const suf = v.replace(streamKey, "");
+            if (suf && !candidateSuffixes.includes(suf)) {
+              candidateSuffixes.unshift(suf);
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    for (const fb of ["1080p", "1080p2", "1080p3", "720p", "720p2", "2160p"]) {
+      if (!candidateSuffixes.includes(fb)) candidateSuffixes.push(fb);
+    }
+    const sportCandidates = sportCategory === "football" ? ["football", "basketball"] : ["basketball", "football"];
+    let foundWorkingFeed = false;
+    for (const suf of candidateSuffixes) {
+      for (const mirror of mirrors) {
         for (const cat of sportCandidates) {
-          for (const q of candidateQualities) {
-            const u = `${mirror}/embed/${cat}/${streamKey}${q}`;
-            const res = await fetch(u, {
+          try {
+            const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
+            const res = await fetch(embedUrl, {
               headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
               }
             });
-            if (res.ok) {
-              const text = await res.text();
-              const match = text.match(/const\s+_0x\s*=\s*({[^;]+});/);
-              if (match) {
-                embedRes = res;
-                tokens = JSON.parse(match[1]);
-                successfulMirror = mirror;
-                recordMirrorSuccess(mirror, 100);
-                break;
-              }
+            if (!res.ok) continue;
+            const html = await res.text();
+            const match = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
+            if (!match) continue;
+            const isLiveMatch = html.match(/const\s+IS_LIVE\s*=\s*([^;]+);/);
+            if (isLiveMatch && isLiveMatch[1].trim() === "false" && candidateSuffixes.indexOf(suf) < candidateSuffixes.length - 1) {
+              continue;
             }
+            const parsedTokens = JSON.parse(match[1]);
+            const qKey2 = suf.replace(/\d+$/, "");
+            const p2 = parsedTokens[qKey2] || parsedTokens[quality] || Object.values(parsedTokens)[0];
+            const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
+            let keyData = {};
+            try {
+              const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`);
+              if (kRes.ok) keyData = await kRes.json();
+            } catch {
+            }
+            if (keyData.is_external && keyData.external_url) {
+              isExternal = true;
+              externalUrl = keyData.external_url;
+              foundWorkingFeed = true;
+              break;
+            }
+            const sName = keyData.server_name || "origin";
+            const prefix = sName === "externalcdn" ? "/live-externalcdn/" : sName !== "origin" ? "/live-cdn/" : "/live/";
+            const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr2}`;
+            const m3u8Res = await fetch(m3u8Url, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+              }
+            });
+            if (!m3u8Res.ok) continue;
+            const m3u8Txt = await m3u8Res.text();
+            if (m3u8Txt.includes("#EXTM3U")) {
+              tokens = parsedTokens;
+              workingHost = mirror;
+              serverName = sName;
+              pathPrefix = prefix;
+              activeVariantSuffix = suf;
+              rawM3u8Text = m3u8Txt;
+              foundWorkingFeed = true;
+              recordMirrorSuccess(mirror, 80);
+              break;
+            }
+          } catch {
+            recordMirrorFailure(mirror);
           }
-          if (embedRes && Object.keys(tokens).length > 0) break;
         }
-        if (embedRes && Object.keys(tokens).length > 0) break;
-      } catch {
-        recordMirrorFailure(mirror);
+        if (foundWorkingFeed) break;
       }
+      if (foundWorkingFeed) break;
     }
-    if (!embedRes || Object.keys(tokens).length === 0) {
-      throw new Error(`Could not retrieve embed page or security tokens for ${streamKey}`);
+    if (!foundWorkingFeed && !isExternal) {
+      tokenCacheMap.delete(streamKey);
+      throw new Error(`Could not locate active live broadcast or security tokens for ${streamKey}`);
     }
-    let keyData = {};
-    for (const mirror of [successfulMirror, ...mirrors.filter((m) => m !== successfulMirror)]) {
-      try {
-        const res = await fetch(`${mirror}/get-stream-key/${streamKey}`);
-        if (res.ok) {
-          keyData = await res.json();
-          break;
-        }
-      } catch {
-      }
-    }
-    if (keyData.is_external && keyData.external_url) {
-      isExternal = true;
-      externalUrl = keyData.external_url;
-    }
-    serverName = keyData.server_name || "origin";
-    if (serverName === "externalcdn") {
-      pathPrefix = "/live-externalcdn/";
-    } else if (serverName !== "origin") {
-      pathPrefix = "/live-cdn/";
-    }
-    workingHost = successfulMirror;
     tokenCacheMap.set(streamKey, {
       tokens,
       workingHost,
       serverName,
       pathPrefix,
+      activeVariantSuffix,
       isExternal,
       externalUrl,
-      expires: now + 3e5
-      // Cache tokens for 5 minutes
+      expires: now + 18e4
+      // Cache active route for 3 minutes
     });
   }
   if (isExternal && externalUrl) {
@@ -367,60 +426,13 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
   if (!tokens[selectedQuality]) {
     selectedQuality = tokens["1080p"] ? "1080p" : tokens["720p"] ? "720p" : tokens["2160p"] ? "2160p" : availableQualities[0];
   }
-  async function attemptM3u8(q) {
-    const p2 = tokens[q];
-    const v = `${streamKey}${q}`;
-    const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
-    for (const host of [workingHost, ...mirrors.filter((m) => m !== workingHost)]) {
-      try {
-        const u = `${host}${pathPrefix}${v}/index.m3u8${qStr2}`;
-        const res2 = await fetch(u, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-          }
-        });
-        if (res2.ok) {
-          return { res: res2, url: u, host };
-        }
-      } catch {
-      }
-    }
-    const fallbackUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr2}`;
-    const res = await fetch(fallbackUrl);
-    return { res, url: fallbackUrl, host: workingHost };
-  }
-  let { res: m3u8Res, url: finalM3u8Url, host: activeHost } = await attemptM3u8(selectedQuality);
-  if (!m3u8Res.ok && selectedQuality !== "1080p" && tokens["1080p"]) {
-    selectedQuality = "1080p";
-    const fallback = await attemptM3u8("1080p");
-    m3u8Res = fallback.res;
-    finalM3u8Url = fallback.url;
-    activeHost = fallback.host;
-  }
-  if (!m3u8Res.ok && selectedQuality !== "720p" && tokens["720p"]) {
-    selectedQuality = "720p";
-    const fallback = await attemptM3u8("720p");
-    m3u8Res = fallback.res;
-    finalM3u8Url = fallback.url;
-    activeHost = fallback.host;
-  }
-  if (!m3u8Res.ok) {
-    tokenCacheMap.delete(streamKey);
-    return {
-      isExternal: false,
-      selectedQuality,
-      availableQualities,
-      m3u8Text: "",
-      upstreamUrl: finalM3u8Url
-    };
-  }
-  const rawM3u8Text = await m3u8Res.text();
-  const variant = `${streamKey}${selectedQuality}`;
-  const p = tokens[selectedQuality];
+  const variant = `${streamKey}${activeVariantSuffix}`;
+  const qKey = activeVariantSuffix.replace(/\d+$/, "");
+  const p = tokens[qKey] || tokens[selectedQuality] || Object.values(tokens)[0];
   const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : "";
   const streamHash = Buffer.from(`${streamKey}-${selectedQuality}`).toString("hex").substring(0, 16);
-  const baseUrl = `${activeHost}${pathPrefix}${variant}/`;
-  const backupHosts = mirrors.filter((m) => m !== activeHost);
+  const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
+  const backupHosts = mirrors.filter((m) => m !== workingHost);
   const backupBaseUrls = backupHosts.map((h) => `${h}${pathPrefix}${variant}/`);
   const existingRecord = streamTargetMap.get(streamHash);
   const segmentMap = existingRecord?.segmentMap || /* @__PURE__ */ new Map();
@@ -448,7 +460,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
     let fullSegmentUrl = trimmed;
     if (!fullSegmentUrl.startsWith("http://") && !fullSegmentUrl.startsWith("https://")) {
       if (fullSegmentUrl.startsWith("/")) {
-        fullSegmentUrl = `${activeHost}${fullSegmentUrl}`;
+        fullSegmentUrl = `${workingHost}${fullSegmentUrl}`;
       } else {
         fullSegmentUrl = `${baseUrl}${fullSegmentUrl}${qStr && !fullSegmentUrl.includes("?") ? qStr : ""}`;
       }
@@ -463,7 +475,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
   streamTargetMap.set(streamHash, {
     baseUrl,
     backupBaseUrls,
-    workingHost: activeHost,
+    workingHost,
     backupHosts,
     qStr,
     expires: Date.now() + 36e5,
@@ -2757,12 +2769,27 @@ var AutonomousWatchdog = class {
           isLive: g.status?.state === "in" || Boolean(g.status?.isLive) || Boolean(g.stream?.isLive)
         });
       }
+      const nbaStreamsData = await getBasketballStreams().catch(() => ({ streams: [] }));
+      for (const s of nbaStreamsData.streams || []) {
+        if (!candidateGames.some((c) => c.streamKey === s.stream_key)) {
+          candidateGames.push({
+            gameId: s.id,
+            name: s.name,
+            sport: "nba",
+            date: new Date(s.match_timestamp * 1e3).toISOString(),
+            streamKey: s.stream_key,
+            startTimeUnix: s.match_timestamp,
+            isLive: Boolean(s.is_live)
+          });
+        }
+      }
     } catch (err) {
       this.services.nbaScoreboard.status = "degraded";
       this.services.nbaScoreboard.message = err?.message;
     }
     try {
-      const nflData = await getNflScoreboard();
+      const todayStr = getTodayDateString();
+      const nflData = await getNflScoreboard(todayStr);
       for (const g of nflData.games || []) {
         const streamKey = g.stream?.streamKey || `${g.awayTeam?.name || ""}-vs-${g.homeTeam?.name || ""}`.toLowerCase().replace(/\s+/g, "-");
         const startUnix = Math.floor(new Date(g.date).getTime() / 1e3);
@@ -2775,6 +2802,20 @@ var AutonomousWatchdog = class {
           startTimeUnix: startUnix,
           isLive: g.status?.state === "in" || Boolean(g.status?.isLive) || Boolean(g.stream?.isLive)
         });
+      }
+      const footballStreamsData = await getFootballStreams().catch(() => ({ streams: [] }));
+      for (const s of footballStreamsData.streams || []) {
+        if (!candidateGames.some((c) => c.streamKey === s.stream_key)) {
+          candidateGames.push({
+            gameId: s.id,
+            name: s.name,
+            sport: "nfl",
+            date: new Date(s.match_timestamp * 1e3).toISOString(),
+            streamKey: s.stream_key,
+            startTimeUnix: s.match_timestamp,
+            isLive: Boolean(s.is_live)
+          });
+        }
       }
     } catch (err) {
       this.services.nflScoreboard.status = "degraded";
@@ -2964,7 +3005,7 @@ var AutonomousWatchdog = class {
       }
       const buf = Buffer.from(await res.arrayBuffer());
       let syncOffset = -1;
-      for (let i = 0; i < Math.min(buf.length - 188, 512); i++) {
+      for (let i = 0; i < Math.min(buf.length - 188, 1024); i++) {
         if (buf[i] === 71 && buf[i + 188] === 71) {
           if (i + 376 < buf.length && buf[i + 376] !== 71) continue;
           syncOffset = i;
