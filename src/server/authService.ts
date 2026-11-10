@@ -60,11 +60,44 @@ class AuthService {
   constructor() {
     this.ensureDataStore();
     this.loadUsers();
-    // Wipe any old 7777 VIP sessions and users from memory/store
+    // Wipe any old generic VIP guests and revoked accounts from store
     for (const [id, user] of this.users.entries()) {
-      if (id.includes('7777') || user.username === 'vip_guest' || user.username === 'smart_tv_viewer' || user.email?.includes('7777')) {
+      if (
+        id.includes('7777') || 
+        user.username === 'vip_guest' || 
+        user.username === 'vip_member' || 
+        user.username === 'vip_fan' ||
+        user.email === 'vip@bigsuustreams.com' ||
+        user.email?.includes('7777')
+      ) {
         this.users.delete(id);
       }
+    }
+
+    // Ensure sandhu.suhail@gmail.com is seeded as the sole VIP member
+    const suhailEmail = 'sandhu.suhail@gmail.com';
+    let suhailUser = Array.from(this.users.values()).find(u => u.email.toLowerCase() === suhailEmail);
+    if (!suhailUser) {
+      suhailUser = {
+        id: 'user_suhail_vip',
+        username: 'sandhu.suhail@gmail.com',
+        email: suhailEmail,
+        displayName: 'Suhail Sandhu',
+        provider: 'google',
+        favoriteTeams: ['Los Angeles Lakers', 'Buffalo Bills'],
+        spoilerFree: false,
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
+        stats: {
+          totalWatchSeconds: 0,
+          totalStreamsWatched: 0,
+          totalVisits: 1,
+          lastOnline: new Date().toISOString(),
+          watchHistory: []
+        }
+      };
+      this.users.set(suhailUser.id, suhailUser);
+      this.persistUsers();
     }
     this.sessions.clear();
   }
@@ -209,10 +242,10 @@ class AuthService {
         }
       },
       {
-        id: 'user_vip_fan',
-        username: 'vip_fan',
-        email: 'vip@bigsuustreams.com',
-        displayName: 'VIP Courtside Pass',
+        id: 'user_alex_reed',
+        username: 'alexreed',
+        email: 'alex@sportsfan.net',
+        displayName: 'Alex Reed',
         provider: 'local',
         favoriteTeams: ['Sacramento Kings', 'Boston Celtics'],
         spoilerFree: false,
@@ -264,6 +297,13 @@ class AuthService {
     }
   ) {
     if (!identifier.userId && !identifier.email && !identifier.username) return;
+
+    // sandhu.suhail@gmail.com is exclusively NOT tracked in the admin section
+    const cleanEmail = (identifier.email || '').trim().toLowerCase();
+    const cleanUname = (identifier.username || '').trim().toLowerCase();
+    if (cleanEmail === 'sandhu.suhail@gmail.com' || cleanUname === 'sandhu.suhail@gmail.com' || cleanUname === 'suhailsandhu') {
+      return;
+    }
 
     let target: UserAccount | undefined;
     if (identifier.userId) {
@@ -467,11 +507,12 @@ class AuthService {
     }
 
     if (password === '7865' && !foundUser) {
+      const isSuhail = clean === 'sandhu.suhail@gmail.com' || clean === 'suhailsandhu';
       foundUser = {
-        id: 'user_vip_' + (clean.replace(/[^a-z0-9]/g, '') || 'fan'),
-        username: clean || 'vip_member',
-        email: clean.includes('@') ? clean : `${clean || 'vip'}@bigsuustreams.com`,
-        displayName: clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'VIP Member',
+        id: isSuhail ? 'user_suhail_vip' : ('user_' + (clean.replace(/[^a-z0-9]/g, '') || 'member')),
+        username: isSuhail ? 'sandhu.suhail@gmail.com' : (clean || 'member'),
+        email: isSuhail ? 'sandhu.suhail@gmail.com' : (clean.includes('@') ? clean : `${clean || 'member'}@bigsuustreams.com`),
+        displayName: isSuhail ? 'Suhail Sandhu' : (clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'Member'),
         provider: 'local',
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString(),

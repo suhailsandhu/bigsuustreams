@@ -371,15 +371,21 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
     return { label: 'Rookie Fan', tier: 'New Member', badgeColor: 'bg-neutral-50 text-neutral-600 border-neutral-200' };
   };
 
+  const isSuhailEmail = (email?: string, username?: string) => {
+    const e = (email || '').toLowerCase();
+    const u = (username || '').toLowerCase();
+    return e === 'sandhu.suhail@gmail.com' || u === 'sandhu.suhail@gmail.com' || u === 'suhailsandhu';
+  };
+
   const onlineMembersCount = useMemo(() => {
-    return (stats?.registeredUsers || []).filter(u => u.isOnline).length;
+    return (stats?.registeredUsers || []).filter(u => u.isOnline && !isSuhailEmail(u.email, u.username)).length;
   }, [stats?.registeredUsers]);
 
   // Search filter query
   const q = searchQuery.trim().toLowerCase();
 
   const filteredUsers = useMemo(() => {
-    let users = [...(stats?.registeredUsers || [])];
+    let users = [...(stats?.registeredUsers || [])].filter(u => !isSuhailEmail(u.email, u.username));
     if (memberFilter === 'online') {
       users = users.filter(u => u.isOnline);
     } else if (memberFilter === 'google') {
@@ -442,7 +448,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   }, [stats?.topStreams, q]);
 
   const filteredSessions = useMemo(() => {
-    const sessions = stats?.activeSessions || [];
+    const sessions = (stats?.activeSessions || []).filter(s => !isSuhailEmail(s.user, s.user));
     if (!q) return sessions;
     return sessions.filter(s => 
       s.device.toLowerCase().includes(q) ||

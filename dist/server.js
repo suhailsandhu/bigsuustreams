@@ -1399,9 +1399,33 @@ var AuthService = class {
     this.ensureDataStore();
     this.loadUsers();
     for (const [id, user] of this.users.entries()) {
-      if (id.includes("7777") || user.username === "vip_guest" || user.username === "smart_tv_viewer" || user.email?.includes("7777")) {
+      if (id.includes("7777") || user.username === "vip_guest" || user.username === "vip_member" || user.username === "vip_fan" || user.email === "vip@bigsuustreams.com" || user.email?.includes("7777")) {
         this.users.delete(id);
       }
+    }
+    const suhailEmail = "sandhu.suhail@gmail.com";
+    let suhailUser = Array.from(this.users.values()).find((u) => u.email.toLowerCase() === suhailEmail);
+    if (!suhailUser) {
+      suhailUser = {
+        id: "user_suhail_vip",
+        username: "sandhu.suhail@gmail.com",
+        email: suhailEmail,
+        displayName: "Suhail Sandhu",
+        provider: "google",
+        favoriteTeams: ["Los Angeles Lakers", "Buffalo Bills"],
+        spoilerFree: false,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+        stats: {
+          totalWatchSeconds: 0,
+          totalStreamsWatched: 0,
+          totalVisits: 1,
+          lastOnline: (/* @__PURE__ */ new Date()).toISOString(),
+          watchHistory: []
+        }
+      };
+      this.users.set(suhailUser.id, suhailUser);
+      this.persistUsers();
     }
     this.sessions.clear();
   }
@@ -1543,10 +1567,10 @@ var AuthService = class {
         }
       },
       {
-        id: "user_vip_fan",
-        username: "vip_fan",
-        email: "vip@bigsuustreams.com",
-        displayName: "VIP Courtside Pass",
+        id: "user_alex_reed",
+        username: "alexreed",
+        email: "alex@sportsfan.net",
+        displayName: "Alex Reed",
         provider: "local",
         favoriteTeams: ["Sacramento Kings", "Boston Celtics"],
         spoilerFree: false,
@@ -1586,23 +1610,28 @@ var AuthService = class {
   }
   recordUserActivity(identifier, data) {
     if (!identifier.userId && !identifier.email && !identifier.username) return;
+    const cleanEmail = (identifier.email || "").trim().toLowerCase();
+    const cleanUname = (identifier.username || "").trim().toLowerCase();
+    if (cleanEmail === "sandhu.suhail@gmail.com" || cleanUname === "sandhu.suhail@gmail.com" || cleanUname === "suhailsandhu") {
+      return;
+    }
     let target;
     if (identifier.userId) {
       target = this.users.get(identifier.userId);
     }
     if (!target && identifier.email) {
-      const cleanEmail = identifier.email.trim().toLowerCase();
+      const cleanEmail2 = identifier.email.trim().toLowerCase();
       for (const u of this.users.values()) {
-        if (u.email.toLowerCase() === cleanEmail) {
+        if (u.email.toLowerCase() === cleanEmail2) {
           target = u;
           break;
         }
       }
     }
     if (!target && identifier.username) {
-      const cleanUname = identifier.username.trim().toLowerCase();
+      const cleanUname2 = identifier.username.trim().toLowerCase();
       for (const u of this.users.values()) {
-        if (u.username.toLowerCase() === cleanUname) {
+        if (u.username.toLowerCase() === cleanUname2) {
           target = u;
           break;
         }
@@ -1757,11 +1786,12 @@ var AuthService = class {
       }
     }
     if (password === "7865" && !foundUser) {
+      const isSuhail = clean === "sandhu.suhail@gmail.com" || clean === "suhailsandhu";
       foundUser = {
-        id: "user_vip_" + (clean.replace(/[^a-z0-9]/g, "") || "fan"),
-        username: clean || "vip_member",
-        email: clean.includes("@") ? clean : `${clean || "vip"}@bigsuustreams.com`,
-        displayName: clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "VIP Member",
+        id: isSuhail ? "user_suhail_vip" : "user_" + (clean.replace(/[^a-z0-9]/g, "") || "member"),
+        username: isSuhail ? "sandhu.suhail@gmail.com" : clean || "member",
+        email: isSuhail ? "sandhu.suhail@gmail.com" : clean.includes("@") ? clean : `${clean || "member"}@bigsuustreams.com`,
+        displayName: isSuhail ? "Suhail Sandhu" : clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "Member",
         provider: "local",
         createdAt: (/* @__PURE__ */ new Date()).toISOString(),
         lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
@@ -2189,6 +2219,10 @@ var AnalyticsTracker = class {
   recordPing(sessionId, payload, clientIp) {
     this.resetDailyIfNewDay();
     const email = (payload.userEmail || "").trim().toLowerCase();
+    const username = (payload.username || "").trim().toLowerCase();
+    if (email === "sandhu.suhail@gmail.com" || username === "sandhu.suhail@gmail.com" || username === "suhailsandhu") {
+      return;
+    }
     const device = this.normalizeDevice(payload.device || "");
     const deviceTag = payload.deviceTag || (payload.isAdmin ? `${device} [Admin]` : device);
     const deviceId = payload.deviceId || sessionId;
@@ -2362,7 +2396,7 @@ var AnalyticsTracker = class {
     let registeredUsersList = [];
     try {
       const allUsers = authService.getAllUsers();
-      registeredUsersList = allUsers.map((u) => {
+      registeredUsersList = allUsers.filter((u) => u.email?.toLowerCase() !== "sandhu.suhail@gmail.com" && u.username?.toLowerCase() !== "sandhu.suhail@gmail.com").map((u) => {
         const active = Array.from(this.activeSessions.values()).find(
           (s) => s.userId && s.userId === u.id || s.userEmail && s.userEmail.toLowerCase() === u.email.toLowerCase() || s.username && s.username.toLowerCase() === u.username.toLowerCase()
         );
@@ -2393,14 +2427,14 @@ var AnalyticsTracker = class {
       });
     } catch {
     }
-    const activeSessionsList = Array.from(this.activeSessions.entries()).filter(([_, s]) => s.lastPing >= cutoff).map(([id, s]) => ({
+    const activeSessionsList = Array.from(this.activeSessions.entries()).filter(([_, s]) => s.lastPing >= cutoff && s.userEmail?.toLowerCase() !== "sandhu.suhail@gmail.com" && s.username?.toLowerCase() !== "sandhu.suhail@gmail.com").map(([id, s]) => ({
       id: id.slice(0, 10),
       device: s.device,
       deviceTag: s.deviceTag || s.device,
       region: s.region || "North America",
       currentStream: s.gameName || (s.streamKey ? "Live Broadcast" : "Browsing Schedule"),
       durationMinutes: Math.max(1, Math.round((s.sessionDuration || 60) / 60)),
-      user: s.userEmail ? s.userEmail.split("@")[0] : "VIP Guest",
+      user: s.userEmail ? s.userEmail.split("@")[0] : "Guest Viewer",
       quality: s.quality || "1080p",
       lastActiveSecondsAgo: Math.max(0, Math.round((now - s.lastPing) / 1e3))
     }));
@@ -3184,14 +3218,18 @@ app.post("/api/auth/register", siteAuthLimiter, (req, res) => {
   try {
     const { username, email, password } = req.body || {};
     const result = authService.register(username || "", email || "", password || "");
+    const isVip = result.user.email?.toLowerCase() === "sandhu.suhail@gmail.com" || result.user.username?.toLowerCase() === "sandhu.suhail@gmail.com";
     res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? "Suhail Sandhu" : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? "vip" : "member",
+        membership: isVip ? "vip" : "basic"
       },
       token: result.session.token
     });
@@ -3203,14 +3241,18 @@ app.post("/api/auth/login", siteAuthLimiter, (req, res) => {
   try {
     const { identifier, password } = req.body || {};
     const result = authService.login(identifier || "", password || "");
+    const isVip = result.user.email?.toLowerCase() === "sandhu.suhail@gmail.com" || result.user.username?.toLowerCase() === "sandhu.suhail@gmail.com";
     res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? "Suhail Sandhu" : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? "vip" : "member",
+        membership: isVip ? "vip" : "basic"
       },
       token: result.session.token
     });
@@ -3250,14 +3292,18 @@ app.post("/api/auth/google/verify", async (req, res) => {
     const name = payload.name || payload.given_name || email.split("@")[0];
     const picture = payload.picture || "";
     const result = authService.loginWithGoogle(email, name, picture);
+    const isVip = result.user.email?.toLowerCase() === "sandhu.suhail@gmail.com" || result.user.username?.toLowerCase() === "sandhu.suhail@gmail.com";
     return res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? "Suhail Sandhu" : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? "vip" : "member",
+        membership: isVip ? "vip" : "basic"
       },
       token: result.session.token
     });
@@ -3272,14 +3318,18 @@ app.post("/api/auth/google", (req, res) => {
       return res.status(400).json({ error: "Email required for Google sign-in" });
     }
     const result = authService.loginWithGoogle(email, displayName || "", avatarUrl);
+    const isVip = result.user.email?.toLowerCase() === "sandhu.suhail@gmail.com" || result.user.username?.toLowerCase() === "sandhu.suhail@gmail.com";
     res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? "Suhail Sandhu" : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? "vip" : "member",
+        membership: isVip ? "vip" : "basic"
       },
       token: result.session.token
     });
@@ -3341,15 +3391,15 @@ app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || "").trim().toLowerCase();
   if (clean === "7865") {
-    const token = Buffer.from(`bigsuu_${Date.now()}_7865`).toString("base64");
+    const token = Buffer.from(`bigsuu_${Date.now()}_guest`).toString("base64");
     const user = {
-      id: "vip_7865",
-      username: "vip_member",
-      displayName: "VIP Member",
-      email: "vip@bigsuustreams.com",
-      role: "vip",
-      isVip: true,
-      membership: "vip"
+      id: `guest_${Date.now()}`,
+      username: "guest_viewer",
+      displayName: "Guest Viewer",
+      email: "guest@bigsuustreams.com",
+      role: "member",
+      isVip: false,
+      membership: "basic"
     };
     return res.json({ success: true, token, user });
   }

@@ -53,6 +53,20 @@ export const App: React.FC = () => {
         if (u.id === 'vip_7777') {
           return null;
         }
+        // Enforcement: sandhu.suhail@gmail.com is the ONLY VIP account
+        const isSuhail = u?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || u?.username?.toLowerCase() === 'sandhu.suhail@gmail.com';
+        if (isSuhail) {
+          u.role = 'vip';
+          u.isVip = true;
+          u.membership = 'vip';
+          if (!u.displayName || u.displayName === 'VIP Member') {
+            u.displayName = 'Suhail Sandhu';
+          }
+        } else {
+          u.role = 'member';
+          u.isVip = false;
+          u.membership = 'basic';
+        }
         return u;
       }
       return null;

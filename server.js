@@ -55,14 +55,18 @@ app.post('/api/auth/register', siteAuthLimiter, (req, res) => {
   try {
     const { username, email, password } = req.body || {};
     const result = authService.register(username || '', email || '', password || '');
+    const isVip = (result.user.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || result.user.username?.toLowerCase() === 'sandhu.suhail@gmail.com');
     res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? 'Suhail Sandhu' : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? 'vip' : 'member',
+        membership: isVip ? 'vip' : 'basic'
       },
       token: result.session.token
     });
@@ -75,14 +79,18 @@ app.post('/api/auth/login', siteAuthLimiter, (req, res) => {
   try {
     const { identifier, password } = req.body || {};
     const result = authService.login(identifier || '', password || '');
+    const isVip = (result.user.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || result.user.username?.toLowerCase() === 'sandhu.suhail@gmail.com');
     res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? 'Suhail Sandhu' : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? 'vip' : 'member',
+        membership: isVip ? 'vip' : 'basic'
       },
       token: result.session.token
     });
@@ -130,14 +138,18 @@ app.post('/api/auth/google/verify', async (req, res) => {
     const picture = payload.picture || '';
 
     const result = authService.loginWithGoogle(email, name, picture);
+    const isVip = (result.user.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || result.user.username?.toLowerCase() === 'sandhu.suhail@gmail.com');
     return res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? 'Suhail Sandhu' : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? 'vip' : 'member',
+        membership: isVip ? 'vip' : 'basic'
       },
       token: result.session.token
     });
@@ -153,14 +165,18 @@ app.post('/api/auth/google', (req, res) => {
       return res.status(400).json({ error: 'Email required for Google sign-in' });
     }
     const result = authService.loginWithGoogle(email, displayName || '', avatarUrl);
+    const isVip = (result.user.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || result.user.username?.toLowerCase() === 'sandhu.suhail@gmail.com');
     res.json({
       success: true,
       user: {
         id: result.user.id,
         username: result.user.username,
         email: result.user.email,
-        displayName: result.user.displayName,
-        avatarUrl: result.user.avatarUrl
+        displayName: isVip ? 'Suhail Sandhu' : result.user.displayName,
+        avatarUrl: result.user.avatarUrl,
+        isVip,
+        role: isVip ? 'vip' : 'member',
+        membership: isVip ? 'vip' : 'basic'
       },
       token: result.session.token
     });
@@ -225,20 +241,20 @@ app.post('/api/user/preferences', (req, res) => {
   res.json({ success: true });
 });
 
-// Passcode gate support (Passcode 7865)
+// Passcode gate support (Passcode 7865) -> Quick Access Guest View (NOT VIP)
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || '').trim().toLowerCase();
   if (clean === '7865') {
-    const token = Buffer.from(`bigsuu_${Date.now()}_7865`).toString('base64');
+    const token = Buffer.from(`bigsuu_${Date.now()}_guest`).toString('base64');
     const user = { 
-      id: 'vip_7865', 
-      username: 'vip_member', 
-      displayName: 'VIP Member', 
-      email: 'vip@bigsuustreams.com',
-      role: 'vip',
-      isVip: true,
-      membership: 'vip'
+      id: `guest_${Date.now()}`, 
+      username: 'guest_viewer', 
+      displayName: 'Guest Viewer', 
+      email: 'guest@bigsuustreams.com',
+      role: 'member',
+      isVip: false,
+      membership: 'basic'
     };
     return res.json({ success: true, token, user });
   }

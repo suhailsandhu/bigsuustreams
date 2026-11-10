@@ -344,6 +344,13 @@ class AnalyticsTracker {
     this.resetDailyIfNewDay();
 
     const email = (payload.userEmail || '').trim().toLowerCase();
+    const username = (payload.username || '').trim().toLowerCase();
+
+    // EXCLUDE: sandhu.suhail@gmail.com is exclusively NOT tracked in the admin section
+    if (email === 'sandhu.suhail@gmail.com' || username === 'sandhu.suhail@gmail.com' || username === 'suhailsandhu') {
+      return;
+    }
+
     const device = this.normalizeDevice(payload.device || '');
     const deviceTag = payload.deviceTag || (payload.isAdmin ? `${device} [Admin]` : device);
     const deviceId = payload.deviceId || sessionId;
@@ -553,11 +560,13 @@ class AnalyticsTracker {
     const primeTimeViews = this.hourlyPageViews.slice(18, 23).reduce((a, b) => a + b, 0);
     const nightViews = this.hourlyPageViews.slice(23, 24).reduce((a, b) => a + b, 0) + this.hourlyPageViews.slice(0, 6).reduce((a, b) => a + b, 0);
 
-    // Registered Users Directory with Real-time Online Tracking & Keynote Dossier Stats
+    // Registered Users Directory with Real-time Online Tracking (sandhu.suhail@gmail.com excluded)
     let registeredUsersList: any[] = [];
     try {
       const allUsers = authService.getAllUsers();
-      registeredUsersList = allUsers.map((u: any) => {
+      registeredUsersList = allUsers
+        .filter((u: any) => u.email?.toLowerCase() !== 'sandhu.suhail@gmail.com' && u.username?.toLowerCase() !== 'sandhu.suhail@gmail.com')
+        .map((u: any) => {
         const active = Array.from(this.activeSessions.values()).find(
           s => (s.userId && s.userId === u.id) ||
                (s.userEmail && s.userEmail.toLowerCase() === u.email.toLowerCase()) ||
@@ -593,9 +602,9 @@ class AnalyticsTracker {
       // ignore
     }
 
-    // Active Live Sessions for real-time monitoring
+    // Active Live Sessions for real-time monitoring (sandhu.suhail@gmail.com excluded)
     const activeSessionsList = Array.from(this.activeSessions.entries())
-      .filter(([_, s]) => s.lastPing >= cutoff)
+      .filter(([_, s]) => s.lastPing >= cutoff && s.userEmail?.toLowerCase() !== 'sandhu.suhail@gmail.com' && s.username?.toLowerCase() !== 'sandhu.suhail@gmail.com')
       .map(([id, s]) => ({
         id: id.slice(0, 10),
         device: s.device,
@@ -603,7 +612,7 @@ class AnalyticsTracker {
         region: s.region || 'North America',
         currentStream: s.gameName || (s.streamKey ? 'Live Broadcast' : 'Browsing Schedule'),
         durationMinutes: Math.max(1, Math.round((s.sessionDuration || 60) / 60)),
-        user: s.userEmail ? (s.userEmail.split('@')[0]) : 'VIP Guest',
+        user: s.userEmail ? (s.userEmail.split('@')[0]) : 'Guest Viewer',
         quality: s.quality || '1080p',
         lastActiveSecondsAgo: Math.max(0, Math.round((now - s.lastPing) / 1000))
       }));

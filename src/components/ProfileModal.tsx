@@ -83,14 +83,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Membership Determination
+  // Membership Determination: sandhu.suhail@gmail.com is the ONLY VIP member account
   const isVip = Boolean(
-    currentUser?.isVip === true ||
-    currentUser?.role === 'vip' ||
-    currentUser?.role === 'admin' ||
-    currentUser?.membership === 'vip' ||
-    currentUser?.id === 'vip_7865' ||
-    currentUser?.username === 'vip_guest'
+    currentUser?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+    currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com'
   );
 
   const displayName = currentUser?.displayName || currentUser?.username || 'Member';

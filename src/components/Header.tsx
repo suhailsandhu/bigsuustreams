@@ -18,17 +18,13 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onOpenProfile
 }) => {
+  // sandhu.suhail@gmail.com is the ONLY VIP member account
   const isVip = Boolean(
-    currentUser?.isVip === true ||
-    currentUser?.role === 'vip' ||
-    currentUser?.role === 'admin' ||
-    currentUser?.membership === 'vip' ||
-    currentUser?.id === 'vip_7865' ||
-    currentUser?.username === 'vip_guest' ||
-    currentUser?.username === 'vip_member'
+    currentUser?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+    currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com'
   );
 
-  const initial = (currentUser?.displayName || currentUser?.username || 'M')[0].toUpperCase();
+  const initial = (currentUser?.displayName || currentUser?.username || 'S')[0].toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-2xs select-none relative">

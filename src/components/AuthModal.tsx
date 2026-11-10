@@ -39,16 +39,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isVipPasscode = (p: string) => {
-    const c = (p || '').trim().toLowerCase();
-    return c === '7865';
+  // Verification helper: sandhu.suhail@gmail.com is the ONLY authorized VIP account
+  const isSuhailUser = (uName?: string, uEmail?: string) => {
+    const cleanU = (uName || '').trim().toLowerCase();
+    const cleanE = (uEmail || '').trim().toLowerCase();
+    return cleanU === 'sandhu.suhail@gmail.com' || cleanU === 'suhailsandhu' || cleanE === 'sandhu.suhail@gmail.com';
   };
 
-  const vipUser = {
-    id: 'vip_7865',
-    username: 'vip_member',
-    displayName: 'VIP Member',
-    email: 'vip7865@bigsuustreams.com',
+  const suhailVipUser = {
+    id: 'user_suhail_vip',
+    username: 'sandhu.suhail@gmail.com',
+    displayName: 'Suhail Sandhu',
+    email: 'sandhu.suhail@gmail.com',
     role: 'vip',
     isVip: true,
     membership: 'vip'
@@ -65,12 +67,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setPasscodeError(null);
 
-    if (isVipPasscode(clean)) {
-      localStorage.setItem('bigsuu_auth_token', 'token_7865');
-      localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-      sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
+    // Quick Login: Grants standard viewer access (VIP removed per owner instruction)
+    if (clean === '7865') {
+      const guestUser = {
+        id: `guest_${Date.now()}`,
+        username: 'guest_viewer',
+        displayName: 'Guest Viewer',
+        email: 'guest@bigsuustreams.com',
+        role: 'member',
+        isVip: false,
+        membership: 'basic'
+      };
+      localStorage.setItem('bigsuu_auth_token', 'token_guest_' + Date.now());
+      localStorage.setItem('bigsuu_auth_user', JSON.stringify(guestUser));
+      sessionStorage.setItem('bigsuu_auth_token', 'token_guest_' + Date.now());
       setLoading(false);
-      onSuccess(vipUser);
+      onSuccess(guestUser);
       return;
     }
 
@@ -83,10 +95,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        const user = data.user || vipUser;
-        localStorage.setItem('bigsuu_auth_token', data.token || 'verified_7865');
+        const user = data.user || {
+          id: `guest_${Date.now()}`,
+          username: 'guest_viewer',
+          displayName: 'Guest Viewer',
+          email: 'guest@bigsuustreams.com',
+          role: 'member',
+          isVip: false,
+          membership: 'basic'
+        };
+        // Enforce: No VIP through quick login
+        user.isVip = false;
+        user.role = 'member';
+        user.membership = 'basic';
+        localStorage.setItem('bigsuu_auth_token', data.token || 'token_guest');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
-        sessionStorage.setItem('bigsuu_auth_token', data.token || 'verified_7865');
+        sessionStorage.setItem('bigsuu_auth_token', data.token || 'token_guest');
         onSuccess(user);
       } else {
         setPasscodeError('Incorrect passcode. Access denied.');
@@ -101,6 +125,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const isSuhail = isSuhailUser(username, email);
 
     if (mode === 'register') {
       if (!username.trim() || username.trim().length < 3) {
@@ -125,21 +151,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      // Fast-path login for 7865 VIP password
-      if (isVipPasscode(password)) {
-        const vipUser = {
-          id: 'vip_7865',
-          username: username.trim() || 'vip_member',
-          displayName: username.trim() || 'VIP Member',
-          email: email.trim() || 'vip7865@bigsuustreams.com',
-          role: 'vip',
-          isVip: true,
-          membership: 'vip'
+      // If Suhail logs in with 7865 passcode, grant exclusive VIP account
+      if (password === '7865' && isSuhail) {
+        localStorage.setItem('bigsuu_auth_token', 'token_suhail_vip');
+        localStorage.setItem('bigsuu_auth_user', JSON.stringify(suhailVipUser));
+        sessionStorage.setItem('bigsuu_auth_token', 'token_suhail_vip');
+        onSuccess(suhailVipUser);
+        return;
+      }
+
+      // Fast-path login for other members with 7865 password -> Standard Member (NOT VIP)
+      if (password === '7865') {
+        const standardMember = {
+          id: 'user_' + (username.trim().replace(/[^a-z0-9]/gi, '') || 'member'),
+          username: username.trim() || 'member',
+          displayName: username.trim() || 'Member',
+          email: username.includes('@') ? username.trim() : `${username.trim()}@bigsuustreams.com`,
+          role: 'member',
+          isVip: false,
+          membership: 'basic'
         };
-        localStorage.setItem('bigsuu_auth_token', 'token_7865');
-        localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-        sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
-        onSuccess(vipUser);
+        localStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
+        localStorage.setItem('bigsuu_auth_user', JSON.stringify(standardMember));
+        sessionStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
+        onSuccess(standardMember);
         return;
       }
     }
@@ -166,42 +201,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const data = await res.json();
 
       if (res.ok && data.token) {
+        const user = data.user;
+        if (isSuhailUser(user.username, user.email)) {
+          user.role = 'vip';
+          user.isVip = true;
+          user.membership = 'vip';
+          user.displayName = 'Suhail Sandhu';
+        } else {
+          user.role = 'member';
+          user.isVip = false;
+          user.membership = 'basic';
+        }
         localStorage.setItem('bigsuu_auth_token', data.token);
-        localStorage.setItem('bigsuu_auth_user', JSON.stringify(data.user));
+        localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
         sessionStorage.setItem('bigsuu_auth_token', data.token);
-        onSuccess(data.user);
+        onSuccess(user);
       } else {
         // Fallback for 7865 password
-        if (isVipPasscode(password)) {
-          const vipUser = {
-            id: 'vip_7865',
-            username: username.trim() || 'vip_guest',
-            displayName: username.trim() || 'VIP Member',
-            email: email.trim() || 'vip@bigsuustreams.com',
-            role: 'vip',
-            isVip: true,
-            membership: 'vip'
+        if (password === '7865') {
+          const user = isSuhail ? suhailVipUser : {
+            id: 'user_' + (username.trim().replace(/[^a-z0-9]/gi, '') || 'member'),
+            username: username.trim() || 'member',
+            displayName: username.trim() || 'Member',
+            email: email.trim() || (username.includes('@') ? username.trim() : 'member@bigsuustreams.com'),
+            role: 'member',
+            isVip: false,
+            membership: 'basic'
           };
-          localStorage.setItem('bigsuu_auth_token', 'token_7865');
-          localStorage.setItem('bigsuu_auth_user', JSON.stringify(vipUser));
-          sessionStorage.setItem('bigsuu_auth_token', 'token_7865');
-          onSuccess(vipUser);
+          localStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
+          localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
+          sessionStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
+          onSuccess(user);
         } else {
           setError(data.error || 'Authentication failed. Please check your credentials.');
         }
       }
     } catch {
-      const mockUser = {
+      const user = isSuhail ? suhailVipUser : {
         id: `local_${Date.now()}`,
-        username: username.trim() || 'sportsfan',
-        displayName: username.trim() || 'Sports Fan',
-        email: email.trim() || 'fan@bss.internal',
-        role: isVipPasscode(password) ? 'vip' : 'member',
-        isVip: isVipPasscode(password)
+        username: username.trim() || 'member',
+        displayName: username.trim() || 'Member',
+        email: email.trim() || (username.includes('@') ? username.trim() : 'member@bigsuustreams.com'),
+        role: 'member',
+        isVip: false,
+        membership: 'basic'
       };
       localStorage.setItem('bigsuu_auth_token', 'local_token_' + Date.now());
-      localStorage.setItem('bigsuu_auth_user', JSON.stringify(mockUser));
-      onSuccess(mockUser);
+      localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
+      onSuccess(user);
     } finally {
       setLoading(false);
     }

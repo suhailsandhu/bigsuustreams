@@ -8,11 +8,34 @@ function isOwnerOrAdmin(): boolean {
     const raw = localStorage.getItem('bigsuu_auth_user');
     if (raw) {
       const u = JSON.parse(raw);
-      if (u.role === 'admin' || u.isAdmin || u.id === 'vip_7865' || u.username === 'admin') return true;
+      if (
+        u.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+        u.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+        u.role === 'admin' ||
+        u.isAdmin ||
+        u.username === 'admin'
+      ) return true;
     }
   } catch {
     // ignore
   }
+  return false;
+}
+
+function isSuhailOwner(): boolean {
+  try {
+    const raw = localStorage.getItem('bigsuu_auth_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (
+        u.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+        u.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+        u.id === 'user_suhail_vip'
+      ) {
+        return true;
+      }
+    }
+  } catch {}
   return false;
 }
 
@@ -132,6 +155,7 @@ export function getCurrentViewerName(): string {
 }
 
 export function identifyUmamiUser(customData?: Record<string, any>) {
+  if (isSuhailOwner()) return;
   const send = () => {
     try {
       if (typeof window !== 'undefined' && window.umami && typeof window.umami.identify === 'function') {
@@ -279,6 +303,7 @@ export function sendUmamiTestEvent(): boolean {
 }
 
 export function trackUmamiPageView(path: string, title?: string) {
+  if (isSuhailOwner()) return;
   const viewer = getCurrentViewerName();
   const send = () => {
     try {
@@ -312,6 +337,7 @@ export function trackUmamiPageView(path: string, title?: string) {
 }
 
 export function trackUmamiEvent(eventName: string, eventData?: Record<string, any>) {
+  if (isSuhailOwner()) return;
   const viewer = getCurrentViewerName();
   const send = () => {
     try {
@@ -406,6 +432,9 @@ export function updateCurrentStream(streamKey?: string, gameName?: string) {
 }
 
 function sendPing(isInitial: boolean) {
+  if (isSuhailOwner()) {
+    return; // sandhu.suhail@gmail.com is exclusively excluded from all admin tracking
+  }
   const isAdmin = isOwnerOrAdmin();
   const user = getLoggedInUser();
 
