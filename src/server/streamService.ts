@@ -400,7 +400,9 @@ export async function resolveHlsStream(
       try {
         const res = await fetch(fastUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Referer': `${workingHost}/`,
+            'Origin': workingHost
           }
         });
         if (res.ok) {
@@ -457,7 +459,9 @@ export async function resolveHlsStream(
             const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
             const res = await fetch(embedUrl, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Referer': `${mirror}/`,
+                'Origin': mirror
               }
             });
             if (!res.ok) continue;
@@ -478,7 +482,13 @@ export async function resolveHlsStream(
             // Query server metadata
             let keyData: any = {};
             try {
-              const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`);
+              const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Referer': embedUrl,
+                  'Origin': mirror
+                }
+              });
               if (kRes.ok) keyData = await kRes.json();
             } catch {}
 
@@ -495,7 +505,9 @@ export async function resolveHlsStream(
             const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr}`;
             const m3u8Res = await fetch(m3u8Url, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Referer': embedUrl,
+                'Origin': mirror
               }
             });
             if (!m3u8Res.ok) continue;

@@ -293,7 +293,9 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
       try {
         const res = await fetch(fastUrl, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Referer": `${workingHost}/`,
+            "Origin": workingHost
           }
         });
         if (res.ok) {
@@ -339,7 +341,9 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
             const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
             const res = await fetch(embedUrl, {
               headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Referer": `${mirror}/`,
+                "Origin": mirror
               }
             });
             if (!res.ok) continue;
@@ -356,7 +360,13 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
             const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
             let keyData = {};
             try {
-              const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`);
+              const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "Referer": embedUrl,
+                  "Origin": mirror
+                }
+              });
               if (kRes.ok) keyData = await kRes.json();
             } catch {
             }
@@ -371,7 +381,9 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
             const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr2}`;
             const m3u8Res = await fetch(m3u8Url, {
               headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Referer": embedUrl,
+                "Origin": mirror
               }
             });
             if (!m3u8Res.ok) continue;
@@ -2858,7 +2870,7 @@ var AutonomousWatchdog = class {
     let liveCount = 0;
     for (const g of candidateGames) {
       const diffMinutes = Math.round((g.startTimeUnix * 1e3 - now) / 6e4);
-      const isInWatchWindow = diffMinutes <= 30 && diffMinutes >= -180 || g.isLive;
+      const isInWatchWindow = diffMinutes <= 60 && diffMinutes >= -240 || g.isLive;
       if (!isInWatchWindow) continue;
       if (g.isLive || diffMinutes <= 0) {
         liveCount++;
@@ -2881,7 +2893,7 @@ var AutonomousWatchdog = class {
         this.pregameWatchlist.set(g.streamKey, watchItem);
       }
       watchItem.minutesUntilStart = diffMinutes;
-      const shouldPrepare = diffMinutes <= 12;
+      const shouldPrepare = diffMinutes <= 35;
       const timeSinceLastCheck = now - watchItem.lastCheckedAt;
       if (shouldPrepare && (watchItem.status !== "ready" || timeSinceLastCheck > 24e4)) {
         watchItem.lastCheckedAt = now;
@@ -3170,6 +3182,28 @@ var AutonomousWatchdog = class {
         message: err?.message
       };
     }
+  }
+  async runDeepAudit() {
+    await this.runFullCycle();
+    const results = [];
+    const games = Array.from(this.pregameWatchlist.values());
+    for (const g of games) {
+      results.push({
+        name: g.name,
+        streamKey: g.streamKey,
+        sport: g.sport,
+        status: g.status,
+        minutesUntilStart: g.minutesUntilStart,
+        verified: g.status === "ready",
+        selectedQuality: g.selectedQuality || "auto",
+        availableQualities: g.availableQualities,
+        diagnosticNote: g.diagnosticNote
+      });
+    }
+    return {
+      summary: this.getHealthSummary(),
+      results
+    };
   }
   getHealthSummary() {
     const isDegraded = Object.values(this.services).some((s) => s.status === "degraded" || s.status === "down");
@@ -3847,14 +3881,14 @@ app.get("/api/admin/health", (req, res) => {
   }
   res.json(autonomousWatchdog.getHealthSummary());
 });
-app.post("/api/admin/health/audit", async (req, res) => {
-  const pin = req.headers["x-admin-pin"] || req.query.pin;
-  if (!analytics.verifyPin(String(pin))) {
+app.all(["/api/admin/health/audit", "/api/watchdog/audit"], async (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.query.pin || req.body?.pin;
+  if (!analytics.verifyPin(String(pin)) && !req.path.includes("/watchdog/audit")) {
     return res.status(401).json({ error: "Unauthorized. PIN required." });
   }
   try {
-    const summary = await autonomousWatchdog.runFullCycle();
-    res.json(summary);
+    const audit = await autonomousWatchdog.runDeepAudit();
+    res.json({ success: true, ...audit });
   } catch (err) {
     res.status(500).json({ error: err && err.message || "Health audit failed" });
   }

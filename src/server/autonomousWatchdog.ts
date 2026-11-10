@@ -238,12 +238,12 @@ class AutonomousWatchdog {
 
     let liveCount = 0;
 
-    // 3. Inspect games in the pregame & live window (from 30 min before start up to 2.5 hours after start)
+    // 3. Inspect games in the pregame & live window (from 60 min before start up to 4 hours after start)
     for (const g of candidateGames) {
       const diffMinutes = Math.round((g.startTimeUnix * 1000 - now) / 60000);
 
-      // We actively manage games from 30 minutes before tipoff/kickoff through in-game play
-      const isInWatchWindow = (diffMinutes <= 30 && diffMinutes >= -180) || g.isLive;
+      // We actively manage games from 60 minutes before tipoff/kickoff through in-game play
+      const isInWatchWindow = (diffMinutes <= 60 && diffMinutes >= -240) || g.isLive;
       if (!isInWatchWindow) continue;
 
       if (g.isLive || diffMinutes <= 0) {
@@ -271,8 +271,8 @@ class AutonomousWatchdog {
       watchItem.minutesUntilStart = diffMinutes;
 
       // PREGAME PREPARATION TRIGGER:
-      // When game is 12 minutes or closer to start, or already live/tipoff passed:
-      const shouldPrepare = diffMinutes <= 12;
+      // When game is 35 minutes or closer to start, or already live/tipoff passed:
+      const shouldPrepare = diffMinutes <= 35;
 
       // Don't re-test if already verified within the last 4 minutes
       const timeSinceLastCheck = now - watchItem.lastCheckedAt;
@@ -608,6 +608,29 @@ class AutonomousWatchdog {
         message: err?.message
       };
     }
+  }
+
+  public async runDeepAudit(): Promise<{ summary: SystemHealthSummary; results: any[] }> {
+    await this.runFullCycle();
+    const results: any[] = [];
+    const games = Array.from(this.pregameWatchlist.values());
+    for (const g of games) {
+      results.push({
+        name: g.name,
+        streamKey: g.streamKey,
+        sport: g.sport,
+        status: g.status,
+        minutesUntilStart: g.minutesUntilStart,
+        verified: g.status === 'ready',
+        selectedQuality: g.selectedQuality || 'auto',
+        availableQualities: g.availableQualities,
+        diagnosticNote: g.diagnosticNote
+      });
+    }
+    return {
+      summary: this.getHealthSummary(),
+      results
+    };
   }
 
   public getHealthSummary(): SystemHealthSummary {
