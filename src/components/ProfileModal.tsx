@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Check, ChevronRight, AlertCircle, LogOut, Send, CheckCircle2 } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 import Lanyard from './Lanyard';
@@ -24,7 +24,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     try {
       const stored = localStorage.getItem('bss_favorite_teams');
       if (stored) return JSON.parse(stored);
-      // Backward compatibility with single team key
       const single = localStorage.getItem('bss_favorite_team');
       return single ? [single] : [];
     } catch {
@@ -204,6 +203,69 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
+  // Ultra-crisp SVG for the BACK of the 3D card
+  const backBadgeDataUrl = () => {
+    const teamsText = selectedTeams.length > 0 
+      ? selectedTeams.map(t => t.name).join(', ')
+      : 'None Selected';
+    const qualityText = streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)';
+    const spoilerText = hideScores ? 'Scores Hidden (Active)' : 'Show Live Scores';
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+        <rect width="600" height="900" rx="46" fill="#ffffff" stroke="#ea580c" stroke-width="4"/>
+        <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
+
+        <text x="300" y="160" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle" letter-spacing="3">
+          CARD SETTINGS
+        </text>
+        <line x1="80" y1="195" x2="520" y2="195" stroke="#f1f5f9" stroke-width="3"/>
+
+        <!-- Setting 1: Favorite Teams -->
+        <text x="80" y="240" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+          FAVORITE TEAMS (${selectedTeams.length})
+        </text>
+        <rect x="80" y="255" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="295" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#0f172a">
+          ${teamsText.length > 24 ? teamsText.slice(0, 24) + '...' : teamsText}
+        </text>
+
+        <!-- Setting 2: Spoiler Shield -->
+        <text x="80" y="360" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+          HIDE FINAL SCORES
+        </text>
+        <rect x="80" y="375" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="415" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="${hideScores ? '#ea580c' : '#0f172a'}">
+          ${spoilerText}
+        </text>
+
+        <!-- Setting 3: Playback Quality -->
+        <text x="80" y="480" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+          PLAYBACK STREAM
+        </text>
+        <rect x="80" y="495" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="535" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#0f172a">
+          ${qualityText}
+        </text>
+
+        <!-- Setting 4: Report a Problem -->
+        <text x="80" y="600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+          REPORT A PROBLEM
+        </text>
+        <rect x="80" y="615" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="655" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#0f172a">
+          Tap to send issue details
+        </text>
+
+        <line x1="80" y1="715" x2="520" y2="715" stroke="#f1f5f9" stroke-width="3"/>
+        <text x="300" y="775" font-family="monospace" font-weight="700" font-size="16" fill="#ea580c" text-anchor="middle" letter-spacing="4">
+          TAP TO EDIT SETTINGS
+        </text>
+      </svg>
+    `;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
+
   const filteredTeams = ALL_TEAMS.filter(t => {
     if (teamTab !== 'ALL' && t.league !== teamTab) return false;
     if (teamSearch.trim()) {
@@ -232,18 +294,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         {/* 3D Card Flipping Container */}
         <div 
-          className="w-full flex-1 relative flex items-center justify-center overflow-hidden my-auto"
+          className="w-full flex-1 relative flex items-center justify-center my-auto"
           style={{ perspective: '1200px' }}
         >
           <div 
-            className="w-full h-full relative transition-transform duration-500 ease-out"
+            className="w-full h-full relative transition-transform duration-600 ease-in-out"
             style={{
               transformStyle: 'preserve-3d',
               transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
             }}
           >
             
-            {/* FRONT FACE: 3D Swinging Lanyard Badge (interactive, tap anywhere to flip to back) */}
+            {/* FRONT FACE: 3D Swinging Lanyard Badge */}
             <div 
               className="absolute inset-0 w-full h-full flex items-center justify-center"
               style={{
@@ -255,7 +317,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             >
               <Lanyard
                 frontImage={frontBadgeDataUrl()}
-                backImage={frontBadgeDataUrl()}
+                backImage={backBadgeDataUrl()}
                 cardColor="#ffffff"
                 strapColor={isVip ? '#d97706' : '#1e293b'}
                 metal={isVip ? 'gold' : 'silver'}
