@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Info, X, Send, CheckCircle2 } from 'lucide-react';
+import { X, Send, CheckCircle2 } from 'lucide-react';
 
 interface ReportProblemModalProps {
   currentUser?: any;

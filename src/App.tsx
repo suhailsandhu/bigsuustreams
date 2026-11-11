@@ -19,6 +19,7 @@ import { UpdatingScreen } from './components/UpdatingScreen.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { findTeamByQuery } from './data/nbaTeams.ts';
 import { isSmartTv } from './utils/tvDetector.ts';
+import { applyTheme } from './utils/theme.ts';
 import { AlertCircle, RefreshCw, Trophy, Tv } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -131,21 +132,7 @@ export const App: React.FC = () => {
     }
     // Initialize user's preferred theme mode (Light / Dark / System)
     try {
-      const theme = localStorage.getItem('bss_theme_mode') || 'light';
-      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-        document.documentElement.style.backgroundColor = '#141414';
-        document.documentElement.style.color = '#f5f5f5';
-        document.body.style.backgroundColor = '#141414';
-        document.body.style.color = '#f5f5f5';
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.style.backgroundColor = '#ffffff';
-        document.documentElement.style.color = '#0f172a';
-        document.body.style.backgroundColor = '#ffffff';
-        document.body.style.color = '#0f172a';
-      }
+      applyTheme();
     } catch {}
   }, []);
 
@@ -186,21 +173,7 @@ export const App: React.FC = () => {
   // Dynamic Theme & Density reactivity on settings change
   useEffect(() => {
     try {
-      const theme = localStorage.getItem('bss_theme_mode') || 'light';
-      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-        document.documentElement.style.backgroundColor = '#141414';
-        document.documentElement.style.color = '#f5f5f5';
-        document.body.style.backgroundColor = '#141414';
-        document.body.style.color = '#f5f5f5';
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.style.backgroundColor = '#ffffff';
-        document.documentElement.style.color = '#0f172a';
-        document.body.style.backgroundColor = '#ffffff';
-        document.body.style.color = '#0f172a';
-      }
+      applyTheme();
 
       // Sync default sport if changed
       const savedSport = localStorage.getItem('bss_default_sport');
@@ -838,7 +811,7 @@ export const App: React.FC = () => {
   // Render iOS-Style Account Auth Modal if user has not yet signed in or created an account
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#141414] flex flex-col justify-between items-center p-4 select-none">
+      <div className="min-h-screen bg-white dark:bg-[#0b0b0c] flex flex-col justify-between items-center p-4 select-none">
         <AuthModal
           isOpen={true}
           currentSport={currentSport}
@@ -867,7 +840,7 @@ export const App: React.FC = () => {
   return (
     <div 
       style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
-      className="min-h-screen flex flex-col bg-white dark:bg-[#141414] text-gray-900 dark:text-neutral-100 selection:bg-blue-500/20 selection:text-blue-900"
+      className="min-h-screen flex flex-col bg-white dark:bg-[#0b0b0c] text-gray-900 dark:text-neutral-100 selection:bg-blue-500/20 selection:text-blue-900"
     >
       {/* Top Header with Sport Logo and Switcher */}
       <Header
@@ -937,20 +910,20 @@ export const App: React.FC = () => {
             {isLoading && (
               <div className={isTv ? "space-y-2 sm:space-y-2.5" : "grid grid-cols-1 md:grid-cols-2 gap-3"}>
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-28 rounded-2xl bg-white border border-gray-200 animate-pulse shadow-xs" />
+                  <div key={i} className="h-28 rounded-2xl bg-white dark:bg-[#141416] border border-gray-200 dark:border-white/[0.08] animate-pulse shadow-xs" />
                 ))}
               </div>
             )}
 
             {/* Error Notice */}
             {error && !isLoading && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center my-6">
-                <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-                <h3 className="text-base font-bold text-gray-900 mb-1">Scoreboard Notice</h3>
-                <p className="text-xs text-gray-600 max-w-md mx-auto mb-4">{error}</p>
+              <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 rounded-2xl p-6 text-center my-6">
+                <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400 mx-auto mb-2" />
+                <h3 className="text-base font-bold text-gray-900 dark:text-neutral-100 mb-1">Scoreboard Notice</h3>
+                <p className="text-xs text-gray-600 dark:text-neutral-400 max-w-md mx-auto mb-4">{error}</p>
                 <button
                   onClick={() => loadScoreboardData(selectedDate)}
-                  className="inline-flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-1.5 bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 text-xs font-bold px-4 py-2 rounded-full transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5 mr-1" />
                   Retry Loading
@@ -982,17 +955,17 @@ export const App: React.FC = () => {
                     />
                   ))
                 ) : (
-                  <div className={`bg-white border border-gray-200 rounded-2xl p-12 text-center shadow-xs ${!isTv ? 'md:col-span-2' : ''}`}>
-                    <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                  <div className={`bg-white dark:bg-[#141416] border border-gray-200 dark:border-white/[0.08] rounded-2xl p-12 text-center shadow-xs ${!isTv ? 'md:col-span-2' : ''}`}>
+                    <Trophy className="w-12 h-12 text-gray-300 dark:text-neutral-600 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-neutral-100 mb-1">
                       No {currentSport.toUpperCase()} Games Scheduled
                     </h3>
-                    <p className="text-sm text-gray-500 max-w-sm mx-auto mb-4">
+                    <p className="text-sm text-gray-500 dark:text-neutral-400 max-w-sm mx-auto mb-4">
                       There are no {currentSport.toUpperCase()} games scheduled for this date. Use the date bar above to check games for other days.
                     </p>
                     <button
                       onClick={() => handleSelectDate(getTodayDateString())}
-                      className="bg-black hover:bg-neutral-800 text-white text-xs font-bold px-5 py-2.5 rounded-full transition-colors cursor-pointer"
+                      className="bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 text-xs font-bold px-5 py-2.5 rounded-full transition-colors cursor-pointer"
                     >
                       Go to Today
                     </button>

@@ -305,7 +305,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 px-3.5 py-1.5 rounded-full shadow-2xs transition-colors cursor-pointer active:scale-95"
+          className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 dark:text-neutral-200 bg-white dark:bg-[#141416] hover:bg-gray-50 dark:hover:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] px-3.5 py-1.5 rounded-full shadow-2xs transition-colors cursor-pointer active:scale-95"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>All Games</span>
@@ -314,7 +314,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         <div className="flex items-center space-x-2">
           <button
             onClick={handleShare}
-            className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 hover:text-black bg-white hover:bg-gray-50 border border-gray-200 px-3.5 py-1.5 rounded-full shadow-2xs transition-colors cursor-pointer active:scale-95"
+            className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 dark:text-neutral-200 bg-white dark:bg-[#141416] hover:bg-gray-50 dark:hover:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] px-3.5 py-1.5 rounded-full shadow-2xs transition-colors cursor-pointer active:scale-95"
           >
             {copied ? (
               <>
@@ -323,7 +323,7 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
               </>
             ) : (
               <>
-                <Share2 className="w-3.5 h-3.5 text-gray-500" />
+                <Share2 className="w-3.5 h-3.5 text-gray-500 dark:text-neutral-400" />
                 <span>Share</span>
               </>
             )}
@@ -340,10 +340,10 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
 
       {/* Live Games Quick-Switcher (Compact 2-3 Games Visible with Smooth Horizontal Scroll) */}
       {liveGamesNow.length > 0 && (
-        <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-2.5">
+        <div className="bg-white dark:bg-[#141416] border border-gray-200/90 dark:border-white/[0.08] rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-2.5">
           <div className="flex items-center space-x-2 px-0.5">
             <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
-            <span className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight">
+            <span className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-neutral-100 tracking-tight">
               Live Games
             </span>
           </div>
@@ -368,10 +368,10 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                       onSelectGame?.(g);
                     }
                   }}
-                  className={`shrink-0 flex flex-col justify-between p-3 sm:p-3.5 rounded-xl min-w-[220px] sm:min-w-[250px] md:min-w-[270px] max-w-[280px] transition-all text-left shadow-2xs hover:shadow-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none focus:scale-[1.02] cursor-pointer ${
+                  className={`shrink-0 flex flex-col justify-between p-3 sm:p-3.5 rounded-xl min-w-[220px] sm:min-w-[250px] md:min-w-[270px] max-w-[280px] transition-all text-left shadow-2xs hover:shadow-xs focus:outline-none cursor-pointer ${
                     isCurrent
-                      ? 'bg-emerald-50/90 border-2 border-emerald-500 shadow-sm ring-2 ring-emerald-500/25'
-                      : 'bg-white hover:bg-gray-50 border border-gray-200/90 hover:border-gray-300'
+                      ? 'bg-gray-50/90 dark:bg-white/[0.06] border-2 border-blue-600 dark:border-blue-500 shadow-xs'
+                      : 'bg-white dark:bg-[#18181b] hover:bg-gray-50 dark:hover:bg-white/[0.03] border border-gray-200/90 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/20'
                   }`}
                 >
                   {/* Away Team */}
@@ -380,9 +380,9 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                       {g.awayTeam?.logo && (
                         <img src={g.awayTeam.logo} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0 drop-shadow-2xs" />
                       )}
-                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{awayName}</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-neutral-100 truncate">{awayName}</span>
                     </div>
-                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{awayScore}</span>
+                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900 dark:text-neutral-100">{awayScore}</span>
                   </div>
 
                   {/* Home Team */}
@@ -391,26 +391,26 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                       {g.homeTeam?.logo && (
                         <img src={g.homeTeam.logo} alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain shrink-0 drop-shadow-2xs" />
                       )}
-                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 truncate">{homeName}</span>
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-neutral-100 truncate">{homeName}</span>
                     </div>
-                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900">{homeScore}</span>
+                    <span className="text-xs sm:text-sm font-black tabular-nums text-gray-900 dark:text-neutral-100">{homeScore}</span>
                   </div>
 
                   {/* Card Bottom Quarter & Switch Stream / Watching Now Badge */}
                   <div className={`flex items-center justify-between pt-2 mt-2 border-t text-[11px] font-bold ${
-                    isCurrent ? 'border-emerald-200/80' : 'border-gray-100'
+                    isCurrent ? 'border-blue-200/80 dark:border-blue-800/40' : 'border-gray-100 dark:border-white/[0.06]'
                   }`}>
-                    <span className="inline-flex items-center space-x-1 text-red-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                    <span className="inline-flex items-center space-x-1 text-red-600 dark:text-red-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400 animate-pulse" />
                       <span className="text-[11px] sm:text-xs font-extrabold">{quarterClock}</span>
                     </span>
                     {isCurrent ? (
-                      <span className="inline-flex items-center space-x-1 text-[9px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                        <span className="w-1 h-1 rounded-full bg-emerald-600" />
+                      <span className="inline-flex items-center space-x-1 text-[9px] font-black text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                        <span className="w-1 h-1 rounded-full bg-blue-600 dark:bg-blue-400" />
                         <span>Watching</span>
                       </span>
                     ) : (
-                      <span className="text-gray-500 hover:text-black text-[10px] sm:text-[11px] font-semibold flex items-center space-x-0.5">
+                      <span className="text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white text-[10px] sm:text-[11px] font-semibold flex items-center space-x-0.5">
                         <span>Switch</span>
                         <span>→</span>
                       </span>
@@ -425,12 +425,12 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
       )}
 
       {/* Matchup Header & Live Scoreboard Section (Symmetrical 3-Column Layout) */}
-      <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">
+      <div className="bg-white dark:bg-[#141416] border border-gray-200/90 dark:border-white/[0.08] rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-6">
           
           {/* Away Team */}
           <div className="flex flex-col sm:flex-row items-center sm:space-x-3.5 text-center sm:text-left min-w-0">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gray-50 border border-gray-100 p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/10 p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
               {team1.logo ? (
                 <img
                   src={team1.logo}
@@ -442,15 +442,15 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
               )}
             </div>
             <div className="min-w-0 mt-1.5 sm:mt-0">
-              <h2 className="text-xs sm:text-lg font-extrabold text-gray-900 leading-tight truncate">
+              <h2 className="text-xs sm:text-lg font-extrabold text-gray-900 dark:text-neutral-100 leading-tight truncate">
                 {team1.name || team1.displayName}
               </h2>
               <div className="flex items-center justify-center sm:justify-start space-x-1.5 mt-0.5">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-neutral-400 bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded">
                   AWAY
                 </span>
                 {team1.record && (
-                  <span className="text-[10px] sm:text-xs text-gray-400 font-normal">
+                  <span className="text-[10px] sm:text-xs text-gray-400 dark:text-neutral-500 font-normal">
                     {team1.record}
                   </span>
                 )}
@@ -463,44 +463,44 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
             {game ? (
               <div className="flex items-center space-x-2.5 sm:space-x-4">
                 <span className={`text-xl sm:text-4xl font-black tabular-nums ${
-                  isFinal && team1.winner ? 'text-gray-900' : isFinal ? 'text-gray-400' : 'text-gray-900'
+                  isFinal && team1.winner ? 'text-gray-900 dark:text-white' : isFinal ? 'text-gray-400 dark:text-neutral-500' : 'text-gray-900 dark:text-neutral-100'
                 }`}>
                   {team1.score}
                 </span>
 
                 <div className="flex flex-col items-center px-1">
                   {isLive ? (
-                    <div className="flex items-center space-x-1.5 text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold whitespace-nowrap">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                    <div className="flex items-center space-x-1.5 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-500 animate-pulse" />
                       <span>{statusDetail}</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] sm:text-xs font-black text-gray-400 uppercase tracking-wider bg-gray-50 border border-gray-200/70 px-2 sm:px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                    <span className="text-[10px] sm:text-xs font-black text-gray-400 dark:text-neutral-400 uppercase tracking-wider bg-gray-50 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/10 px-2 sm:px-2.5 py-0.5 rounded-full whitespace-nowrap">
                       {statusDetail}
                     </span>
                   )}
-                  <span className="text-[9px] font-bold text-gray-400 uppercase mt-0.5 tracking-wider">
+                  <span className="text-[9px] font-bold text-gray-400 dark:text-neutral-500 uppercase mt-0.5 tracking-wider">
                     {game?.league || stream.league || 'NBA'}
                   </span>
                 </div>
 
                 <span className={`text-xl sm:text-4xl font-black tabular-nums ${
-                  isFinal && team2.winner ? 'text-gray-900' : isFinal ? 'text-gray-400' : 'text-gray-900'
+                  isFinal && team2.winner ? 'text-gray-900 dark:text-white' : isFinal ? 'text-gray-400 dark:text-neutral-500' : 'text-gray-900 dark:text-neutral-100'
                 }`}>
                   {team2.score}
                 </span>
               </div>
             ) : (
               <div className="flex flex-col items-center">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">AT</span>
-                <span className="text-xs font-semibold text-gray-600 mt-1">{statusDetail}</span>
+                <span className="text-xs font-bold text-gray-400 dark:text-neutral-500 uppercase tracking-widest">AT</span>
+                <span className="text-xs font-semibold text-gray-600 dark:text-neutral-300 mt-1">{statusDetail}</span>
               </div>
             )}
           </div>
 
           {/* Home Team */}
           <div className="flex flex-col sm:flex-row-reverse items-center sm:space-x-3.5 sm:space-x-reverse text-center sm:text-right min-w-0">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gray-50 border border-gray-100 p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-gray-50 dark:bg-white/[0.04] border border-gray-100 dark:border-white/10 p-1.5 flex items-center justify-center shrink-0 shadow-2xs">
               {team2.logo ? (
                 <img
                   src={team2.logo}
@@ -512,16 +512,16 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
               )}
             </div>
             <div className="min-w-0 mt-1.5 sm:mt-0">
-              <h2 className="text-xs sm:text-lg font-extrabold text-gray-900 leading-tight truncate">
+              <h2 className="text-xs sm:text-lg font-extrabold text-gray-900 dark:text-neutral-100 leading-tight truncate">
                 {team2.name || team2.displayName}
               </h2>
               <div className="flex items-center justify-center sm:justify-end space-x-1.5 mt-0.5">
                 {team2.record && (
-                  <span className="text-[10px] sm:text-xs text-gray-400 font-normal">
+                  <span className="text-[10px] sm:text-xs text-gray-400 dark:text-neutral-500 font-normal">
                     {team2.record}
                   </span>
                 )}
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-neutral-400 bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded">
                   HOME
                 </span>
               </div>
@@ -534,52 +534,52 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
       {/* ========================================================= */}
       {/* BOX SCORE & STATS SECTION                                 */}
       {/* ========================================================= */}
-      <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-[#141416] border border-gray-200/90 dark:border-white/[0.08] rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
         
         {/* Title & Quarter Breakdown */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider">
+            <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-neutral-100 uppercase tracking-wider">
               Game Stats & Box Score
             </h3>
-            <span className="text-[11px] font-semibold text-gray-400">
+            <span className="text-[11px] font-semibold text-gray-400 dark:text-neutral-500">
               {game?.status?.detail || 'Live Statistics'}
             </span>
           </div>
 
           {/* Quarter Linescore Table */}
-          <div className="bg-gray-50/90 border border-gray-200/80 rounded-2xl p-3 sm:p-4 overflow-x-auto">
+          <div className="bg-gray-50/90 dark:bg-white/[0.02] border border-gray-200/80 dark:border-white/[0.06] rounded-2xl p-3 sm:p-4 overflow-x-auto">
             <table className="w-full text-xs text-center border-collapse min-w-[280px]">
               <thead>
-                <tr className="text-gray-400 border-b border-gray-200/80 font-bold uppercase text-[10px] sm:text-[11px]">
-                  <th className="text-left py-1.5 px-2 font-semibold text-gray-500 min-w-[120px]">Team</th>
+                <tr className="text-gray-400 dark:text-neutral-400 border-b border-gray-200/80 dark:border-white/[0.06] font-bold uppercase text-[10px] sm:text-[11px]">
+                  <th className="text-left py-1.5 px-2 font-semibold text-gray-500 dark:text-neutral-400 min-w-[120px]">Team</th>
                   <th className="py-1.5 px-1.5 min-w-[28px]">Q1</th>
                   <th className="py-1.5 px-1.5 min-w-[28px]">Q2</th>
                   <th className="py-1.5 px-1.5 min-w-[28px]">Q3</th>
                   <th className="py-1.5 px-1.5 min-w-[28px]">Q4</th>
                   {awayTeamBox.linescores.length > 4 && <th className="py-1.5 px-1.5 min-w-[28px]">OT</th>}
-                  <th className="py-1.5 px-2 text-right font-black text-gray-900 min-w-[36px]">Total</th>
+                  <th className="py-1.5 px-2 text-right font-black text-gray-900 dark:text-neutral-100 min-w-[36px]">Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.06] font-medium text-gray-700 dark:text-neutral-300">
                 {/* Away Team */}
                 <tr>
-                  <td className="text-left py-2 px-2 font-bold text-gray-900 flex items-center space-x-2">
+                  <td className="text-left py-2 px-2 font-bold text-gray-900 dark:text-neutral-100 flex items-center space-x-2">
                     {team1.logo && <img src={team1.logo} className="w-5 h-5 object-contain shrink-0" alt="" />}
                     <span className="truncate">{team1.name || team1.displayName}</span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase bg-gray-200/60 px-1 py-0.5 rounded shrink-0">
+                    <span className="text-[9px] font-bold text-gray-400 dark:text-neutral-400 uppercase bg-gray-200/60 dark:bg-white/[0.06] px-1 py-0.5 rounded shrink-0">
                       AWAY
                     </span>
                   </td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeamBox.linescores[0] ?? '-'}</td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeamBox.linescores[1] ?? '-'}</td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeamBox.linescores[2] ?? '-'}</td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeamBox.linescores[3] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{awayTeamBox.linescores[0] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{awayTeamBox.linescores[1] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{awayTeamBox.linescores[2] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{awayTeamBox.linescores[3] ?? '-'}</td>
                   {awayTeamBox.linescores.length > 4 && (
-                    <td className="py-2 px-1.5 tabular-nums text-gray-500">{awayTeamBox.linescores[4]}</td>
+                    <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{awayTeamBox.linescores[4]}</td>
                   )}
                   <td className={`py-2 px-2 text-right font-black tabular-nums text-sm ${
-                    isFinal && (team1 as any).winner ? 'text-gray-900' : isFinal ? 'text-gray-400' : 'text-gray-900'
+                    isFinal && (team1 as any).winner ? 'text-gray-900 dark:text-white' : isFinal ? 'text-gray-400 dark:text-neutral-500' : 'text-gray-900 dark:text-neutral-100'
                   }`}>
                     {team1.score}
                   </td>
@@ -587,22 +587,22 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
 
                 {/* Home Team */}
                 <tr>
-                  <td className="text-left py-2 px-2 font-bold text-gray-900 flex items-center space-x-2">
+                  <td className="text-left py-2 px-2 font-bold text-gray-900 dark:text-neutral-100 flex items-center space-x-2">
                     {team2.logo && <img src={team2.logo} className="w-5 h-5 object-contain shrink-0" alt="" />}
                     <span className="truncate">{team2.name || team2.displayName}</span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase bg-gray-200/60 px-1 py-0.5 rounded shrink-0">
+                    <span className="text-[9px] font-bold text-gray-400 dark:text-neutral-400 uppercase bg-gray-200/60 dark:bg-white/[0.06] px-1 py-0.5 rounded shrink-0">
                       HOME
                     </span>
                   </td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeamBox.linescores[0] ?? '-'}</td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeamBox.linescores[1] ?? '-'}</td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeamBox.linescores[2] ?? '-'}</td>
-                  <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeamBox.linescores[3] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{homeTeamBox.linescores[0] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{homeTeamBox.linescores[1] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{homeTeamBox.linescores[2] ?? '-'}</td>
+                  <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{homeTeamBox.linescores[3] ?? '-'}</td>
                   {homeTeamBox.linescores.length > 4 && (
-                    <td className="py-2 px-1.5 tabular-nums text-gray-500">{homeTeamBox.linescores[4]}</td>
+                    <td className="py-2 px-1.5 tabular-nums text-gray-500 dark:text-neutral-400">{homeTeamBox.linescores[4]}</td>
                   )}
                   <td className={`py-2 px-2 text-right font-black tabular-nums text-sm ${
-                    isFinal && (team2 as any).winner ? 'text-gray-900' : isFinal ? 'text-gray-400' : 'text-gray-900'
+                    isFinal && (team2 as any).winner ? 'text-gray-900 dark:text-white' : isFinal ? 'text-gray-400 dark:text-neutral-500' : 'text-gray-900 dark:text-neutral-100'
                   }`}>
                     {team2.score}
                   </td>
@@ -613,13 +613,13 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         </div>
 
         {/* Balanced Team Selector Tabs */}
-        <div className="w-full grid grid-cols-2 gap-1.5 bg-gray-100 p-1 rounded-2xl border border-gray-200/70 sm:w-auto sm:inline-flex">
+        <div className="w-full grid grid-cols-2 gap-1.5 bg-gray-100 dark:bg-white/[0.06] p-1 rounded-2xl border border-gray-200/70 dark:border-white/[0.08] sm:w-auto sm:inline-flex">
           <button
             onClick={() => setActiveTeamTab('away')}
             className={`flex items-center justify-center space-x-2 py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer truncate ${
               activeTeamTab === 'away'
-                ? 'bg-white text-gray-900 shadow-xs'
-                : 'text-gray-500 hover:text-gray-900'
+                ? 'bg-white dark:bg-[#202024] text-gray-900 dark:text-white shadow-xs'
+                : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             {team1.logo && <img src={team1.logo} className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" alt="" />}
@@ -630,8 +630,8 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
             onClick={() => setActiveTeamTab('home')}
             className={`flex items-center justify-center space-x-2 py-2 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer truncate ${
               activeTeamTab === 'home'
-                ? 'bg-white text-gray-900 shadow-xs'
-                : 'text-gray-500 hover:text-gray-900'
+                ? 'bg-white dark:bg-[#202024] text-gray-900 dark:text-white shadow-xs'
+                : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             {team2.logo && <img src={team2.logo} className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" alt="" />}
@@ -649,20 +649,20 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
           null
         ) : currentTeamBox.athletes.length > 0 ? (
           <div
-            className="border border-gray-200/90 rounded-2xl overflow-x-auto touch-pan-x shadow-2xs bg-white"
+            className="border border-gray-200/90 dark:border-white/[0.08] rounded-2xl overflow-x-auto touch-pan-x shadow-2xs bg-white dark:bg-[#141416]"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
             <table className="w-full text-left text-xs border-collapse min-w-[560px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px]">
-                  <th className="py-2.5 px-3 sm:px-4 font-bold sticky left-0 bg-gray-50 z-20 min-w-[175px] sm:min-w-[210px] shadow-[2px_0_5px_rgba(0,0,0,0.04)]">
+                <tr className="bg-gray-50 dark:bg-[#18181c] border-b border-gray-200 dark:border-white/[0.08] text-gray-500 dark:text-neutral-400 font-bold uppercase text-[10px]">
+                  <th className="py-2.5 px-3 sm:px-4 font-bold sticky left-0 bg-gray-50 dark:bg-[#18181c] z-20 min-w-[175px] sm:min-w-[210px] shadow-[2px_0_5px_rgba(0,0,0,0.04)]">
                     Player
                   </th>
                   {currentTeamBox.statLabels.map((lbl) => (
                     <th
                       key={lbl}
                       className={`py-2.5 px-2.5 text-right font-bold ${
-                        lbl === 'PTS' ? 'text-gray-900 font-black' : 'text-gray-500'
+                        lbl === 'PTS' ? 'text-gray-900 dark:text-white font-black' : 'text-gray-500 dark:text-neutral-400'
                       }`}
                     >
                       {lbl}
@@ -670,27 +670,27 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.06] font-medium text-gray-700 dark:text-neutral-300">
                 {currentTeamBox.athletes.map((ath) => (
-                  <tr key={ath.athlete.id} className="hover:bg-gray-50/80 transition-colors">
+                  <tr key={ath.athlete.id} className="hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition-colors">
                     {/* Sticky Player Name Column: Widen so full names never truncate */}
-                    <td className="py-2.5 px-3 sm:px-4 font-bold text-gray-900 flex items-center space-x-2.5 sticky left-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.04)] min-w-[175px] sm:min-w-[210px]">
+                    <td className="py-2.5 px-3 sm:px-4 font-bold text-gray-900 dark:text-neutral-100 flex items-center space-x-2.5 sticky left-0 bg-white dark:bg-[#141416] z-10 shadow-[2px_0_5px_rgba(0,0,0,0.04)] min-w-[175px] sm:min-w-[210px]">
                       {ath.athlete.headshot ? (
                         <img
                           src={ath.athlete.headshot}
-                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-gray-100 shrink-0"
+                          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-gray-100 dark:border-white/10 shrink-0"
                           alt=""
                         />
                       ) : (
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-100 dark:bg-white/[0.08] flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-neutral-400 shrink-0">
                           {ath.athlete.jersey || '#'}
                         </div>
                       )}
                       <div className="min-w-0 pr-1">
-                        <div className="text-xs sm:text-sm font-bold text-gray-900 whitespace-nowrap">
+                        <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-neutral-100 whitespace-nowrap">
                           {ath.athlete.displayName}
                         </div>
-                        <div className="text-[10px] text-gray-400 font-normal">
+                        <div className="text-[10px] text-gray-400 dark:text-neutral-500 font-normal">
                           {ath.athlete.jersey ? `#${ath.athlete.jersey}` : ''} {ath.athlete.position ? `• ${ath.athlete.position}` : ''}
                         </div>
                       </div>

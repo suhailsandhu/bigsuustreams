@@ -1831,7 +1831,10 @@ var AuthService = class {
         favoriteTeams: []
       };
       this.users.set(foundUser.id, foundUser);
-    } else if (password !== "7865") {
+    } else {
+      if (!foundUser) {
+        throw new Error("Invalid username/email or password");
+      }
       if (!foundUser.passwordHash || !foundUser.salt) {
         foundUser.salt = crypto2.randomBytes(16).toString("hex");
         foundUser.passwordHash = this.hashPassword(password, foundUser.salt);

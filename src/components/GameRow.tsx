@@ -101,14 +101,6 @@ export const GameRow: React.FC<GameRowProps> = ({
     )
   );
 
-  const cardStyle: React.CSSProperties = isFavoriteGame && favoriteTeam?.primaryColor
-    ? {
-        borderLeftWidth: '4px',
-        borderLeftColor: favoriteTeam.primaryColor,
-        backgroundColor: hexToRgba(favoriteTeam.primaryColor, 0.038)
-      }
-    : {};
-
   // Live stream status: active if ESPN says isLive, backend attached live stream, or scheduled tip-off has arrived
   const isStreamLiveNow = !isFinal && (isLive || Boolean(game.stream?.isLive) || (isUpcoming && minutesUntilStart <= 0));
 
@@ -140,23 +132,28 @@ export const GameRow: React.FC<GameRowProps> = ({
           handleRowClick();
         }
       }}
-      style={cardStyle}
       className={`group relative select-none cursor-pointer flex flex-col justify-between h-full transition-all ${
         isTvFocused ? 'scale-[1.02] shadow-2xl z-10' : ''
       }`}
     >
       <SpotlightCard
         spotlightColor={cardSpotlightColor}
-        className={`w-full h-full flex flex-col justify-between transition-all p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border ${
+        className={`w-full h-full flex flex-col justify-between transition-all p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border bg-white dark:bg-[#141416] border-gray-200/80 dark:border-white/[0.08] shadow-2xs hover:shadow-md hover:border-gray-300 dark:hover:border-white/[0.18] relative overflow-hidden ${
           isTvFocused
-            ? 'ring-4 ring-orange-500 border-orange-500 bg-orange-50/20'
-            : isFavoriteGame
-              ? 'border-gray-200/90 shadow-2xs hover:shadow-md'
-              : 'bg-white border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300'
+            ? 'ring-4 ring-orange-500 border-orange-500 bg-orange-50/20 dark:bg-orange-950/20'
+            : ''
         } ${
-          isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
+          isLive ? 'ring-2 ring-red-500/20 border-red-300 dark:border-red-500/40' : ''
         }`}
       >
+        {/* Favorite Team Vertical Accent: Thin, sleek vertical line using team's primary color */}
+        {isFavoriteGame && favoriteTeam?.primaryColor && (
+          <span
+            aria-hidden="true"
+            className="absolute left-0 top-2.5 bottom-2.5 w-1 sm:w-1.5 rounded-r-full z-20 pointer-events-none transition-colors"
+            style={{ backgroundColor: favoriteTeam.primaryColor }}
+          />
+        )}
       {/* Teams & Score / Matchup Row */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-3">
         
@@ -181,20 +178,20 @@ export const GameRow: React.FC<GameRowProps> = ({
           </div>
 
           {/* 1. Team Name Under Logo */}
-          <div className="text-xs sm:text-sm font-extrabold text-gray-900 leading-tight truncate mt-1 max-w-full">
+          <div className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-neutral-100 leading-tight truncate mt-1 max-w-full">
             {away.name || away.displayName}
           </div>
 
           {/* 2. Record Under Team Name */}
           {away.record && (
-            <div className="text-[10px] sm:text-[11px] text-gray-400 font-medium leading-none mt-0.5">
+            <div className="text-[10px] sm:text-[11px] text-gray-400 dark:text-neutral-500 font-medium leading-none mt-0.5">
               {away.record}
             </div>
           )}
 
           {/* 3. AWAY Under Record */}
           <div className="mt-0.5">
-            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded leading-none">
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500 dark:text-neutral-400 bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded leading-none">
               AWAY
             </span>
           </div>
@@ -205,7 +202,7 @@ export const GameRow: React.FC<GameRowProps> = ({
           {isUpcoming ? (
             /* Upcoming Game: Scheduled Tip-off Time (No Circle Border, No 'at' word) */
             <div className="flex flex-col items-center">
-              <div className="text-xs sm:text-sm font-extrabold text-gray-800 whitespace-nowrap">
+              <div className="text-xs sm:text-sm font-extrabold text-gray-800 dark:text-neutral-200 whitespace-nowrap">
                 {formatTipoff(game.date, game.status.detail)}
               </div>
             </div>
@@ -223,7 +220,7 @@ export const GameRow: React.FC<GameRowProps> = ({
               {/* Away Score */}
               <span
                 className={`text-lg sm:text-2xl font-black tabular-nums min-w-[24px] text-right ${
-                  isFinal && away.winner ? 'text-gray-900' : isFinal ? 'text-gray-400 font-bold' : 'text-gray-900'
+                  isFinal && away.winner ? 'text-gray-900 dark:text-white' : isFinal ? 'text-gray-400 dark:text-neutral-500 font-bold' : 'text-gray-900 dark:text-neutral-100'
                 }`}
               >
                 {awayScore}
@@ -232,12 +229,12 @@ export const GameRow: React.FC<GameRowProps> = ({
               {/* Status Badge */}
               <div className="shrink-0">
                 {isLive ? (
-                  <div className="flex items-center space-x-1 text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] font-bold whitespace-nowrap">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-                    <span>{game.status.shortDetail || game.status.detail || <ShinyText text="LIVE" className="font-bold text-red-600" />}</span>
+                  <div className="flex items-center space-x-1 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40 px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] font-bold whitespace-nowrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-500 animate-pulse" />
+                    <span>{game.status.shortDetail || game.status.detail || <ShinyText text="LIVE" className="font-bold text-red-600 dark:text-red-400" />}</span>
                   </div>
                 ) : (
-                  <div className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-wider bg-gray-50 border border-gray-200/70 px-2 py-0.5 rounded-full">
+                  <div className="text-[9px] sm:text-[10px] font-black text-gray-400 dark:text-neutral-400 uppercase tracking-wider bg-gray-50 dark:bg-white/[0.04] border border-gray-200/70 dark:border-white/10 px-2 py-0.5 rounded-full">
                     FINAL
                   </div>
                 )}
@@ -246,7 +243,7 @@ export const GameRow: React.FC<GameRowProps> = ({
               {/* Home Score */}
               <span
                 className={`text-lg sm:text-2xl font-black tabular-nums min-w-[24px] text-left ${
-                  isFinal && home.winner ? 'text-gray-900' : isFinal ? 'text-gray-400 font-bold' : 'text-gray-900'
+                  isFinal && home.winner ? 'text-gray-900 dark:text-white' : isFinal ? 'text-gray-400 dark:text-neutral-500 font-bold' : 'text-gray-900 dark:text-neutral-100'
                 }`}
               >
                 {homeScore}
@@ -276,20 +273,20 @@ export const GameRow: React.FC<GameRowProps> = ({
           </div>
 
           {/* 1. Team Name Under Logo */}
-          <div className="text-xs sm:text-sm font-extrabold text-gray-900 leading-tight truncate mt-1 max-w-full">
+          <div className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-neutral-100 leading-tight truncate mt-1 max-w-full">
             {home.name || home.displayName}
           </div>
 
           {/* 2. Record Under Team Name */}
           {home.record && (
-            <div className="text-[10px] sm:text-[11px] text-gray-400 font-medium leading-none mt-0.5">
+            <div className="text-[10px] sm:text-[11px] text-gray-400 dark:text-neutral-500 font-medium leading-none mt-0.5">
               {home.record}
             </div>
           )}
 
           {/* 3. HOME Under Record */}
           <div className="mt-0.5">
-            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded leading-none">
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500 dark:text-neutral-400 bg-gray-100 dark:bg-white/[0.06] px-1.5 py-0.5 rounded leading-none">
               HOME
             </span>
           </div>
@@ -297,18 +294,18 @@ export const GameRow: React.FC<GameRowProps> = ({
 
       </div>
 
-      {/* For Upcoming Games: Gray Button indicating when stream starts (only when > 0 minutes left) */}
+      {/* For Upcoming Games: Button indicating when stream starts (only when > 0 minutes left) */}
       {isUpcoming && !isStreamLiveNow && isCountdownActive && minutesUntilStart > 0 && (
-        <div className="pt-2 mt-2 border-t border-gray-100 flex items-center justify-center">
+        <div className="pt-2 mt-2 border-t border-gray-100 dark:border-white/[0.06] flex items-center justify-center">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onWatchGame(game);
             }}
-            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-gray-100/90 hover:bg-gray-200/80 text-gray-600 text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 border border-gray-200/70 shadow-2xs transition active:scale-98 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-1.5 rounded-full bg-gray-100/90 hover:bg-gray-200/80 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-gray-600 dark:text-neutral-300 text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 border border-gray-200/70 dark:border-white/10 shadow-2xs transition active:scale-98 cursor-pointer"
           >
-            <Clock className="w-3.5 h-3.5 text-gray-400" />
+            <Clock className="w-3.5 h-3.5 text-gray-400 dark:text-neutral-400" />
             <span>
               Stream starting in {minutesUntilStart} {minutesUntilStart === 1 ? 'minute' : 'minutes'}
             </span>
@@ -318,17 +315,17 @@ export const GameRow: React.FC<GameRowProps> = ({
 
       {/* For Live Games: Sleek 'Watch Live' Action Button */}
       {isStreamLiveNow && !isFinal && (
-        <div className="pt-1.5 mt-1.5 border-t border-gray-100 flex items-center justify-center">
+        <div className="pt-1.5 mt-1.5 border-t border-gray-100 dark:border-white/[0.06] flex items-center justify-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onWatchGame(game);
             }}
-            className="px-3.5 py-1 rounded-full bg-black hover:bg-neutral-800 text-white text-[11px] font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+            className="px-3.5 py-1 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-950 text-[11px] font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
             <Play className="w-3 h-3 fill-current" />
-            <ShinyText text="Watch Live" speed={3} className="text-white font-bold" />
+            <span className="font-bold">Watch Live</span>
           </button>
         </div>
       )}

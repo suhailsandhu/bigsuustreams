@@ -799,9 +799,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           </div>
         )}
 
-        {/* Loading Indicator (Clean, White Background with React Bits LatticeLoader) */}
+        {/* Loading Indicator (Clean Background with React Bits LatticeLoader) */}
         {isLoading && !hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 z-20 pointer-events-none p-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-[#0c0c0e]/95 z-20 pointer-events-none p-4">
             <LatticeLoader
               label="Connecting stream..."
               status="working"
@@ -809,13 +809,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
               grid={3}
               cellSize={7}
               gap={3}
-              ink="#ea580c"
+              color="#ea580c"
               glow
               glowColor="#ea580c"
               showTimer
-              className="text-gray-900 font-bold"
+              className="text-gray-900 dark:text-neutral-100 font-bold"
             />
-            <p className="text-[11px] text-gray-500 mt-2 font-medium">
+            <p className="text-[11px] text-gray-500 dark:text-neutral-400 mt-2 font-medium">
               {selectedQuality} HD
             </p>
           </div>
@@ -823,12 +823,12 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
         {/* Error Notice */}
         {hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 p-4 text-center z-30">
-            <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-2.5">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-[#0c0c0e]/95 p-4 text-center z-30">
+            <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-center justify-center mb-2.5">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Stream Connecting</h3>
-            <p className="text-xs text-gray-500 max-w-xs mb-3 leading-relaxed">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-neutral-100 mb-0.5">Stream Connecting</h3>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 max-w-xs mb-3 leading-relaxed">
               {errorMessage || 'Direct stream temporarily initializing.'}
             </p>
             <button
@@ -836,7 +836,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                 retryCountRef.current = 0;
                 loadHlsStream();
               }}
-              className="flex items-center space-x-1.5 bg-black hover:bg-neutral-800 text-white text-xs font-semibold px-4 py-2 rounded-full transition cursor-pointer shadow-xs active:scale-95"
+              className="flex items-center space-x-1.5 bg-black hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-200 text-white dark:text-neutral-900 text-xs font-semibold px-4 py-2 rounded-full transition cursor-pointer shadow-xs active:scale-95"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry Feed</span>
@@ -853,8 +853,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           >
             {/* Top Bar: Compact title badge */}
             <div className="flex items-center justify-between pointer-events-auto">
-              <div className="flex items-center space-x-1.5 bg-white/90 border border-gray-200 px-2 py-0.5 rounded-lg shadow-xs backdrop-blur-xs max-w-[70%]">
-                <span className="text-[11px] font-semibold text-gray-900 truncate">
+              <div className="flex items-center space-x-1.5 bg-white/90 dark:bg-[#141416]/90 border border-gray-200 dark:border-white/10 px-2 py-0.5 rounded-lg shadow-xs backdrop-blur-xs max-w-[70%]">
+                <span className="text-[11px] font-semibold text-gray-900 dark:text-neutral-100 truncate">
                   {stream.name}
                 </span>
               </div>
@@ -864,7 +864,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
             <div className="flex items-center justify-center pointer-events-auto">
               <button
                 onClick={togglePlay}
-                className="w-12 h-12 rounded-full bg-white/90 hover:bg-white text-gray-900 flex items-center justify-center shadow-lg border border-gray-200 transition-transform active:scale-90 cursor-pointer"
+                className="w-12 h-12 rounded-full bg-white/90 hover:bg-white dark:bg-[#141416]/90 dark:hover:bg-[#141416] text-gray-900 dark:text-white flex items-center justify-center shadow-lg border border-gray-200 dark:border-white/10 transition-transform active:scale-90 cursor-pointer"
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? (
@@ -876,11 +876,11 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
             </div>
 
             {/* Bottom Controls Bar */}
-            <div className="flex items-center justify-between gap-2 pointer-events-auto bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-gray-200 shadow-md text-gray-800">
+            <div className="flex items-center justify-between gap-2 pointer-events-auto bg-white/95 dark:bg-[#141416]/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 shadow-md text-gray-800 dark:text-neutral-200">
               <div className="flex items-center space-x-2.5">
                 <button
                   onClick={togglePlay}
-                  className="text-gray-700 hover:text-black transition-colors cursor-pointer"
+                  className="text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                 >
                   {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                 </button>
@@ -888,7 +888,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                 <div className="flex items-center space-x-1.5 group/vol">
                   <button
                     onClick={toggleMute}
-                    className="text-gray-700 hover:text-black transition-colors cursor-pointer"
+                    className="text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                   >
                     {isMuted || volume === 0 ? (
                       <VolumeX className="w-3.5 h-3.5 text-red-500" />
@@ -903,7 +903,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                     step="0.05"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-14 h-1 accent-black bg-gray-200 rounded-lg cursor-pointer hidden sm:block"
+                    className="w-14 h-1 accent-black dark:accent-white bg-gray-200 dark:bg-white/20 rounded-lg cursor-pointer hidden sm:block"
                   />
                 </div>
 
@@ -913,9 +913,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                     retryCountRef.current = 0;
                     loadHlsStream();
                   }}
-                  className="flex items-center space-x-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded transition cursor-pointer"
+                  className="flex items-center space-x-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/60 px-1.5 py-0.5 rounded transition cursor-pointer"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400 animate-pulse"></span>
                   <span>LIVE</span>
                 </button>
               </div>
@@ -931,7 +931,9 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                       setSettingsSubmenu('main');
                     }}
                     className={`p-1 rounded-lg transition cursor-pointer ${
-                      showSettingsMenu ? 'bg-gray-200 text-black' : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                      showSettingsMenu
+                        ? 'bg-gray-200 dark:bg-white/20 text-black dark:text-white'
+                        : 'text-gray-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.08]'
                     }`}
                     title="Player Settings"
                   >
@@ -942,17 +944,17 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                   {showSettingsMenu && (
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute bottom-full right-0 mb-2 w-48 bg-white/98 backdrop-blur-md border border-gray-200 rounded-xl shadow-xl py-1.5 px-1 z-30 text-xs font-semibold text-gray-800"
+                      className="absolute bottom-full right-0 mb-2 w-48 bg-white/98 dark:bg-[#141416]/98 backdrop-blur-md border border-gray-200 dark:border-white/10 rounded-xl shadow-xl py-1.5 px-1 z-30 text-xs font-semibold text-gray-800 dark:text-neutral-200"
                     >
                       {settingsSubmenu === 'main' && (
                         <div className="space-y-0.5">
                           {/* Quality selector */}
                           <button
                             onClick={() => setSettingsSubmenu('quality')}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-left cursor-pointer"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.08] text-left cursor-pointer"
                           >
-                            <span className="text-gray-600 font-medium">Quality</span>
-                            <span className="text-[11px] font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">
+                            <span className="text-gray-600 dark:text-neutral-400 font-medium">Quality</span>
+                            <span className="text-[11px] font-bold text-gray-900 dark:text-neutral-100 bg-gray-100 dark:bg-white/[0.08] px-1.5 py-0.5 rounded">
                               {selectedQuality} ›
                             </span>
                           </button>
@@ -960,11 +962,11 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                           {/* Captions toggle */}
                           <button
                             onClick={() => setSettingsSubmenu('captions')}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-left cursor-pointer"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.08] text-left cursor-pointer"
                           >
-                            <span className="text-gray-600 font-medium">Captions</span>
+                            <span className="text-gray-600 dark:text-neutral-400 font-medium">Captions</span>
                             <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                              captionsEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                              captionsEnabled ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-white/[0.08] text-gray-500 dark:text-neutral-400'
                             }`}>
                               {captionsEnabled ? 'On ›' : 'Off ›'}
                             </span>
@@ -976,7 +978,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                         <div>
                           <button
                             onClick={() => setSettingsSubmenu('main')}
-                            className="w-full flex items-center space-x-1 px-2.5 py-1 text-[11px] text-gray-500 hover:text-gray-900 border-b border-gray-100 mb-1 cursor-pointer"
+                            className="w-full flex items-center space-x-1 px-2.5 py-1 text-[11px] text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white border-b border-gray-100 dark:border-white/[0.06] mb-1 cursor-pointer"
                           >
                             <span>‹ Back</span>
                           </button>
@@ -989,7 +991,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                                   setShowSettingsMenu(false);
                                 }}
                                 className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left cursor-pointer ${
-                                  selectedQuality === q ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-800'
+                                  selectedQuality === q ? 'bg-black dark:bg-white text-white dark:text-neutral-900 font-bold' : 'hover:bg-gray-100 dark:hover:bg-white/[0.08] text-gray-800 dark:text-neutral-200'
                                 }`}
                               >
                                 <span>{q}</span>
@@ -1004,7 +1006,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                         <div>
                           <button
                             onClick={() => setSettingsSubmenu('main')}
-                            className="w-full flex items-center space-x-1 px-2.5 py-1 text-[11px] text-gray-500 hover:text-gray-900 border-b border-gray-100 mb-1 cursor-pointer"
+                            className="w-full flex items-center space-x-1 px-2.5 py-1 text-[11px] text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white border-b border-gray-100 dark:border-white/[0.06] mb-1 cursor-pointer"
                           >
                             <span>‹ Back</span>
                           </button>
@@ -1015,7 +1017,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                                 setShowSettingsMenu(false);
                               }}
                               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left cursor-pointer ${
-                                !captionsEnabled ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-800'
+                                !captionsEnabled ? 'bg-black dark:bg-white text-white dark:text-neutral-900 font-bold' : 'hover:bg-gray-100 dark:hover:bg-white/[0.08] text-gray-800 dark:text-neutral-200'
                               }`}
                             >
                               <span>Off (Default)</span>
@@ -1027,7 +1029,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                                 setShowSettingsMenu(false);
                               }}
                               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left cursor-pointer ${
-                                captionsEnabled ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-800'
+                                captionsEnabled ? 'bg-black dark:bg-white text-white dark:text-neutral-900 font-bold' : 'hover:bg-gray-100 dark:hover:bg-white/[0.08] text-gray-800 dark:text-neutral-200'
                               }`}
                             >
                               <span>On</span>
@@ -1042,7 +1044,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
                 <button
                   onClick={toggleFullscreen}
-                  className="text-gray-600 hover:text-black p-1 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                  className="text-gray-600 dark:text-neutral-300 hover:text-black dark:hover:text-white p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.08] transition cursor-pointer"
                   title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                 >
                   {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}

