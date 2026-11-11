@@ -86,10 +86,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
     if (isDark) {
       root.classList.add('dark');
+      root.style.backgroundColor = '#141414';
+      root.style.color = '#f5f5f5';
       document.body.style.backgroundColor = '#141414';
       document.body.style.color = '#f5f5f5';
     } else {
       root.classList.remove('dark');
+      root.style.backgroundColor = '#ffffff';
+      root.style.color = '#0f172a';
       document.body.style.backgroundColor = '#ffffff';
       document.body.style.color = '#0f172a';
     }

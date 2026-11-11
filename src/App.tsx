@@ -135,10 +135,14 @@ export const App: React.FC = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) {
         document.documentElement.classList.add('dark');
+        document.documentElement.style.backgroundColor = '#141414';
+        document.documentElement.style.color = '#f5f5f5';
         document.body.style.backgroundColor = '#141414';
         document.body.style.color = '#f5f5f5';
       } else {
         document.documentElement.classList.remove('dark');
+        document.documentElement.style.backgroundColor = '#ffffff';
+        document.documentElement.style.color = '#0f172a';
         document.body.style.backgroundColor = '#ffffff';
         document.body.style.color = '#0f172a';
       }
@@ -186,10 +190,14 @@ export const App: React.FC = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) {
         document.documentElement.classList.add('dark');
+        document.documentElement.style.backgroundColor = '#141414';
+        document.documentElement.style.color = '#f5f5f5';
         document.body.style.backgroundColor = '#141414';
         document.body.style.color = '#f5f5f5';
       } else {
         document.documentElement.classList.remove('dark');
+        document.documentElement.style.backgroundColor = '#ffffff';
+        document.documentElement.style.color = '#0f172a';
         document.body.style.backgroundColor = '#ffffff';
         document.body.style.color = '#0f172a';
       }

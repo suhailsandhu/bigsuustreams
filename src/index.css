@@ -39,155 +39,165 @@ html.dark {
   color-scheme: dark;
 }
 
+html.dark,
+html.dark body {
+  background-color: #141414 !important;
+  color: #f5f5f5 !important;
+}
+
 html.dark header {
   background-color: #141414 !important;
-  border-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Website Cards on Dark Mode: Clean unified dark gray with subtle border */
-html.dark .bg-white:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .bg-white {
   background-color: #181818 !important;
-  border-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
   color: #f5f5f5;
 }
 
-html.dark .bg-white\/95:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-white\/90:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-white\/85:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-white\/80:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-white\/70:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .bg-white\/95,
+html.dark .bg-white\/90,
+html.dark .bg-white\/85,
+html.dark .bg-white\/80,
+html.dark .bg-white\/70 {
   background-color: #181818 !important;
-  border-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-html.dark .bg-slate-50:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-gray-50:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-neutral-50:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .bg-slate-50,
+html.dark .bg-gray-50,
+html.dark .bg-neutral-50 {
   background-color: #141414 !important;
 }
 
-html.dark .bg-slate-100:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-gray-100:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-neutral-100:not(.bss-settings-card):not(.bss-settings-card *) {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+html.dark .bg-slate-100,
+html.dark .bg-gray-100,
+html.dark .bg-neutral-100 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
   color: #e5e5e5 !important;
 }
 
-html.dark .bg-slate-200:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-gray-200:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .bg-neutral-200:not(.bss-settings-card):not(.bss-settings-card *) {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+html.dark .bg-slate-200,
+html.dark .bg-gray-200,
+html.dark .bg-neutral-200 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-html.dark .text-slate-900:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-900:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-neutral-900:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-950:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-black:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .text-slate-900,
+html.dark .text-gray-900,
+html.dark .text-neutral-900,
+html.dark .text-gray-950,
+html.dark .text-black {
   color: #f5f5f5 !important;
 }
 
-html.dark .text-slate-800:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-800:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-neutral-800:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-slate-700:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-700:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-neutral-700:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .text-slate-800,
+html.dark .text-gray-800,
+html.dark .text-neutral-800,
+html.dark .text-slate-700,
+html.dark .text-gray-700,
+html.dark .text-neutral-700 {
   color: #d4d4d4 !important;
 }
 
-html.dark .text-slate-600:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-600:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-neutral-600:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .text-slate-600,
+html.dark .text-gray-600,
+html.dark .text-neutral-600 {
   color: #a3a3a3 !important;
 }
 
-html.dark .text-slate-500:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-500:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-neutral-500:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-slate-400:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-gray-400:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .text-neutral-400:not(.bss-settings-card):not(.bss-settings-card *) {
+html.dark .text-slate-500,
+html.dark .text-gray-500,
+html.dark .text-neutral-500,
+html.dark .text-slate-400,
+html.dark .text-gray-400,
+html.dark .text-neutral-400 {
   color: #737373 !important;
 }
 
-html.dark .border-slate-200:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-gray-200:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-neutral-200:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-slate-300:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-gray-300:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-slate-100:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-gray-100:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-neutral-100:not(.bss-settings-card):not(.bss-settings-card *) {
-  border-color: rgba(255, 255, 255, 0.07) !important;
+html.dark .border-slate-200,
+html.dark .border-gray-200,
+html.dark .border-neutral-200,
+html.dark .border-slate-300,
+html.dark .border-gray-300,
+html.dark .border-slate-100,
+html.dark .border-gray-100,
+html.dark .border-neutral-100 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-html.dark .border-white\/80:not(.bss-settings-card):not(.bss-settings-card *),
-html.dark .border-white\/90:not(.bss-settings-card):not(.bss-settings-card *) {
-  border-color: rgba(255, 255, 255, 0.07) !important;
+html.dark .border-white\/80,
+html.dark .border-white\/90 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-html.dark input:not(.bss-settings-card *),
-html.dark textarea:not(.bss-settings-card *) {
+html.dark input,
+html.dark textarea {
   background-color: #1a1a1a !important;
   color: #f5f5f5 !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-html.dark input:not(.bss-settings-card *)::placeholder,
-html.dark textarea:not(.bss-settings-card *)::placeholder {
+html.dark input::placeholder,
+html.dark textarea::placeholder {
   color: #737373 !important;
 }
 
-/* SETTINGS MODAL: Always Crisp Clean White with NBA Royal Blue (#1d4ed8) Accents */
-.bss-settings-card,
-html.dark .bss-settings-card {
+/* SETTINGS MODAL: Isolated High Specificity to Stay Crisp Pure White with NBA Blue (#1d4ed8) */
+html.dark div.bss-settings-card,
+div.bss-settings-card {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: #e2e8f0 !important;
 }
 
-.bss-settings-card .bg-white,
-html.dark .bss-settings-card .bg-white,
-.bss-settings-card .bg-white\/95,
-html.dark .bss-settings-card .bg-white\/95,
-.bss-settings-card .bg-white\/70,
-html.dark .bss-settings-card .bg-white\/70 {
+html.dark div.bss-settings-card div,
+html.dark div.bss-settings-card span,
+html.dark div.bss-settings-card p,
+html.dark div.bss-settings-card h2,
+html.dark div.bss-settings-card h3 {
+  /* inherit clean light styling */
+}
+
+html.dark div.bss-settings-card .bg-white,
+div.bss-settings-card .bg-white {
   background-color: #ffffff !important;
   color: #0f172a !important;
 }
 
-.bss-settings-card .bg-slate-50,
-html.dark .bss-settings-card .bg-slate-50,
-.bss-settings-card .bg-slate-100,
-html.dark .bss-settings-card .bg-slate-100 {
+html.dark div.bss-settings-card .bg-slate-50,
+div.bss-settings-card .bg-slate-50,
+html.dark div.bss-settings-card .bg-slate-100,
+div.bss-settings-card .bg-slate-100 {
   background-color: #f1f5f9 !important;
   color: #334155 !important;
 }
 
-.bss-settings-card .text-slate-900,
-html.dark .bss-settings-card .text-slate-900 {
+html.dark div.bss-settings-card .text-slate-900,
+div.bss-settings-card .text-slate-900 {
   color: #0f172a !important;
 }
 
-.bss-settings-card .text-slate-800,
-html.dark .bss-settings-card .text-slate-800,
-.bss-settings-card .text-slate-700,
-html.dark .bss-settings-card .text-slate-700 {
+html.dark div.bss-settings-card .text-slate-800,
+div.bss-settings-card .text-slate-800,
+html.dark div.bss-settings-card .text-slate-700,
+div.bss-settings-card .text-slate-700 {
   color: #334155 !important;
 }
 
-.bss-settings-card .text-slate-600,
-html.dark .bss-settings-card .text-slate-600,
-.bss-settings-card .text-slate-500,
-html.dark .bss-settings-card .text-slate-500 {
+html.dark div.bss-settings-card .text-slate-600,
+div.bss-settings-card .text-slate-600,
+html.dark div.bss-settings-card .text-slate-500,
+div.bss-settings-card .text-slate-500 {
   color: #64748b !important;
 }
 
-.bss-settings-card .border-slate-200,
-html.dark .bss-settings-card .border-slate-200,
-.bss-settings-card .border-slate-100,
-html.dark .bss-settings-card .border-slate-100 {
+html.dark div.bss-settings-card .border-slate-200,
+div.bss-settings-card .border-slate-200,
+html.dark div.bss-settings-card .border-slate-100,
+div.bss-settings-card .border-slate-100 {
   border-color: #e2e8f0 !important;
 }
 
