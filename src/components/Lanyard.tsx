@@ -1358,6 +1358,14 @@ const Lanyard = ({
       toPointer(event);
       const hit = pickCard();
       if (!hit) return;
+
+      // Dampen existing momentum immediately when touched so finger can bring swinging to a stop
+      sim.body.velocity.multiplyScalar(0.15);
+      sim.body.angular.multiplyScalar(0.15);
+      for (let i = 0; i < JOINTS; i++) {
+        sim.velocities[i]?.multiplyScalar(0.2);
+      }
+
       sim.grab = {
         local: hit.point.clone().sub(sim.body.position).applyQuaternion(sim.body.quaternion.clone().invert()),
         rotation: sim.body.quaternion.clone(),
@@ -1378,6 +1386,14 @@ const Lanyard = ({
       if (sim.grab) {
         if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6) press = null;
         raycaster.ray.at(sim.grab.reach, sim.grab.target);
+        
+        // Touch stabilization: if moving slowly or held in place, actively brake velocities to settle faster
+        const moveDist = Math.hypot(event.movementX || 0, event.movementY || 0);
+        if (moveDist < 3) {
+          sim.body.velocity.multiplyScalar(0.4);
+          sim.body.angular.multiplyScalar(0.4);
+        }
+
         start();
         return;
       }

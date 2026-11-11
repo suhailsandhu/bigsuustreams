@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Check, ChevronRight, AlertCircle, Sliders, LogOut, Send, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Check, ChevronRight, AlertCircle, LogOut, Send, CheckCircle2 } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 import Lanyard from './Lanyard';
 
@@ -18,8 +18,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLogout,
   onSettingsChange
 }) => {
-  const [favoriteTeamId, setFavoriteTeamId] = useState<string>(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('bss_favorite_team')) || '';
+  // Support multiple favorite teams (array of team IDs)
+  const [favoriteTeamIds, setFavoriteTeamIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('bss_favorite_teams');
+      if (stored) return JSON.parse(stored);
+      // Backward compatibility with single team key
+      const single = localStorage.getItem('bss_favorite_team');
+      return single ? [single] : [];
+    } catch {
+      return [];
+    }
   });
 
   const [hideScores, setHideScores] = useState<boolean>(() => {
@@ -68,15 +78,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const roleName = isVip ? 'VIP PASS' : 'MEMBER PASS';
   const initials = (displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) || 'BS').toUpperCase();
 
-  const selectedTeamObj = ALL_TEAMS.find(t => t.id === favoriteTeamId);
-  const selectedTeamName = selectedTeamObj ? selectedTeamObj.displayName : 'None Selected';
+  const selectedTeams = ALL_TEAMS.filter(t => favoriteTeamIds.includes(t.id));
 
-  const handleSelectTeam = (id: string) => {
-    setFavoriteTeamId(id);
-    if (id) localStorage.setItem('bss_favorite_team', id);
-    else localStorage.removeItem('bss_favorite_team');
+  // Toggle favorite team selection (allows adding multiple)
+  const handleToggleTeam = (id: string) => {
+    let next: string[];
+    if (favoriteTeamIds.includes(id)) {
+      next = favoriteTeamIds.filter(t => t !== id);
+    } else {
+      next = [...favoriteTeamIds, id];
+    }
+    setFavoriteTeamIds(next);
+    localStorage.setItem('bss_favorite_teams', JSON.stringify(next));
+    if (next.length > 0) {
+      localStorage.setItem('bss_favorite_team', next[0]);
+    } else {
+      localStorage.removeItem('bss_favorite_team');
+    }
     onSettingsChange?.();
-    setActiveDialog(null);
+  };
+
+  const handleClearTeams = () => {
+    setFavoriteTeamIds([]);
+    localStorage.removeItem('bss_favorite_teams');
+    localStorage.removeItem('bss_favorite_team');
+    onSettingsChange?.();
   };
 
   const handleToggleHideScores = () => {
@@ -123,7 +149,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }, 2200);
   };
 
-  // Ultra-crisp SVG for the FRONT of the 3D card (now says BSS STREAMS)
+  // Ultra-crisp SVG for the FRONT of the 3D card (says BSS STREAMS)
   const frontBadgeDataUrl = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
@@ -204,15 +230,28 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </button>
         </div>
 
-        {/* Central Card Area: Interactive 3D Lanyard on FRONT, or Interactive Settings on BACK */}
-        <div className="w-full flex-1 relative flex items-center justify-center overflow-hidden my-auto">
-          
-          {!isFlipped ? (
-            /* FRONT: 3D Swinging Lanyard Badge */
+        {/* 3D Card Flipping Container */}
+        <div 
+          className="w-full flex-1 relative flex items-center justify-center overflow-hidden my-auto"
+          style={{ perspective: '1200px' }}
+        >
+          <div 
+            className="w-full h-full relative transition-transform duration-500 ease-out"
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
+            }}
+          >
+            
+            {/* FRONT FACE: 3D Swinging Lanyard Badge (interactive, tap anywhere to flip to back) */}
             <div 
-              className="w-full h-full relative cursor-pointer flex items-center justify-center"
+              className="absolute inset-0 w-full h-full flex items-center justify-center"
+              style={{
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden'
+              }}
               onClick={() => setIsFlipped(true)}
-              title="Click badge to open card settings"
+              title="Tap card to flip to settings"
             >
               <Lanyard
                 frontImage={frontBadgeDataUrl()}
@@ -225,162 +264,160 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 strapWidth={0.65}
                 finish="glossy"
                 gravity={1.2}
-                damping={0.45}
-                elasticity={0.45}
-                breeze={0.25}
+                damping={0.6}
+                elasticity={0.3}
+                breeze={0.15}
                 interactive={true}
                 intro={true}
-                className="w-full h-full pointer-events-none"
+                className="w-full h-full cursor-pointer"
               />
-              
-              {/* Tap to Flip Button directly over/below badge */}
-              <div className="absolute bottom-4 inset-x-0 flex justify-center pointer-events-auto">
-                <button
-                  onClick={() => setIsFlipped(true)}
-                  className="bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-xl border border-orange-400/50 backdrop-blur-md transition active:scale-95 flex items-center space-x-2 cursor-pointer"
-                >
-                  <Sliders className="w-4 h-4" />
-                  <span>Card Settings ⚙️</span>
-                </button>
-              </div>
             </div>
-          ) : (
-            /* BACK: Interactive HTML Settings Card */
-            <div className="relative w-[300px] sm:w-[325px] bg-white rounded-3xl p-5 shadow-2xl border-4 border-orange-500 flex flex-col justify-between max-h-[92%] overflow-y-auto animate-in zoom-in-95 duration-200">
-              
-              {/* Lanyard Top Ring Slot */}
-              <div className="w-full flex items-center justify-between pb-2 border-b border-gray-100">
-                <button
-                  onClick={() => setIsFlipped(false)}
-                  className="text-xs font-black text-orange-600 hover:text-orange-700 flex items-center space-x-1 cursor-pointer"
-                >
-                  <span>← Flip to Front</span>
-                </button>
-                <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-300" />
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Settings</span>
-              </div>
 
-              {/* Editable Setting Rows inside the Card */}
-              <div className="space-y-3 pt-3">
+            {/* BACK FACE: Interactive HTML Settings Card */}
+            <div 
+              className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-auto"
+              style={{
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)'
+              }}
+            >
+              <div className="relative w-[300px] sm:w-[325px] bg-white rounded-3xl p-5 shadow-2xl border-4 border-orange-500 flex flex-col justify-between max-h-[92%] overflow-y-auto">
                 
-                {/* 1. Your Team (With Logo Display) */}
-                <div 
-                  onClick={() => setActiveDialog('team')}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98]"
-                >
-                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                    <span>Your Team</span>
-                    <span className="text-orange-600 text-[11px] font-bold">Change ✎</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <div className="flex items-center space-x-2.5 min-w-0">
-                      {selectedTeamObj ? (
-                        <div className="w-9 h-9 rounded-xl bg-white p-1 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
-                          <img src={selectedTeamObj.logo} alt={selectedTeamObj.name} className="w-7 h-7 object-contain" />
+                {/* Lanyard Top Ring Slot */}
+                <div className="w-full flex items-center justify-between pb-2 border-b border-gray-100">
+                  <button
+                    onClick={() => setIsFlipped(false)}
+                    className="text-xs font-black text-orange-600 hover:text-orange-700 flex items-center space-x-1 cursor-pointer"
+                  >
+                    <span>← Flip to Front</span>
+                  </button>
+                  <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-300" />
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Settings</span>
+                </div>
+
+                {/* Editable Setting Rows inside the Card */}
+                <div className="space-y-3 pt-3">
+                  
+                  {/* 1. Favorite Teams (Multi-team with logos) */}
+                  <div 
+                    onClick={() => setActiveDialog('team')}
+                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98]"
+                  >
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                      <span>Favorite Teams ({selectedTeams.length})</span>
+                      <span className="text-orange-600 text-[11px] font-bold">Edit ✎</span>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between">
+                      {selectedTeams.length > 0 ? (
+                        <div className="flex items-center space-x-1.5 overflow-x-auto py-0.5 max-w-[210px] scrollbar-none">
+                          {selectedTeams.slice(0, 4).map(team => (
+                            <div key={team.id} className="w-8 h-8 rounded-xl bg-white p-1 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs" title={team.displayName}>
+                              <img src={team.logo} alt={team.name} className="w-6 h-6 object-contain" />
+                            </div>
+                          ))}
+                          {selectedTeams.length > 4 && (
+                            <div className="w-7 h-7 rounded-xl bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 shrink-0">
+                              +{selectedTeams.length - 4}
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="w-9 h-9 rounded-xl bg-slate-200/80 flex items-center justify-center text-slate-400 text-xs font-black shrink-0">
-                          -
+                        <div className="text-xs font-black text-slate-400">
+                          None Selected (Tap to add)
                         </div>
                       )}
-                      <div className="truncate">
-                        <div className="text-xs font-black text-slate-900 truncate">
-                          {selectedTeamName}
+                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                    </div>
+                  </div>
+
+                  {/* 2. Show or Hide Final Scores */}
+                  <div 
+                    onClick={handleToggleHideScores}
+                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Show or Hide Final Scores
+                      </div>
+                      <div className="text-xs font-black text-slate-900 mt-0.5">
+                        {hideScores ? 'Scores Hidden (Spoiler Shield)' : 'Show Live Scores'}
+                      </div>
+                    </div>
+                    <div className={`w-11 h-6 rounded-full p-1 transition-colors shrink-0 ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${hideScores ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </div>
+
+                  {/* 3. Playback Stream */}
+                  <div 
+                    onClick={handleToggleQuality}
+                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Playback Stream
+                      </div>
+                      <div className="text-xs font-black text-slate-900 mt-0.5">
+                        {streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)'}
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-orange-600 shrink-0">Toggle</span>
+                  </div>
+
+                  {/* 4. Report a Problem (Click opens interactive textbox modal) */}
+                  <div 
+                    onClick={() => setActiveDialog('report')}
+                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900">
+                          Report a problem
                         </div>
-                        <div className="text-[10px] text-slate-400 font-semibold">
-                          {selectedTeamObj ? `${selectedTeamObj.league} • Tap to switch` : 'Tap to select team'}
+                        <div className="text-[10px] text-slate-400 font-medium">
+                          Send issue details to admin
                         </div>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                   </div>
+
                 </div>
 
-                {/* 2. Show or Hide Final Scores */}
-                <div 
-                  onClick={handleToggleHideScores}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                >
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Show or Hide Final Scores
-                    </div>
-                    <div className="text-xs font-black text-slate-900 mt-0.5">
-                      {hideScores ? 'Scores Hidden (Spoiler Shield)' : 'Show Live Scores'}
-                    </div>
-                  </div>
-                  <div className={`w-11 h-6 rounded-full p-1 transition-colors shrink-0 ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${hideScores ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </div>
-                </div>
-
-                {/* 3. Playback Stream */}
-                <div 
-                  onClick={handleToggleQuality}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                >
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Playback Stream
-                    </div>
-                    <div className="text-xs font-black text-slate-900 mt-0.5">
-                      {streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)'}
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold text-orange-600 shrink-0">Toggle</span>
-                </div>
-
-                {/* 4. Report a Problem (Click opens interactive textbox modal) */}
-                <div 
-                  onClick={() => setActiveDialog('report')}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
-                      <AlertCircle className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-slate-900">
-                        Report a problem
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-medium">
-                        Send issue details to admin
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                {/* Sign Out at bottom of card */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-3">
+                  <button
+                    onClick={() => setIsFlipped(false)}
+                    className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+                  >
+                    Done
+                  </button>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onLogout();
+                    }}
+                    className="text-xs font-black text-red-600 hover:text-red-700 flex items-center space-x-1 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
                 </div>
 
               </div>
-
-              {/* Sign Out at bottom of card */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-3">
-                <button
-                  onClick={() => setIsFlipped(false)}
-                  className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
-                >
-                  Done
-                </button>
-                <button
-                  onClick={() => {
-                    onClose();
-                    onLogout();
-                  }}
-                  className="text-xs font-black text-red-600 hover:text-red-700 flex items-center space-x-1 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-
             </div>
-          )}
 
+          </div>
         </div>
 
       </div>
 
-      {/* Pop-up Dialog: Visual Grid of Team Logos with Smooth Scroll */}
+      {/* Pop-up Dialog: Multi-Team Logo Picker */}
       {activeDialog === 'team' && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl p-5 max-w-sm sm:max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
@@ -388,8 +425,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Choose Your Favorite Team</h3>
-                <p className="text-[11px] text-slate-400 font-semibold">Select your team logo</p>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Choose Your Favorite Teams</h3>
+                <p className="text-[11px] text-slate-400 font-semibold">Select all your teams ({favoriteTeamIds.length} selected)</p>
               </div>
               <button 
                 onClick={() => setActiveDialog(null)}
@@ -428,39 +465,33 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </button>
               </div>
 
-              <input
-                type="text"
-                placeholder="Search team name or city..."
-                value={teamSearch}
-                onChange={e => setTeamSearch(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"
-              />
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  placeholder="Search team name or city..."
+                  value={teamSearch}
+                  onChange={e => setTeamSearch(e.target.value)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"
+                />
+                {favoriteTeamIds.length > 0 && (
+                  <button
+                    onClick={handleClearTeams}
+                    className="text-[10px] font-bold text-red-600 hover:text-red-700 px-2 py-1 bg-red-50 rounded-lg cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Visual Grid with Team Logos */}
             <div className="overflow-y-auto flex-1 my-1 pr-1 grid grid-cols-3 sm:grid-cols-4 gap-2.5 py-2">
-              
-              {/* No Favorite / Reset Option */}
-              <button
-                onClick={() => handleSelectTeam('')}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border transition cursor-pointer active:scale-95 text-center ${
-                  !favoriteTeamId
-                    ? 'border-orange-500 bg-orange-50/70 shadow-xs'
-                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                }`}
-              >
-                <div className="w-11 h-11 rounded-full bg-slate-200/80 flex items-center justify-center text-slate-400 text-xs font-black mb-1">
-                  ✕
-                </div>
-                <span className="text-[11px] font-black text-slate-800 line-clamp-1">None</span>
-              </button>
-
               {filteredTeams.map(team => {
-                const isSelected = favoriteTeamId === team.id;
+                const isSelected = favoriteTeamIds.includes(team.id);
                 return (
                   <button
                     key={team.id}
-                    onClick={() => handleSelectTeam(team.id)}
+                    onClick={() => handleToggleTeam(team.id)}
                     className={`group relative flex flex-col items-center justify-center p-2.5 rounded-2xl border transition cursor-pointer active:scale-95 text-center ${
                       isSelected
                         ? 'border-orange-500 bg-orange-50 shadow-md ring-2 ring-orange-500/20'
@@ -489,16 +520,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </button>
                 );
               })}
-
             </div>
 
             {/* Footer */}
-            <div className="pt-2 border-t border-slate-100">
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">
+                {favoriteTeamIds.length} team{favoriteTeamIds.length === 1 ? '' : 's'} chosen
+              </span>
               <button
                 onClick={() => setActiveDialog(null)}
-                className="w-full py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl transition cursor-pointer"
+                className="py-2 px-5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl transition cursor-pointer"
               >
-                Close
+                Done
               </button>
             </div>
           </div>
