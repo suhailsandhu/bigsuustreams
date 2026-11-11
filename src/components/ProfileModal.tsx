@@ -6,7 +6,6 @@ import {
   Sparkles, ExternalLink
 } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
-import Lanyard from './Lanyard';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -92,7 +91,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return typeof window !== 'undefined' && localStorage.getItem('bss_privacy_mode') === 'true';
   });
 
-  const [isFlipped, setIsFlipped] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
   // Sub-dialogs: 'team' picker or 'report' problem dialog
@@ -225,212 +223,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setOpenAccordion(prev => (prev === section ? null : section));
   };
 
-  // Ultra-crisp Glassy SVG for the FRONT of the 3D card (100% matching Image 1)
-  const frontBadgeDataUrl = () => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
-        <defs>
-          <linearGradient id="frontGlass" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
-            <stop offset="35%" stop-color="#f8fafc" stop-opacity="0.88"/>
-            <stop offset="70%" stop-color="#ffffff" stop-opacity="0.94"/>
-            <stop offset="100%" stop-color="#edf2f7" stop-opacity="0.88"/>
-          </linearGradient>
-          <linearGradient id="frontWave" x1="0%" y1="0%" x2="100%" y2="80%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.65"/>
-            <stop offset="45%" stop-color="#ffffff" stop-opacity="0.2"/>
-            <stop offset="75%" stop-color="#ffffff" stop-opacity="0.0"/>
-          </linearGradient>
-          <radialGradient id="frontGlowBL" cx="0%" cy="100%" r="55%">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.45"/>
-            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.1"/>
-            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="frontGlowMR" cx="100%" cy="60%" r="50%">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.38"/>
-            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.08"/>
-            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-          </radialGradient>
-          <linearGradient id="goldHalo" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#fde68a"/>
-            <stop offset="50%" stop-color="#f59e0b"/>
-            <stop offset="100%" stop-color="#d97706"/>
-          </linearGradient>
-        </defs>
-
-        <!-- Frosted Glass Card Base with Soft White Edge -->
-        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#frontGlass)" stroke="rgba(255, 255, 255, 0.95)" stroke-width="4"/>
-        <rect x="17" y="17" width="566" height="866" rx="44" fill="none" stroke="rgba(203, 213, 225, 0.45)" stroke-width="2"/>
-
-        <!-- Warm Golden Corner Edge Glows matching photo -->
-        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#frontGlowBL)"/>
-        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#frontGlowMR)"/>
-
-        <!-- Curved Specular Glass Sheen -->
-        <path d="M 15 15 L 360 15 C 240 380 400 620 200 885 L 15 885 Z" fill="url(#frontWave)" opacity="0.6"/>
-
-        <!-- Top Lanyard Slot Cutout -->
-        <rect x="250" y="55" width="100" height="26" rx="13" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2.5"/>
-
-        <!-- Top VIP MEMBER Pill with Gold Crown -->
-        <rect x="195" y="150" width="210" height="48" rx="24" fill="rgba(254, 243, 199, 0.65)" stroke="#f59e0b" stroke-width="2.5"/>
-        <g transform="translate(216, 163)">
-          <path d="M 0 17 L 3 4 L 8 11 L 14 0 L 20 11 L 25 4 L 28 17 Z" fill="#f59e0b"/>
-        </g>
-        <text x="312" y="181" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="16" fill="#0f172a" text-anchor="middle" letter-spacing="2">
-          ${roleName}
-        </text>
-
-        <!-- Circular Avatar Frame with Gold Halo -->
-        <circle cx="300" cy="345" r="105" fill="none" stroke="url(#goldHalo)" stroke-width="5"/>
-        <circle cx="300" cy="345" r="98" fill="#e2e8f0"/>
-        
-        <!-- Clean User Silhouette Icon -->
-        <circle cx="300" cy="320" r="34" fill="#94a3b8"/>
-        <path d="M 235 395 C 235 352 260 352 300 352 C 340 352 365 352 365 395 C 365 405 235 405 235 395 Z" fill="#94a3b8"/>
-
-        <!-- Display Name: BigSuu -->
-        <text x="300" y="505" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
-          ${displayName}
-        </text>
-
-        <!-- Barcode / Strip -->
-        <g fill="#94a3b8" opacity="0.65">
-          <rect x="110" y="555" width="6" height="42"/>
-          <rect x="122" y="555" width="14" height="42"/>
-          <rect x="142" y="555" width="4" height="42"/>
-          <rect x="152" y="555" width="18" height="42"/>
-          <rect x="176" y="555" width="10" height="42"/>
-          <rect x="192" y="555" width="6" height="42"/>
-          <rect x="204" y="555" width="16" height="42"/>
-          <rect x="226" y="555" width="8" height="42"/>
-          <rect x="240" y="555" width="22" height="42"/>
-          <rect x="268" y="555" width="6" height="42"/>
-          <rect x="280" y="555" width="14" height="42"/>
-          <rect x="300" y="555" width="18" height="42"/>
-          <rect x="324" y="555" width="8" height="42"/>
-          <rect x="338" y="555" width="24" height="42"/>
-          <rect x="368" y="555" width="12" height="42"/>
-          <rect x="386" y="555" width="6" height="42"/>
-          <rect x="398" y="555" width="16" height="42"/>
-          <rect x="420" y="555" width="10" height="42"/>
-          <rect x="436" y="555" width="20" height="42"/>
-          <rect x="462" y="555" width="8" height="42"/>
-          <rect x="476" y="555" width="14" height="42"/>
-        </g>
-
-        <!-- Bottom Pill Button: Tap for Settings > -->
-        <rect x="145" y="660" width="310" height="54" rx="27" fill="rgba(255, 255, 255, 0.9)" stroke="rgba(203, 213, 225, 0.9)" stroke-width="2"/>
-        
-        <!-- Small gear icon inside button -->
-        <g transform="translate(185, 678)" stroke="#0f172a" stroke-width="2.5" fill="none" stroke-linecap="round">
-          <circle cx="9" cy="9" r="4"/>
-          <path d="M 9 1 L 9 3 M 9 15 L 9 17 M 1 9 L 3 9 M 15 9 L 17 9 M 3.5 3.5 L 5 5 M 13 13 L 14.5 14.5 M 14.5 3.5 L 13 5 M 5 13 L 3.5 14.5"/>
-        </g>
-        
-        <text x="305" y="694" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="16" fill="#0f172a" text-anchor="middle">
-          Tap for Settings
-        </text>
-
-        <!-- Right Chevron > -->
-        <path d="M 416 681 L 424 687 L 416 693" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  };
-
-  // Ultra-crisp Glassy SVG for the BACK of the 3D card (100% matching Image 2)
-  const backBadgeDataUrl = () => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
-        <defs>
-          <linearGradient id="backGlass" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
-            <stop offset="40%" stop-color="#f8fafc" stop-opacity="0.88"/>
-            <stop offset="100%" stop-color="#edf2f7" stop-opacity="0.92"/>
-          </linearGradient>
-          <linearGradient id="backWave" x1="0%" y1="0%" x2="100%" y2="80%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
-            <stop offset="50%" stop-color="#ffffff" stop-opacity="0.15"/>
-            <stop offset="80%" stop-color="#ffffff" stop-opacity="0.0"/>
-          </linearGradient>
-          <radialGradient id="backGlowBL" cx="0%" cy="100%" r="55%">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.45"/>
-            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.1"/>
-            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="backGlowMR" cx="100%" cy="60%" r="50%">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.38"/>
-            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.08"/>
-            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-
-        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#backGlass)" stroke="rgba(255, 255, 255, 0.95)" stroke-width="4"/>
-        <rect x="17" y="17" width="566" height="866" rx="44" fill="none" stroke="rgba(203, 213, 225, 0.45)" stroke-width="2"/>
-
-        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#backGlowBL)"/>
-        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#backGlowMR)"/>
-        <path d="M 15 15 L 360 15 C 240 380 400 620 200 885 L 15 885 Z" fill="url(#backWave)" opacity="0.55"/>
-
-        <!-- Top Lanyard Slot Cutout -->
-        <rect x="250" y="55" width="100" height="26" rx="13" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2.5"/>
-
-        <!-- Header: Back Button on Left, Settings Title in Center -->
-        <rect x="55" y="130" width="46" height="46" rx="14" fill="rgba(255, 255, 255, 0.85)" stroke="rgba(203, 213, 225, 0.8)" stroke-width="2"/>
-        <path d="M 81 146 L 73 153 L 81 160" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        
-        <text x="300" y="162" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle">
-          Settings
-        </text>
-
-        <!-- 7 Frosted Glass Pill Rows matching Image 2 -->
-        <!-- 1. Account -->
-        <rect x="55" y="210" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="239" r="14" fill="#f1f5f9"/>
-        <text x="135" y="246" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Account</text>
-        <path d="M 505 235 L 513 243 L 521 235" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- 2. Playback -->
-        <rect x="55" y="285" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="314" r="14" fill="#f1f5f9"/>
-        <text x="135" y="321" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Playback</text>
-        <path d="M 505 310 L 513 318 L 521 310" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- 3. Display -->
-        <rect x="55" y="360" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="389" r="14" fill="#f1f5f9"/>
-        <text x="135" y="396" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Display</text>
-        <path d="M 505 385 L 513 393 L 521 385" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- 4. Content -->
-        <rect x="55" y="435" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="464" r="14" fill="#f1f5f9"/>
-        <text x="135" y="471" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Content</text>
-        <path d="M 505 460 L 513 468 L 521 460" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- 5. Preferences -->
-        <rect x="55" y="510" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="539" r="14" fill="#f1f5f9"/>
-        <text x="135" y="546" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Preferences</text>
-        <path d="M 505 535 L 513 543 L 521 535" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- 6. Security -->
-        <rect x="55" y="585" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="614" r="14" fill="#f1f5f9"/>
-        <text x="135" y="621" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Security</text>
-        <path d="M 505 610 L 513 618 L 521 610" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-        <!-- 7. About -->
-        <rect x="55" y="660" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
-        <circle cx="95" cy="689" r="14" fill="#f1f5f9"/>
-        <text x="135" y="696" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">About</text>
-        <path d="M 505 685 L 513 693 L 521 685" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  };
-
   const filteredTeams = ALL_TEAMS.filter(t => {
     if (teamTab !== 'ALL' && t.league !== teamTab) return false;
     if (teamSearch.trim()) {
@@ -443,100 +235,36 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 select-none bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
       
-      {/* Modal Container */}
-      <div className="relative w-full max-w-sm sm:max-w-md h-[92vh] flex flex-col items-center justify-between">
+      {/* Frosted Glass Settings Modal Card */}
+      <div className="relative w-full max-w-sm sm:max-w-md bg-white/95 backdrop-blur-2xl rounded-[32px] p-4 sm:p-5 shadow-2xl border border-white/80 flex flex-col max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-200">
         
-        {/* Floating Close Button Top Right matching user's image */}
-        <div className="w-full flex justify-end px-2 pt-1 z-30">
+        {/* Header: Title and Close button */}
+        <div className="w-full flex items-center justify-between pb-3 border-b border-slate-200/80">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center">
+              <Sliders className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                Settings
+              </h2>
+              <p className="text-[11px] font-semibold text-slate-500">
+                {displayName} • <span className="text-orange-600 font-bold">{roleName}</span>
+              </p>
+            </div>
+          </div>
+          
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-black/80 hover:bg-black text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer active:scale-95 shadow-xl border border-white/20"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-xs"
             title="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* 3D Card Flipping Container */}
-        <div 
-          className="w-full flex-1 relative flex items-center justify-center my-auto"
-          style={{ perspective: '1200px' }}
-        >
-          <div 
-            className="w-full h-full relative transition-transform duration-600 ease-in-out"
-            style={{
-              transformStyle: 'preserve-3d',
-              transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
-            }}
-          >
-            
-            {/* FRONT FACE: 3D Swinging Lanyard Badge (Matching Image 1) */}
-            <div 
-              className="absolute inset-0 w-full h-full flex items-center justify-center"
-              style={{
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden'
-              }}
-              onClick={() => setIsFlipped(true)}
-              title="Tap card to open settings"
-            >
-              <Lanyard
-                frontImage={frontBadgeDataUrl()}
-                backImage={backBadgeDataUrl()}
-                cardColor="#ffffff"
-                strapColor="#1d4ed8" /* Royal Blue matching photo */
-                metal="gold" /* Gold metal clamp & ring matching photo */
-                size={0.82}
-                strapLength={0.4}
-                strapWidth={0.65}
-                finish="glossy"
-                gravity={1.2}
-                damping={0.6}
-                elasticity={0.3}
-                breeze={0.15}
-                interactive={true}
-                intro={true}
-                onCardClick={() => setIsFlipped(prev => !prev)}
-                className="w-full h-full cursor-pointer"
-              />
-            </div>
-
-            {/* BACK FACE: Frosted Glass Settings Card with Accordion Dropdowns (Matching Image 2) */}
-            <div 
-              className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-auto"
-              style={{
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
-                transform: 'rotateY(180deg)'
-              }}
-            >
-              {/* Frosted Glass Acrylic Badge Body */}
-              <div className="relative w-[310px] sm:w-[340px] max-h-[94%] bg-white/85 backdrop-blur-2xl rounded-[38px] p-4 sm:p-5 shadow-2xl border-4 border-white/80 flex flex-col justify-between overflow-hidden">
-                
-                {/* Lanyard Top Ribbon & Ring Decor */}
-                <div className="w-full flex items-center justify-center -mt-2 pb-2">
-                  <div className="w-20 h-4 bg-slate-200/80 rounded-full border border-slate-300 flex items-center justify-center shadow-inner">
-                    <div className="w-3.5 h-3.5 rounded-full bg-amber-400 border border-amber-500 shadow-xs" />
-                  </div>
-                </div>
-
-                {/* Header: Back Button on Left, Settings Title in Center */}
-                <div className="w-full flex items-center justify-between pb-3 border-b border-slate-200/60">
-                  <button
-                    onClick={() => setIsFlipped(false)}
-                    className="w-8 h-8 rounded-xl bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center shadow-xs border border-slate-200 cursor-pointer transition active:scale-95"
-                    title="Back to Front"
-                  >
-                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                    Settings
-                  </h2>
-                  <div className="w-8" />
-                </div>
-
-                {/* Scrollable List of 7 Dropdown Pills matching Image 2 */}
-                <div className="flex-1 overflow-y-auto space-y-2 py-3 pr-1 scrollbar-thin">
+        {/* Scrollable List of 7 Dropdown Accordions */}
+        <div className="flex-1 overflow-y-auto space-y-2 py-3 pr-1 scrollbar-thin">
                   
                   {/* 1. Account Dropdown */}
                   <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
@@ -1034,22 +762,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     )}
                   </div>
 
-                </div>
+        </div>
 
-                {/* Card Footer: Back Button */}
-                <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between">
-                  <button
-                    onClick={() => setIsFlipped(false)}
-                    className="w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-black text-xs transition cursor-pointer active:scale-98 shadow-md"
-                  >
-                    Done (Back to Badge)
-                  </button>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
+        {/* Card Footer: Done Button */}
+        <div className="pt-3 border-t border-slate-200/60 flex items-center justify-end">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-black text-xs transition cursor-pointer active:scale-98 shadow-md"
+          >
+            Done
+          </button>
         </div>
 
       </div>
