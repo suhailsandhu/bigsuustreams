@@ -3998,11 +3998,21 @@ async function buildIptvPlaylist(req, sportFilter = "all") {
     const logo = s.team1?.logo || s.thumbnail_url || "https://bigsuustreams.com/apple-touch-icon.png";
     const statusEmoji = isLive ? "\u{1F534}" : "\u23F0";
     const statusTag = isLive ? "LIVE" : "UPCOMING";
-    const title = `${statusEmoji} [${leagueLabel}] ${cleanName} (${statusTag})`;
     const group = isLive ? `${leagueLabel} Live` : `${leagueLabel} Scheduled`;
-    const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
-    lines.push(`#EXTINF:-1 tvg-id="${category}-${s.stream_key}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
-    lines.push(streamUrl);
+    const smoothUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
+    const smoothTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (Smooth 720p 60fps - No Lag)`;
+    lines.push(`#EXTINF:-1 tvg-id="${category}-${s.stream_key}-smooth" tvg-name="${cleanName} (Smooth 720p)" tvg-logo="${logo}" group-title="${group}",${smoothTitle}`);
+    lines.push(smoothUrl);
+    const fhdUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
+    const fhdTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (FHD 1080p)`;
+    lines.push(`#EXTINF:-1 tvg-id="${category}-${s.stream_key}-fhd" tvg-name="${cleanName} (1080p)" tvg-logo="${logo}" group-title="${group}",${fhdTitle}`);
+    lines.push(fhdUrl);
+    if (isLive) {
+      const altUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p2.m3u8${tokenQuery}`;
+      const altTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (Alternate Feed / In-Arena)`;
+      lines.push(`#EXTINF:-1 tvg-id="${category}-${s.stream_key}-alt" tvg-name="${cleanName} (Alt Feed)" tvg-logo="${logo}" group-title="${group}",${altTitle}`);
+      lines.push(altUrl);
+    }
   };
   const liveNba = nbaStreams.filter((s) => s.is_live);
   const liveNfl = nflStreams.filter((s) => s.is_live);
