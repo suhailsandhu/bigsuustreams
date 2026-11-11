@@ -160,6 +160,7 @@ export const App: React.FC = () => {
 
   // VIP Member Profile modal & custom settings reactivity
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [settingsTick, setSettingsTick] = useState(0);
 
   // Website is Updating / Maintenance State
@@ -734,6 +735,7 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         onOpenProfile={() => setShowProfileModal(true)}
         onOpenAuth={() => setIsQuickAccessOpen(true)}
+        onOpenReport={() => setShowReportModal(true)}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);
@@ -851,8 +853,12 @@ export const App: React.FC = () => {
         }}
       />
 
-      {/* Floating Main Page 'i' Report a Problem Button & Modal */}
-      <ReportProblemButton currentUser={currentUser} />
+      {/* Relocated 'i' Report a Problem Modal (Triggered directly from Header under profile badge) */}
+      <ReportProblemButton 
+        currentUser={currentUser} 
+        isOpen={showReportModal} 
+        onClose={() => setShowReportModal(false)} 
+      />
 
       {/* Legal Shield Modal (DMCA, Trademark Non-Affiliation, Terms & Privacy) */}
       <LegalModal

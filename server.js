@@ -390,7 +390,7 @@ async function handleResolve(req, res) {
 
 async function handleHls(req, res) {
   const key = req.params.key;
-  const quality = req.params.quality || req.query.quality || '1080p';
+  const quality = req.params.quality || req.query.quality || '720p';
   const isFootball = (req.baseUrl || req.path || req.originalUrl || '').includes('football');
   const category = isFootball ? 'football' : 'basketball';
   try {
@@ -399,14 +399,44 @@ async function handleHls(req, res) {
       return res.status(503).json({ error: 'Stream temporarily initializing. Please retry in a moment.' });
     }
 
-    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    const host = req.get('x-forwarded-host') || req.get('host') || 'bigsuustreams.com';
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const protocol = isLocal ? 'http' : (req.get('x-forwarded-proto') || (req.secure ? 'https' : 'https'));
+    const baseUrl = `${protocol}://${host}`;
+
+    // For Cyberdash / Smart TV IPTV players, provide fully-qualified URLs so hardware decoders never misresolve paths
+    let m3u8Output = hls.m3u8Text;
+    if (m3u8Output && m3u8Output.includes('/api/stream/chunk/')) {
+      m3u8Output = m3u8Output.split('\n').map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('/api/stream/chunk/')) {
+          return `${baseUrl}${trimmed}`;
+        }
+        return line;
+      }).join('\n');
+    }
+
+    // Pre-buffer first chunk into server RAM immediately for 0ms initial play response
+    const firstChunkLine = hls.m3u8Text.split('\n').find(l => l.trim().startsWith('/api/stream/chunk/'));
+    if (firstChunkLine) {
+      const parts = firstChunkLine.trim().split('/');
+      const chunkHash = parts[4];
+      const chunkSeg = parts[5];
+      if (chunkHash && chunkSeg) {
+        setImmediate(() => {
+          fetchChunkBuffer(chunkHash, chunkSeg).catch(() => {});
+        });
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('X-Stream-Quality', hls.selectedQuality);
     res.setHeader('X-Available-Qualities', hls.availableQualities.join(','));
-    res.send(hls.m3u8Text);
+    res.send(m3u8Output);
   } catch (err) {
     res.status(502).json({ error: 'Stream resolution failed' });
   }
@@ -520,175 +550,193 @@ function putCachedChunk(key, buffer, ttlMs = 45000) {
 // Protected Video Chunk Proxy Endpoint
 // Proxies all HLS .ts / .js chunks through server memory
 // Upstream provider domains are 100% invisible to browser network inspection
-async function handleChunkProxy(req, res) {
-  try {
-    const { hash, segment } = req.params;
-    const cacheKey = `${hash}:${segment}`;
+async function fetchChunkBuffer(hash, segment) {
+  const cacheKey = `${hash}:${segment}`;
 
-    // 1. FAST PATH: Serve directly from server RAM cache if available (< 2ms response time)
-    const cached = getCachedChunk(cacheKey);
-    if (cached) {
-      res.setHeader('Content-Type', 'video/mp2t');
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Cache-Control', 'public, max-age=60');
-      res.setHeader('X-Proxy-Cache', 'HIT');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', '*');
-      res.setHeader('Access-Control-Expose-Headers', '*');
-      return res.send(cached);
-    }
+  // 1. FAST PATH: Serve directly from server RAM cache if available (< 2ms response time)
+  const cached = getCachedChunk(cacheKey);
+  if (cached) {
+    return { buffer: cached, status: 'HIT' };
+  }
 
-    const record = streamTargetMap.get(hash);
-    if (!record || record.expires < Date.now()) {
-      return res.status(404).send('Segment expired');
-    }
+  const record = streamTargetMap.get(hash);
+  if (!record || record.expires < Date.now()) {
+    return null;
+  }
 
-    // 2. IN-FLIGHT COALESCING: Multiple concurrent viewers share a single upstream fetch
-    let fetchPromise = inflightChunks.get(cacheKey);
-    if (!fetchPromise) {
-      fetchPromise = (async () => {
-        let targetUrl = record.segmentMap?.get(segment);
-        if (!targetUrl) {
-          const cleanSegment = path.basename(segment);
-          targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
-        }
+  // 2. IN-FLIGHT COALESCING: Multiple concurrent viewers share a single upstream fetch
+  let fetchPromise = inflightChunks.get(cacheKey);
+  if (!fetchPromise) {
+    fetchPromise = (async () => {
+      let targetUrl = record.segmentMap?.get(segment);
+      if (!targetUrl) {
+        const cleanSegment = path.basename(segment);
+        targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
+      }
 
-        // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only
-        if (targetUrl && targetUrl.includes('strmfree') && targetUrl.startsWith('https://cdn')) {
-          targetUrl = targetUrl.replace('https://', 'http://');
-        }
+      // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only
+      if (targetUrl && targetUrl.includes('strmfree') && targetUrl.startsWith('https://cdn')) {
+        targetUrl = targetUrl.replace('https://', 'http://');
+      }
 
-        let directSfUrl = null;
-        if (targetUrl && targetUrl.includes('#sf=')) {
-          try {
-            directSfUrl = decodeURIComponent(targetUrl.split('#sf=')[1]);
-          } catch {}
-        }
-
-        let upstreamRes = null;
+      let directSfUrl = null;
+      if (targetUrl && targetUrl.includes('#sf=')) {
         try {
-          const parsed = new URL(targetUrl);
-          const hostOrigin = parsed.origin;
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-          const r = await fetch(targetUrl, {
-            signal: controller.signal,
-            headers: {
-              'Referer': record.embedUrl || hostOrigin,
-              'Origin': hostOrigin,
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-            }
-          });
-          clearTimeout(timeoutId);
-          const cType = r.headers.get('content-type') || '';
-          if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
-            upstreamRes = r;
-          }
-        } catch {
-          // If HTTPS failed due to SSL error on HTTP-only CDN, retry with HTTP immediately
-          if (targetUrl.startsWith('https://')) {
-            try {
-              const httpUrl = targetUrl.replace('https://', 'http://');
-              const parsed = new URL(httpUrl);
-              const hostOrigin = parsed.origin;
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
-              const r = await fetch(httpUrl, {
-                signal: controller.signal,
-                headers: {
-                  'Referer': record.embedUrl || hostOrigin,
-                  'Origin': hostOrigin,
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-                }
-              });
-              clearTimeout(timeoutId);
-              const cType = r.headers.get('content-type') || '';
-              if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
-                upstreamRes = r;
-              }
-            } catch {}
-          }
-        }
+          directSfUrl = decodeURIComponent(targetUrl.split('#sf=')[1]);
+        } catch {}
+      }
 
-        if ((!upstreamRes || !upstreamRes.ok) && directSfUrl) {
+      let upstreamRes = null;
+      try {
+        const parsed = new URL(targetUrl);
+        const hostOrigin = parsed.origin;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const r = await fetch(targetUrl, {
+          signal: controller.signal,
+          headers: {
+            'Referer': record.embedUrl || hostOrigin,
+            'Origin': hostOrigin,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          }
+        });
+        clearTimeout(timeoutId);
+        const cType = r.headers.get('content-type') || '';
+        if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+          upstreamRes = r;
+        }
+      } catch {
+        // If HTTPS failed due to SSL error on HTTP-only CDN, retry with HTTP immediately
+        if (targetUrl.startsWith('https://')) {
           try {
+            const httpUrl = targetUrl.replace('https://', 'http://');
+            const parsed = new URL(httpUrl);
+            const hostOrigin = parsed.origin;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-            const rSf = await fetch(directSfUrl, {
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const r = await fetch(httpUrl, {
               signal: controller.signal,
               headers: {
-                'Referer': 'https://strmfree.st',
-                'Origin': 'https://strmfree.st',
+                'Referer': record.embedUrl || hostOrigin,
+                'Origin': hostOrigin,
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
               }
             });
             clearTimeout(timeoutId);
-            const cType = rSf.headers.get('content-type') || '';
-            if (rSf.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
-              upstreamRes = rSf;
+            const cType = r.headers.get('content-type') || '';
+            if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+              upstreamRes = r;
             }
           } catch {}
         }
+      }
 
-        if (!upstreamRes || !upstreamRes.ok) {
-          const cleanSegment = path.basename(segment);
-          const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
-            url: `${bUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`,
-            host: (record.backupHosts && record.backupHosts[idx]) || record.workingHost
-          }));
-
-          for (const cand of candidateUrls) {
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
-              const r = await fetch(cand.url, {
-                signal: controller.signal,
-                headers: {
-                  'Referer': cand.host,
-                  'Origin': cand.host,
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-                }
-              });
-              clearTimeout(timeoutId);
-              const cType = r.headers.get('content-type') || '';
-              if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
-                upstreamRes = r;
-                break;
-              }
-            } catch {}
+      if ((!upstreamRes || !upstreamRes.ok) && directSfUrl) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const rSf = await fetch(directSfUrl, {
+            signal: controller.signal,
+            headers: {
+              'Referer': 'https://strmfree.st',
+              'Origin': 'https://strmfree.st',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+            }
+          });
+          clearTimeout(timeoutId);
+          const cType = rSf.headers.get('content-type') || '';
+          if (rSf.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+            upstreamRes = rSf;
           }
+        } catch {}
+      }
+
+      if (!upstreamRes || !upstreamRes.ok) {
+        const cleanSegment = path.basename(segment);
+        const candidateUrls = (record.backupBaseUrls || []).map((bUrl, idx) => ({
+          url: `${bUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`,
+          host: (record.backupHosts && record.backupHosts[idx]) || record.workingHost
+        }));
+
+        for (const cand of candidateUrls) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const r = await fetch(cand.url, {
+              signal: controller.signal,
+              headers: {
+                'Referer': cand.host,
+                'Origin': cand.host,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+              }
+            });
+            clearTimeout(timeoutId);
+            const cType = r.headers.get('content-type') || '';
+            if (r.ok && !cType.includes('text/html') && !cType.includes('application/json')) {
+              upstreamRes = r;
+              break;
+            }
+          } catch {}
         }
+      }
 
-        if (!upstreamRes || !upstreamRes.ok) {
-          return null;
-        }
+      if (!upstreamRes || !upstreamRes.ok) {
+        return null;
+      }
 
-        const arrayBuf = await upstreamRes.arrayBuffer();
-        const rawBuf = Buffer.from(arrayBuf);
-        const cleanBuf = cleanTsBuffer(rawBuf);
-        putCachedChunk(cacheKey, cleanBuf, 45000);
-        return cleanBuf;
-      })();
+      const arrayBuf = await upstreamRes.arrayBuffer();
+      const rawBuf = Buffer.from(arrayBuf);
+      const cleanBuf = cleanTsBuffer(rawBuf);
+      putCachedChunk(cacheKey, cleanBuf, 60000);
+      return cleanBuf;
+    })();
 
-      inflightChunks.set(cacheKey, fetchPromise);
-      fetchPromise.finally(() => {
-        inflightChunks.delete(cacheKey);
-      });
+    inflightChunks.set(cacheKey, fetchPromise);
+    fetchPromise.finally(() => {
+      inflightChunks.delete(cacheKey);
+    });
+  }
+
+  const chunkData = await fetchPromise;
+  return chunkData ? { buffer: chunkData, status: 'MISS' } : null;
+}
+
+function sendChunkData(res, req, chunkData, cacheStatus = 'MISS') {
+  res.setHeader('Content-Type', 'video/mp2t');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  res.setHeader('X-Proxy-Cache', cacheStatus);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Expose-Headers', '*');
+
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : chunkData.length - 1;
+    if (!isNaN(start) && start < chunkData.length) {
+      const slice = chunkData.subarray(start, Math.min(end + 1, chunkData.length));
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${Math.min(end, chunkData.length - 1)}/${chunkData.length}`);
+      res.setHeader('Content-Length', slice.length);
+      return res.send(slice);
     }
+  }
 
-    const chunkData = await fetchPromise;
-    if (!chunkData) {
+  res.setHeader('Content-Length', chunkData.length);
+  return res.send(chunkData);
+}
+
+async function handleChunkProxy(req, res) {
+  try {
+    const { hash, segment } = req.params;
+    const chunkResult = await fetchChunkBuffer(hash, segment);
+    if (!chunkResult || !chunkResult.buffer) {
       return res.status(502).send('Chunk fetch failed across all failover mirrors');
     }
-
-    res.setHeader('Content-Type', 'video/mp2t');
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'public, max-age=60');
-    res.setHeader('X-Proxy-Cache', 'MISS');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-    res.setHeader('Access-Control-Expose-Headers', '*');
-    return res.send(chunkData);
+    return sendChunkData(res, req, chunkResult.buffer, chunkResult.status);
   } catch (err) {
     return res.status(502).send('Proxy error');
   }

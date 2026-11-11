@@ -41,6 +41,7 @@ export interface LanyardProps {
   intro?: boolean;
   className?: string;
   style?: CSSProperties;
+  onCardClick?: () => void;
 }
 
 interface Settings {
@@ -64,6 +65,7 @@ interface Settings {
   breeze: number;
   interactive: boolean;
   intro: boolean;
+  onCardClick?: () => void;
 }
 
 interface Images {
@@ -183,7 +185,7 @@ const CLAMP_BODY = 0.15;
 const FACE_WIDTH = 1024;
 
 const FINISHES: Record<string, FinishLook> = {
-  glossy: { roughness: 0.42, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06, foil: 0, anisotropy: 0 },
+  glossy: { roughness: 0.15, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.02, foil: 0, anisotropy: 0 },
   matte: { roughness: 0.85, metalness: 0, clearcoat: 0, clearcoatRoughness: 0.6, foil: 0, anisotropy: 0 },
   holographic: { roughness: 0.3, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.04, foil: 1, anisotropy: 0 },
   metallic: { roughness: 0.36, metalness: 0.75, clearcoat: 0.5, clearcoatRoughness: 0.18, foil: 0, anisotropy: 0.7 }
@@ -889,7 +891,8 @@ const Lanyard = ({
   interactive = true,
   intro = true,
   className = '',
-  style
+  style,
+  onCardClick
 }: LanyardProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<Settings | null>(null);
@@ -915,7 +918,8 @@ const Lanyard = ({
     elasticity,
     breeze,
     interactive,
-    intro
+    intro,
+    onCardClick
   };
 
   useEffect(() => {
@@ -1405,7 +1409,13 @@ const Lanyard = ({
     const onPointerUp = (event: PointerEvent) => {
       if (!sim.grab) return;
       sim.grab = null;
-      if (press && event.type === 'pointerup' && performance.now() - press.time < 450) flip(press.point);
+      if (press && event.type === 'pointerup' && performance.now() - press.time < 450) {
+        if (settingsRef.current?.onCardClick) {
+          settingsRef.current.onCardClick();
+        } else {
+          flip(press.point);
+        }
+      }
       press = null;
       canvas.releasePointerCapture?.(event.pointerId);
       setCursor(hovering && event.pointerType !== 'touch' ? 'grab' : '');

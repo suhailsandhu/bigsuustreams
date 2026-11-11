@@ -2,6 +2,7 @@
 // Multi-Source Failover Architecture with Circuit Breaking & Resilient Mirror Routing
 
 import type { Stream, StreamsResponse } from '../types/stream.js';
+import crypto from 'crypto';
 
 interface MirrorState {
   url: string;
@@ -380,7 +381,8 @@ export async function resolveHlsStream(
   let rawM3u8Text = '';
 
   const now = Date.now();
-  const cachedTarget = tokenCacheMap.get(streamKey);
+  const cacheKey = `${streamKey}:${quality}`;
+  const cachedTarget = tokenCacheMap.get(cacheKey);
 
   // If cached, attempt fast validation to ensure stream is actively healthy
   if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
@@ -421,9 +423,14 @@ export async function resolveHlsStream(
   if (!rawM3u8Text && !isExternal) {
     // 1. Gather all candidate variant suffixes in priority order
     const candidateSuffixes: string[] = [];
+    const is720Requested = quality.startsWith('720');
 
     // Prioritize requested quality variants
-    candidateSuffixes.push(quality, `${quality}2`, `${quality}3`);
+    if (is720Requested) {
+      candidateSuffixes.push('720p', '720p2', '720p3');
+    } else {
+      candidateSuffixes.push(quality, `${quality}2`, `${quality}3`);
+    }
 
     // Extract any explicitly broadcast variant suffixes from upstream streams registry
     try {
@@ -437,7 +444,13 @@ export async function resolveHlsStream(
           if (v && v.startsWith(streamKey)) {
             const suf = v.replace(streamKey, '');
             if (suf && !candidateSuffixes.includes(suf)) {
-              candidateSuffixes.unshift(suf); // Put active live sources at the very front!
+              if (is720Requested && suf.includes('720')) {
+                candidateSuffixes.unshift(suf);
+              } else if (!is720Requested) {
+                candidateSuffixes.unshift(suf);
+              } else {
+                candidateSuffixes.push(suf);
+              }
             }
           }
         }
@@ -445,8 +458,20 @@ export async function resolveHlsStream(
     } catch {}
 
     // Add standard fallbacks
-    for (const fb of ['1080p', '1080p2', '1080p3', '720p', '720p2', '2160p']) {
+    const standardFallbacks = is720Requested
+      ? ['720p', '720p2', '720p3', '1080p', '1080p2', '1080p3', '2160p']
+      : ['1080p', '1080p2', '1080p3', '720p', '720p2', '2160p'];
+
+    for (const fb of standardFallbacks) {
       if (!candidateSuffixes.includes(fb)) candidateSuffixes.push(fb);
+    }
+
+    if (is720Requested) {
+      candidateSuffixes.sort((a, b) => {
+        const a720 = a.includes('720') ? 0 : 1;
+        const b720 = b.includes('720') ? 0 : 1;
+        return a720 - b720;
+      });
     }
 
     const sportCandidates: ('basketball' | 'football')[] =
@@ -535,11 +560,11 @@ export async function resolveHlsStream(
     }
 
     if (!foundWorkingFeed && !isExternal) {
-      tokenCacheMap.delete(streamKey);
+      tokenCacheMap.delete(cacheKey);
       throw new Error(`Could not locate active live broadcast or security tokens for ${streamKey}`);
     }
 
-    tokenCacheMap.set(streamKey, {
+    tokenCacheMap.set(cacheKey, {
       tokens,
       workingHost,
       serverName,
@@ -574,7 +599,7 @@ export async function resolveHlsStream(
   const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
   // STABLE DETERMINISTIC STREAM HASH: Never changes between playlist polls!
-  const streamHash = Buffer.from(`${streamKey}-${selectedQuality}`).toString('hex').substring(0, 16);
+  const streamHash = crypto.createHash('md5').update(`${streamKey}-${selectedQuality}`).digest('hex').substring(0, 16);
   const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
   const backupHosts = mirrors.filter(m => m !== workingHost);
   const backupBaseUrls = backupHosts.map(h => `${h}${pathPrefix}${variant}/`);

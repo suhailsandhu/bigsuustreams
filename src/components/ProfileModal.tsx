@@ -148,62 +148,90 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }, 2200);
   };
 
-  // Ultra-crisp SVG for the FRONT of the 3D card (says BSS STREAMS)
+  // Ultra-crisp Glassy SVG for the FRONT of the 3D card (says BSS STREAMS)
   const frontBadgeDataUrl = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
-        <rect width="600" height="900" rx="46" fill="#ffffff" stroke="#e2e8f0" stroke-width="4"/>
+        <defs>
+          <linearGradient id="glassBase" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/>
+            <stop offset="50%" stop-color="#f8fafc" stop-opacity="0.92"/>
+            <stop offset="100%" stop-color="#edf2f7" stop-opacity="0.95"/>
+          </linearGradient>
+          <linearGradient id="glassSheen" x1="0%" y1="0%" x2="100%" y2="80%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+            <stop offset="40%" stop-color="#ffffff" stop-opacity="0.15"/>
+            <stop offset="70%" stop-color="#ffffff" stop-opacity="0.0"/>
+          </linearGradient>
+          <linearGradient id="glassBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+            <stop offset="50%" stop-color="${isVip ? '#fbbf24' : '#cbd5e1'}" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.4"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Glass Background with Frosted Drop Shadow Appearance -->
+        <rect width="600" height="900" rx="48" fill="url(#glassBase)" stroke="url(#glassBorder)" stroke-width="5"/>
+        
+        <!-- Diagonal Glass Sheen Layer -->
+        <path d="M 0 0 L 320 0 L 120 900 L 0 900 Z" fill="url(#glassSheen)" opacity="0.45"/>
+        <path d="M 40 40 L 560 40 L 560 860 L 40 860 Z" rx="36" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>
+
+        <!-- Top Lanyard Hole Slot -->
         <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
 
         <!-- Header Tag: BSS STREAMS -->
-        <text x="300" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="32" fill="#0f172a" text-anchor="middle" letter-spacing="3">
+        <text x="300" y="175" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="34" fill="#0f172a" text-anchor="middle" letter-spacing="3">
           BSS STREAMS
         </text>
-        <rect x="210" y="220" width="180" height="38" rx="19" fill="${isVip ? '#fef3c7' : '#f1f5f9'}" stroke="${isVip ? '#fbbf24' : '#e2e8f0'}" stroke-width="2"/>
-        <text x="300" y="245" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="15" fill="${isVip ? '#b45309' : '#64748b'}" text-anchor="middle" letter-spacing="2">
+        <rect x="200" y="215" width="200" height="40" rx="20" fill="${isVip ? 'rgba(254, 243, 199, 0.9)' : 'rgba(241, 245, 249, 0.9)'}" stroke="${isVip ? '#f59e0b' : '#cbd5e1'}" stroke-width="2"/>
+        <text x="300" y="241" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="15" fill="${isVip ? '#b45309' : '#475569'}" text-anchor="middle" letter-spacing="2">
           ${roleName}
         </text>
 
-        <!-- Premium Avatar Circle -->
-        <circle cx="300" cy="440" r="105" fill="${isVip ? '#fffbeb' : '#f8fafc'}" stroke="${isVip ? '#d97706' : '#0f172a'}" stroke-width="4"/>
-        <text x="300" y="475" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="82" fill="${isVip ? '#b45309' : '#0f172a'}" text-anchor="middle">
+        <!-- Premium Glass Avatar Circle -->
+        <circle cx="300" cy="435" r="105" fill="${isVip ? '#fffbeb' : '#ffffff'}" stroke="${isVip ? '#d97706' : '#0f172a'}" stroke-width="5"/>
+        <circle cx="300" cy="435" r="97" fill="none" stroke="${isVip ? '#fbbf24' : '#e2e8f0'}" stroke-width="2" opacity="0.8"/>
+        <text x="300" y="470" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="80" fill="${isVip ? '#b45309' : '#0f172a'}" text-anchor="middle">
           ${initials}
         </text>
 
         <!-- Username -->
-        <text x="300" y="625" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
+        <text x="300" y="620" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
           ${displayName}
         </text>
 
         <!-- Barcode / Strip -->
-        <line x1="90" y1="720" x2="510" y2="720" stroke="#e2e8f0" stroke-width="2"/>
-        <g fill="#94a3b8" opacity="0.6">
-          <rect x="110" y="745" width="8" height="50"/>
-          <rect x="125" y="745" width="18" height="50"/>
-          <rect x="150" y="745" width="6" height="50"/>
-          <rect x="165" y="745" width="24" height="50"/>
-          <rect x="195" y="745" width="12" height="50"/>
-          <rect x="215" y="745" width="8" height="50"/>
-          <rect x="230" y="745" width="20" height="50"/>
-          <rect x="260" y="745" width="12" height="50"/>
-          <rect x="280" y="745" width="28" height="50"/>
-          <rect x="320" y="745" width="8" height="50"/>
-          <rect x="335" y="745" width="16" height="50"/>
-          <rect x="360" y="745" width="22" height="50"/>
-          <rect x="390" y="745" width="10" height="50"/>
-          <rect x="410" y="745" width="30" height="50"/>
-          <rect x="450" y="745" width="14" height="50"/>
-          <rect x="475" y="745" width="8" height="50"/>
+        <line x1="90" y1="710" x2="510" y2="710" stroke="#e2e8f0" stroke-width="2"/>
+        <g fill="#64748b" opacity="0.7">
+          <rect x="110" y="735" width="8" height="50"/>
+          <rect x="125" y="735" width="18" height="50"/>
+          <rect x="150" y="735" width="6" height="50"/>
+          <rect x="165" y="735" width="24" height="50"/>
+          <rect x="195" y="735" width="12" height="50"/>
+          <rect x="215" y="735" width="8" height="50"/>
+          <rect x="230" y="735" width="20" height="50"/>
+          <rect x="260" y="735" width="12" height="50"/>
+          <rect x="280" y="735" width="28" height="50"/>
+          <rect x="320" y="735" width="8" height="50"/>
+          <rect x="335" y="735" width="16" height="50"/>
+          <rect x="360" y="735" width="22" height="50"/>
+          <rect x="390" y="735" width="10" height="50"/>
+          <rect x="410" y="735" width="30" height="50"/>
+          <rect x="450" y="735" width="14" height="50"/>
+          <rect x="475" y="735" width="8" height="50"/>
         </g>
-        <text x="300" y="830" font-family="monospace" font-weight="700" font-size="16" fill="#ea580c" text-anchor="middle" letter-spacing="4">
-          TAP CARD TO OPEN SETTINGS
+        
+        <rect x="130" y="810" width="340" height="42" rx="21" fill="rgba(234, 88, 12, 0.12)" stroke="#ea580c" stroke-width="2"/>
+        <text x="300" y="837" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="16" fill="#ea580c" text-anchor="middle" letter-spacing="3">
+          TAP CARD FOR SETTINGS ⚙
         </text>
       </svg>
     `;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
-  // Ultra-crisp SVG for the BACK of the 3D card
+  // Ultra-crisp Glassy SVG for the BACK of the 3D card
   const backBadgeDataUrl = () => {
     const teamsText = selectedTeams.length > 0 
       ? selectedTeams.map(t => t.name).join(', ')
@@ -213,52 +241,57 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
-        <rect width="600" height="900" rx="46" fill="#ffffff" stroke="#ea580c" stroke-width="4"/>
+        <defs>
+          <linearGradient id="backGlassBase" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/>
+            <stop offset="100%" stop-color="#f1f5f9" stop-opacity="0.95"/>
+          </linearGradient>
+          <linearGradient id="backGlassSheen" x1="0%" y1="0%" x2="100%" y2="80%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
+            <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
+            <stop offset="80%" stop-color="#ffffff" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+
+        <rect width="600" height="900" rx="48" fill="url(#backGlassBase)" stroke="#ea580c" stroke-width="5"/>
+        <path d="M 0 0 L 320 0 L 120 900 L 0 900 Z" fill="url(#backGlassSheen)" opacity="0.4"/>
         <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
 
-        <text x="300" y="160" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle" letter-spacing="3">
+        <text x="300" y="170" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="30" fill="#0f172a" text-anchor="middle" letter-spacing="3">
           CARD SETTINGS
         </text>
-        <line x1="80" y1="195" x2="520" y2="195" stroke="#f1f5f9" stroke-width="3"/>
+        <line x1="80" y1="210" x2="520" y2="210" stroke="#f1f5f9" stroke-width="3"/>
 
         <!-- Setting 1: Favorite Teams -->
-        <text x="80" y="240" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+        <text x="80" y="270" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="17" fill="#94a3b8" letter-spacing="2">
           FAVORITE TEAMS (${selectedTeams.length})
         </text>
-        <rect x="80" y="255" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="295" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#0f172a">
+        <rect x="80" y="290" width="440" height="74" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="336" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="#0f172a">
           ${teamsText.length > 24 ? teamsText.slice(0, 24) + '...' : teamsText}
         </text>
 
         <!-- Setting 2: Spoiler Shield -->
-        <text x="80" y="360" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+        <text x="80" y="420" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="17" fill="#94a3b8" letter-spacing="2">
           HIDE FINAL SCORES
         </text>
-        <rect x="80" y="375" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="415" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="${hideScores ? '#ea580c' : '#0f172a'}">
+        <rect x="80" y="440" width="440" height="74" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="486" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="${hideScores ? '#ea580c' : '#0f172a'}">
           ${spoilerText}
         </text>
 
         <!-- Setting 3: Playback Quality -->
-        <text x="80" y="480" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+        <text x="80" y="570" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="17" fill="#94a3b8" letter-spacing="2">
           PLAYBACK STREAM
         </text>
-        <rect x="80" y="495" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="535" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#0f172a">
+        <rect x="80" y="590" width="440" height="74" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="636" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="#0f172a">
           ${qualityText}
         </text>
 
-        <!-- Setting 4: Report a Problem -->
-        <text x="80" y="600" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
-          REPORT A PROBLEM
-        </text>
-        <rect x="80" y="615" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="655" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#0f172a">
-          Tap to send issue details
-        </text>
-
-        <line x1="80" y1="715" x2="520" y2="715" stroke="#f1f5f9" stroke-width="3"/>
-        <text x="300" y="775" font-family="monospace" font-weight="700" font-size="16" fill="#ea580c" text-anchor="middle" letter-spacing="4">
+        <line x1="80" y1="730" x2="520" y2="730" stroke="#f1f5f9" stroke-width="3"/>
+        <rect x="130" y="780" width="340" height="46" rx="23" fill="#ea580c"/>
+        <text x="300" y="809" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="17" fill="#ffffff" text-anchor="middle" letter-spacing="2">
           TAP TO EDIT SETTINGS
         </text>
       </svg>
@@ -331,6 +364,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 breeze={0.15}
                 interactive={true}
                 intro={true}
+                onCardClick={() => setIsFlipped(prev => !prev)}
                 className="w-full h-full cursor-pointer"
               />
             </div>
@@ -426,27 +460,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       </div>
                     </div>
                     <span className="text-xs font-bold text-orange-600 shrink-0">Toggle</span>
-                  </div>
-
-                  {/* 4. Report a Problem (Click opens interactive textbox modal) */}
-                  <div 
-                    onClick={() => setActiveDialog('report')}
-                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                  >
-                    <div className="flex items-center space-x-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
-                        <AlertCircle className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-slate-900">
-                          Report a problem
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-medium">
-                          Send issue details to admin
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                   </div>
 
                 </div>

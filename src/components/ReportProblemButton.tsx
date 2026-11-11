@@ -3,10 +3,19 @@ import { Info, X, Send, CheckCircle2 } from 'lucide-react';
 
 interface ReportProblemModalProps {
   currentUser?: any;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export const ReportProblemButton: React.FC<ReportProblemModalProps> = ({ currentUser }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const ReportProblemButton: React.FC<ReportProblemModalProps> = ({ 
+  currentUser,
+  isOpen: controlledIsOpen,
+  onClose: controlledOnClose
+}) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const handleClose = controlledOnClose || (() => setInternalIsOpen(false));
+
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -37,7 +46,7 @@ export const ReportProblemButton: React.FC<ReportProblemModalProps> = ({ current
         setMessage('');
         setTimeout(() => {
           setIsSubmitted(false);
-          setIsOpen(false);
+          handleClose();
         }, 2200);
       } else {
         setError('Failed to submit report. Please try again.');
@@ -48,7 +57,7 @@ export const ReportProblemButton: React.FC<ReportProblemModalProps> = ({ current
       setMessage('');
       setTimeout(() => {
         setIsSubmitted(false);
-        setIsOpen(false);
+        handleClose();
       }, 2200);
     } finally {
       setIsSubmitting(false);
@@ -57,24 +66,6 @@ export const ReportProblemButton: React.FC<ReportProblemModalProps> = ({ current
 
   return (
     <>
-      {/* Floating or Main Page 'i' Button */}
-      <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end">
-        <button
-          onClick={() => setIsOpen(true)}
-          className="group relative flex items-center justify-center w-10 h-10 rounded-full bg-white hover:bg-neutral-50 text-gray-700 hover:text-black border border-gray-200/90 shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 cursor-pointer"
-          title="Report a problem"
-          aria-label="Report a problem"
-        >
-          <span className="w-5 h-5 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center text-xs font-serif font-bold italic text-gray-800 transition-colors">
-            i
-          </span>
-          <span className="sr-only">Report a problem</span>
-        </button>
-        <span className="text-[10px] font-bold text-gray-400 mt-1 select-none pr-0.5">
-          Report
-        </span>
-      </div>
-
       {/* Pop-up Text Box Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none animate-in fade-in duration-150">
@@ -91,7 +82,7 @@ export const ReportProblemButton: React.FC<ReportProblemModalProps> = ({ current
                 </h3>
               </div>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition cursor-pointer active:scale-95"
               >
                 <X className="w-4 h-4" />
