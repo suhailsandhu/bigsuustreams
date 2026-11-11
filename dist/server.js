@@ -4192,6 +4192,11 @@ async function sendDiscordProblemNotification(report) {
     const token = process.env.DISCORD_BOT_TOKEN || Buffer.from("TVRVMk9Ua3dNVGd5TkRjNE9ETTVPREUyTUEuR0dNbzFrLk44bkYzMXBxc3hITkYtUmt6M0NXaHZaYjEwMEYtZFJhMGRxV3pz", "base64").toString("utf8");
     const channelId = process.env.DISCORD_REPORT_CHANNEL || "1569996857537462293";
     if (!token || !channelId) return;
+    const formattedTime = new Date(report.timestamp).toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
     await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
       method: "POST",
       headers: {
@@ -4201,7 +4206,7 @@ async function sendDiscordProblemNotification(report) {
       body: JSON.stringify({
         content: `\u{1F6A8} **NEW STREAM PROBLEM REPORT**
 \u{1F464} **From**: ${report.user} (${report.email || "N/A"})
-\u{1F552} **Time**: ${new Date(report.timestamp).toLocaleString("en-US", { timeZone: "America/New_York" })} ET
+\u{1F552} **Time**: ${formattedTime} PT (Pacific)
 \u{1F4DD} **Details**: \`\`\`${report.message}\`\`\``
       })
     });

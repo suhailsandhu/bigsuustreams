@@ -1615,7 +1615,7 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                               <span className="text-[10px] font-semibold text-neutral-400">({rpt.email || 'N/A'})</span>
                             </div>
                             <div className="text-[10px] text-neutral-400 mt-0.5">
-                              {new Date(rpt.timestamp).toLocaleString()}
+                              {new Date(rpt.timestamp).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} PT
                             </div>
                           </div>
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-50 text-orange-700 border border-orange-200 shrink-0">
