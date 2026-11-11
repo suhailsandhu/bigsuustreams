@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, Key } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
+import { trackUmamiEvent, identifyUmamiUser } from '../utils/analyticsClient';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -194,6 +195,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         localStorage.setItem('bigsuu_auth_token', data.token);
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
         sessionStorage.setItem('bigsuu_auth_token', data.token);
+
+        try {
+          if (mode === 'register') {
+            trackUmamiEvent('user_signup', {
+              username: user.username,
+              email: user.email,
+              provider: user.provider || 'local',
+              favoriteTeam: favoriteTeamId || undefined,
+              signedUpAt: new Date().toISOString()
+            });
+          } else {
+            trackUmamiEvent('user_login', {
+              username: user.username,
+              email: user.email,
+              provider: user.provider || 'local'
+            });
+          }
+          identifyUmamiUser({
+            userId: user.email || user.id,
+            userName: user.username,
+            name: user.displayName || user.username
+          });
+        } catch {}
+
         onSuccess(user);
       } else {
         // Fallback for 7865 password

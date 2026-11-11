@@ -31,6 +31,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   });
 
   const [problemReported, setProblemReported] = useState(false);
+  const [copiedIptv, setCopiedIptv] = useState(false);
 
   // Keyboard shortcut: Escape to close
   useEffect(() => {
@@ -80,6 +81,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const handleReport = () => {
     setProblemReported(true);
     setTimeout(() => setProblemReported(false), 3000);
+  };
+
+  const handleCopyIptv = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bigsuustreams.com';
+    const cleanOrigin = origin.includes('localhost') ? 'https://bigsuustreams.com' : origin;
+    const url = `${cleanOrigin}/playlist.m3u`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).catch(() => {});
+    }
+    setCopiedIptv(true);
+    setTimeout(() => setCopiedIptv(false), 2500);
   };
 
   // Ultra-crisp, premium pure white card for the FRONT (only username, pass type & initials)
@@ -154,42 +166,51 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
 
         <!-- Header -->
-        <text x="300" y="170" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle" letter-spacing="3">
+        <text x="300" y="160" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle" letter-spacing="3">
           CARD SETTINGS
         </text>
-        <line x1="80" y1="210" x2="520" y2="210" stroke="#f1f5f9" stroke-width="3"/>
+        <line x1="80" y1="195" x2="520" y2="195" stroke="#f1f5f9" stroke-width="3"/>
 
         <!-- Setting 1: Favorite Team -->
-        <text x="80" y="270" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#94a3b8" letter-spacing="2">
+        <text x="80" y="240" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
           FAVORITE TEAM
         </text>
-        <rect x="80" y="295" width="440" height="70" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="340" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22" fill="#0f172a">
+        <rect x="80" y="255" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="295" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="#0f172a">
           ${teamText.length > 22 ? teamText.slice(0, 22) + '...' : teamText}
         </text>
 
         <!-- Setting 2: Spoiler Shield -->
-        <text x="80" y="425" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#94a3b8" letter-spacing="2">
+        <text x="80" y="350" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
           HIDE FINAL SCORES
         </text>
-        <rect x="80" y="450" width="440" height="70" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="495" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22" fill="${hideScores ? '#ea580c' : '#0f172a'}">
+        <rect x="80" y="365" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="405" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="${hideScores ? '#ea580c' : '#0f172a'}">
           ${spoilerText}
         </text>
 
         <!-- Setting 3: Playback Quality -->
-        <text x="80" y="580" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#94a3b8" letter-spacing="2">
+        <text x="80" y="460" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
           PLAYBACK STREAM
         </text>
-        <rect x="80" y="605" width="440" height="70" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="650" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22" fill="#0f172a">
+        <rect x="80" y="475" width="440" height="60" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="515" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="#0f172a">
           ${qualityText}
         </text>
 
+        <!-- Setting 4: Cyberdash IPTV -->
+        <text x="80" y="570" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#94a3b8" letter-spacing="2">
+          CYBERDASH / IPTV PLAYLIST
+        </text>
+        <rect x="80" y="585" width="440" height="60" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+        <text x="110" y="623" font-family="monospace" font-weight="800" font-size="18" fill="#ea580c">
+          /playlist.m3u
+        </text>
+
         <!-- Footer Help -->
-        <line x1="80" y1="730" x2="520" y2="730" stroke="#f1f5f9" stroke-width="3"/>
-        <text x="300" y="790" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="18" fill="#64748b" text-anchor="middle">
-          Tap controls below to edit card
+        <line x1="80" y1="695" x2="520" y2="695" stroke="#f1f5f9" stroke-width="3"/>
+        <text x="300" y="745" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="18" fill="#64748b" text-anchor="middle">
+          Tap controls below to edit or copy
         </text>
       </svg>
     `;
@@ -286,6 +307,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {streamQualityMode === 'highest' ? 'Quality: 1080p' : 'Quality: Auto'}
             </button>
 
+          </div>
+
+          {/* Cyberdash / IPTV M3U Playlist Quick-Copy Pill */}
+          <div className="flex justify-center pt-0.5">
+            <button
+              onClick={handleCopyIptv}
+              className={`text-xs font-bold py-1.5 px-4 rounded-full border shadow-lg backdrop-blur-md transition cursor-pointer active:scale-95 flex items-center space-x-1.5 ${
+                copiedIptv
+                  ? 'bg-green-600/90 text-white border-green-400'
+                  : 'bg-black/75 hover:bg-black/90 text-white border-orange-500/50 hover:border-orange-400'
+              }`}
+              title="Copy M3U Playlist link for Cyberdash / CyberTube IPTV"
+            >
+              <span className="text-sm">📺</span>
+              <span>{copiedIptv ? '✓ Copied /playlist.m3u!' : 'Copy Cyberdash IPTV Link'}</span>
+            </button>
           </div>
 
           {/* Report a Problem Button with 'i' icon & Caption underneath */}

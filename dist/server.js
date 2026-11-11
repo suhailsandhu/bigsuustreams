@@ -3246,7 +3246,7 @@ var apiLimiter = createRateLimiter({
   message: "High request volume detected. Please try again in a moment."
 });
 app.use("/api", (req, res, next) => {
-  if (req.path.startsWith("/stream/chunk/") || req.path.includes("/hls/")) {
+  if (req.path.startsWith("/stream/chunk/") || req.path.includes("/hls/") || req.path.startsWith("/iptv/")) {
     return next();
   }
   return apiLimiter(req, res, next);
@@ -3479,6 +3479,9 @@ app.get("/api/basketball/highlights", async (req, res) => {
   }
 });
 app.use("/api", (req, res, next) => {
+  if (req.path.startsWith("/stream/chunk/") || req.path.includes("/hls/") || req.path.startsWith("/iptv/")) {
+    return next();
+  }
   const ua = (req.get("user-agent") || "").toLowerCase();
   const isBot = /curl|python-requests|wget|httpclient|scrapy|aiohttp|urllib/i.test(ua);
   if (isBot) {
@@ -3972,6 +3975,67 @@ app.post("/api/admin/deploy", async (req, res) => {
     });
   }, 2500);
 });
+async function buildIptvPlaylist(req, sportFilter = "all") {
+  const host = req.get("x-forwarded-host") || req.get("host") || "bigsuustreams.com";
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const protocol = isLocal ? "http" : req.get("x-forwarded-proto") || (req.secure ? "https" : "https");
+  const baseUrl = `${protocol}://${host}`;
+  const token = req.query.token || req.query.t || "";
+  const tokenQuery = token ? `?t=${encodeURIComponent(String(token))}` : "";
+  const [bball, fball] = await Promise.all([
+    sportFilter === "all" || sportFilter === "nba" ? getBasketballStreams(false).catch(() => ({ streams: [] })) : Promise.resolve({ streams: [] }),
+    sportFilter === "all" || sportFilter === "nfl" ? getFootballStreams(false).catch(() => ({ streams: [] })) : Promise.resolve({ streams: [] })
+  ]);
+  const nbaStreams = bball?.streams || [];
+  const nflStreams = fball?.streams || [];
+  const lines = [
+    '#EXTM3U name="BigSuuStreams Live Sports" x-tvg-url=""'
+  ];
+  const addStreamEntry = (s, category, leagueLabel) => {
+    if (!s || !s.stream_key) return;
+    const isLive = Boolean(s.is_live);
+    const cleanName = (s.name || "Sports Matchup").replace(/"/g, "'");
+    const logo = s.team1?.logo || s.thumbnail_url || "https://bigsuustreams.com/apple-touch-icon.png";
+    const statusEmoji = isLive ? "\u{1F534}" : "\u23F0";
+    const statusTag = isLive ? "LIVE" : "UPCOMING";
+    const title = `${statusEmoji} [${leagueLabel}] ${cleanName} (${statusTag})`;
+    const group = isLive ? `${leagueLabel} Live` : `${leagueLabel} Scheduled`;
+    const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
+    lines.push(`#EXTINF:-1 tvg-id="${category}-${s.stream_key}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
+    lines.push(streamUrl);
+  };
+  const liveNba = nbaStreams.filter((s) => s.is_live);
+  const liveNfl = nflStreams.filter((s) => s.is_live);
+  const schedNba = nbaStreams.filter((s) => !s.is_live);
+  const schedNfl = nflStreams.filter((s) => !s.is_live);
+  for (const s of liveNba) addStreamEntry(s, "basketball", "NBA");
+  for (const s of liveNfl) addStreamEntry(s, "football", "NFL");
+  for (const s of schedNba) addStreamEntry(s, "basketball", "NBA");
+  for (const s of schedNfl) addStreamEntry(s, "football", "NFL");
+  return lines.join("\n");
+}
+async function handleIptvPlaylist(req, res, sportFilter = "all") {
+  try {
+    const playlistText = await buildIptvPlaylist(req, sportFilter);
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
+    res.setHeader("Content-Disposition", 'inline; filename="playlist.m3u8"');
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.setHeader("Access-Control-Expose-Headers", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.status(200).send(playlistText);
+  } catch (err) {
+    console.error("[IPTV Handler Error]", err);
+    res.status(500).send("#EXTM3U\n# Error generating playlist\n");
+  }
+}
+app.all(["/playlist.m3u", "/playlist.m3u8", "/iptv.m3u", "/iptv.m3u8", "/streams.m3u", "/streams.m3u8"], (req, res) => handleIptvPlaylist(req, res, "all"));
+app.all(["/nba.m3u", "/nba.m3u8"], (req, res) => handleIptvPlaylist(req, res, "nba"));
+app.all(["/nfl.m3u", "/nfl.m3u8"], (req, res) => handleIptvPlaylist(req, res, "nfl"));
+app.all(["/api/iptv/playlist.m3u", "/api/iptv/playlist.m3u8", "/api/iptv/live.m3u", "/api/iptv/live.m3u8"], (req, res) => handleIptvPlaylist(req, res, "all"));
+app.all(["/api/iptv/nba.m3u", "/api/iptv/nba.m3u8"], (req, res) => handleIptvPlaylist(req, res, "nba"));
+app.all(["/api/iptv/nfl.m3u", "/api/iptv/nfl.m3u8"], (req, res) => handleIptvPlaylist(req, res, "nfl"));
 var distPath = path3.join(__dirname, "dist");
 if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
   distPath = __dirname;
