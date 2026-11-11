@@ -405,9 +405,9 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
                       <span className="text-[11px] sm:text-xs font-extrabold">{quarterClock}</span>
                     </span>
                     {isCurrent ? (
-                      <span className="inline-flex items-center space-x-1 text-[10px] sm:text-[11px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                        <span>Watching Now</span>
+                      <span className="inline-flex items-center space-x-1 text-[9px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                        <span className="w-1 h-1 rounded-full bg-emerald-600" />
+                        <span>Watching</span>
                       </span>
                     ) : (
                       <span className="text-gray-500 hover:text-black text-[10px] sm:text-[11px] font-semibold flex items-center space-x-0.5">

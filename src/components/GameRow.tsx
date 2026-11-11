@@ -2,8 +2,8 @@ import React from 'react';
 import { Play, Trophy, Clock } from 'lucide-react';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
 import type { SportsTeam } from '../data/nbaTeams.ts';
-import SpotlightCard from './ui/SpotlightCard.tsx';
-import ShinyText from './ui/ShinyText.tsx';
+import SpotlightCard from './SpotlightCard.tsx';
+import ShinyText from './ShinyText.tsx';
 
 interface GameRowProps {
   game: ScoreboardGame;

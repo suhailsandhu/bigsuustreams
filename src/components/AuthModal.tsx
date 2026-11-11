@@ -370,7 +370,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
               </div>
 
-              {/* Form */}
+              {/* Clean Single-View Sign In & Create Account Form */}
               <form onSubmit={handleSubmit} className="space-y-3.5">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
@@ -424,7 +424,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={mode === 'register' ? 'Minimum 6 characters' : 'Enter password'}
+                      placeholder={mode === 'register' ? 'Minimum 4 characters' : 'Enter password'}
                       className="w-full pl-10 pr-10 py-2.5 bg-gray-50/80 border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-black focus:ring-2 focus:ring-black/10 transition"
                       required
                     />

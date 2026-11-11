@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshCw, KeyRound } from 'lucide-react';
 import { NflLogo } from './NflLogo';
-import { ShinyText } from './ui/ShinyText';
+import ShinyText from './ShinyText';
 
 interface HeaderProps {
   onNavigateHome: () => void;
@@ -35,19 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-2xs select-none relative">
 
-      {/* Account / Membership Status & Quick Key in Top Right */}
+      {/* Account / Membership Status in Top Right */}
       <div className="absolute right-3 sm:right-6 top-2.5 sm:top-3.5 flex items-center space-x-2 z-20">
-        {onOpenAuth && (
-          <button
-            onClick={onOpenAuth}
-            className="p-1.5 rounded-full text-gray-500 hover:text-black hover:bg-gray-100 transition active:scale-95 cursor-pointer shadow-2xs border border-gray-200/80 bg-white"
-            title="Sign In / Passcode Access"
-            aria-label="Sign In"
-          >
-            <KeyRound className="w-4 h-4 text-gray-600 hover:text-black" />
-          </button>
-        )}
-
         {currentUser && onOpenProfile && (
           isVip ? (
             <button
@@ -79,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2 flex flex-col items-center justify-center">
         
-        {/* Prominent League Logo (NBA / NFL) - Big & Crisp */}
+        {/* Prominent League Logo (NBA / NFL) - Clean without box */}
         <div
           onClick={onNavigateHome}
           className="flex items-center justify-center cursor-pointer group py-0.5"

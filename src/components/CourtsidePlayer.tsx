@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { isSamsungSmartTv, isSmartTv, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
 import Hls from 'hls.js';
+import LatticeLoader from './LatticeLoader.tsx';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle,
@@ -798,14 +799,23 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           </div>
         )}
 
-        {/* Loading Indicator (Clean, Lightweight, Centered - No Overlapping Controls) */}
+        {/* Loading Indicator (Clean, White Background with React Bits LatticeLoader) */}
         {isLoading && !hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/95 z-20 pointer-events-none p-4">
-            <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
-            <p className="mt-3 text-xs font-semibold text-gray-800">
-              Loading Live Feed...
-            </p>
-            <p className="text-[11px] text-gray-400 mt-0.5 font-normal">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 z-20 pointer-events-none p-4">
+            <LatticeLoader
+              label="Connecting stream..."
+              status="working"
+              pattern="orbit"
+              grid={3}
+              cellSize={7}
+              gap={3}
+              ink="#ea580c"
+              glow
+              glowColor="#ea580c"
+              showTimer
+              className="text-gray-900 font-bold"
+            />
+            <p className="text-[11px] text-gray-500 mt-2 font-medium">
               {selectedQuality} HD
             </p>
           </div>

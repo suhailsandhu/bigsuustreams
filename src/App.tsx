@@ -14,6 +14,7 @@ import { AdminStatsModal } from './components/AdminStatsModal.tsx';
 import { AuthModal } from './components/AuthModal.tsx';
 import { LegalModal } from './components/LegalModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
+import { ReportProblemButton } from './components/ReportProblemButton.tsx';
 import { UpdatingScreen } from './components/UpdatingScreen.tsx';
 import { trackPageView, updateCurrentStream } from './utils/analyticsClient.ts';
 import { findTeamByQuery } from './data/nbaTeams.ts';
@@ -25,8 +26,21 @@ export const App: React.FC = () => {
   const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>('nba');
 
   // iOS-style Account Authentication state (auto-kick all 7777 VIP passes immediately)
+  // On Smart TVs: Auto-authenticate as TV Guest so the TV viewer directly sees live games without needing mouse/keyboard sign-in
   const [currentUser, setCurrentUser] = useState<any>(() => {
     try {
+      const isTv = isSmartTv();
+      if (isTv) {
+        return {
+          id: 'user_smart_tv',
+          username: 'Smart TV',
+          displayName: 'TV Viewer',
+          email: 'tv@bigsuustreams.com',
+          role: 'member',
+          isVip: false,
+          membership: 'basic'
+        };
+      }
       const stored = localStorage.getItem('bigsuu_auth_user');
       const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
       
@@ -836,6 +850,9 @@ export const App: React.FC = () => {
           setShowLegalModal(true);
         }}
       />
+
+      {/* Floating Main Page 'i' Report a Problem Button & Modal */}
+      <ReportProblemButton currentUser={currentUser} />
 
       {/* Legal Shield Modal (DMCA, Trademark Non-Affiliation, Terms & Privacy) */}
       <LegalModal

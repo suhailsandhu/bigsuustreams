@@ -64,6 +64,21 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <p style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '380px', marginBottom: '24px', lineHeight: 1.5 }}>
             The application encountered a client state refresh notice. Tap below to reload fresh broadcast data.
           </p>
+          {this.state.error?.message && (
+            <div style={{
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              color: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              maxWidth: '90%',
+              wordBreak: 'break-all'
+            }}>
+              {this.state.error.message}
+            </div>
+          )}
           <button
             onClick={() => {
               if (typeof window !== 'undefined' && 'caches' in window) {

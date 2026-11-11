@@ -1811,12 +1811,15 @@ var AuthService = class {
       };
       this.users.set(foundUser.id, foundUser);
     } else if (password !== "7865") {
-      if (!foundUser || !foundUser.passwordHash || !foundUser.salt) {
-        throw new Error("Invalid username/email or password");
-      }
-      const inputHash = this.hashPassword(password, foundUser.salt);
-      if (inputHash !== foundUser.passwordHash) {
-        throw new Error("Invalid username/email or password");
+      if (!foundUser.passwordHash || !foundUser.salt) {
+        foundUser.salt = crypto.randomBytes(16).toString("hex");
+        foundUser.passwordHash = this.hashPassword(password, foundUser.salt);
+        this.persistUsers();
+      } else {
+        const inputHash = this.hashPassword(password, foundUser.salt);
+        if (inputHash !== foundUser.passwordHash) {
+          throw new Error("Invalid username/email or password");
+        }
       }
     }
     if (!foundUser) {
@@ -4012,9 +4015,39 @@ async function runAutoSync() {
 runAutoSync();
 setInterval(runAutoSync, 45e3);
 autonomousWatchdog.start();
-authService.clearAllSessions();
-analytics.clearActiveSessions();
-console.log("\u26A1 [Admin] Purged all active sessions and online viewers on boot.");
+app.post("/api/report-problem", (req, res) => {
+  try {
+    const { message, user, email, url, userAgent } = req.body || {};
+    const report = {
+      id: `report_${Date.now()}`,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      user: user || "Anonymous",
+      email: email || "anonymous",
+      message: String(message || "").trim(),
+      url: url || "",
+      userAgent: userAgent || ""
+    };
+    const reportsDir = path3.join(process.cwd(), "data");
+    if (!fs3.existsSync(reportsDir)) {
+      fs3.mkdirSync(reportsDir, { recursive: true });
+    }
+    const reportsFile = path3.join(reportsDir, "problem_reports.json");
+    let existingReports = [];
+    if (fs3.existsSync(reportsFile)) {
+      try {
+        existingReports = JSON.parse(fs3.readFileSync(reportsFile, "utf8"));
+      } catch {
+      }
+    }
+    existingReports.unshift(report);
+    fs3.writeFileSync(reportsFile, JSON.stringify(existingReports.slice(0, 200), null, 2));
+    console.log(`\u{1F6A8} [Problem Report] from ${report.user}: "${report.message.slice(0, 80)}"`);
+    res.json({ success: true, message: "It'll be fixed ASAP" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to record problem report" });
+  }
+});
+console.log("\u26A1 [Auth] Preserving active user sessions across server updates.");
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);
 });

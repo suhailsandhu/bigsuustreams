@@ -1042,9 +1042,45 @@ setInterval(runAutoSync, 45000);
 autonomousWatchdog.start();
 
 // Purge all old active sessions and online viewers on startup
-authService.clearAllSessions();
-analytics.clearActiveSessions();
-console.log('⚡ [Admin] Purged all active sessions and online viewers on boot.');
+// 11. Problem Reports (User Feedback & Issues)
+app.post('/api/report-problem', (req, res) => {
+  try {
+    const { message, user, email, url, userAgent } = req.body || {};
+    const report = {
+      id: `report_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      user: user || 'Anonymous',
+      email: email || 'anonymous',
+      message: String(message || '').trim(),
+      url: url || '',
+      userAgent: userAgent || ''
+    };
+
+    const reportsDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(reportsDir)) {
+      fs.mkdirSync(reportsDir, { recursive: true });
+    }
+    const reportsFile = path.join(reportsDir, 'problem_reports.json');
+    let existingReports = [];
+    if (fs.existsSync(reportsFile)) {
+      try {
+        existingReports = JSON.parse(fs.readFileSync(reportsFile, 'utf8'));
+      } catch {}
+    }
+    existingReports.unshift(report);
+    // Keep last 200 reports
+    fs.writeFileSync(reportsFile, JSON.stringify(existingReports.slice(0, 200), null, 2));
+
+    console.log(`🚨 [Problem Report] from ${report.user}: "${report.message.slice(0, 80)}"`);
+    res.json({ success: true, message: "It'll be fixed ASAP" });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to record problem report' });
+  }
+});
+
+// Persist active user sessions across server reboots so users never get kicked out during updates
+// (Sessions remain valid until explicit user logout)
+console.log('⚡ [Auth] Preserving active user sessions across server updates.');
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);

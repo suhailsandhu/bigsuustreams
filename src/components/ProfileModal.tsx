@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Search, Check, ChevronRight, Trash2 } from 'lucide-react';
-import { type SportsTeam, searchSportsTeams, findTeamByQuery } from '../data/nbaTeams';
+import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { ALL_TEAMS } from '../data/nbaTeams';
+import Lanyard from './Lanyard';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -17,96 +18,48 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLogout,
   onSettingsChange
 }) => {
-  // Ensure Autoplay with sound is enabled automatically for everyone
-  useEffect(() => {
-    try {
-      localStorage.setItem('bss_autoplay_sound', 'true');
-    } catch {}
-  }, []);
-
-  // 1. Preferences State
-  const [selectedTeam, setSelectedTeam] = useState<SportsTeam | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bss_favorite_team') || '';
-      return findTeamByQuery(saved) || null;
-    }
-    return null;
+  const [favoriteTeamId, setFavoriteTeamId] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_favorite_team')) || '';
   });
 
-  const [hideScores, setHideScores] = useState(() => {
+  const [hideScores, setHideScores] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('bss_hide_scores') === 'true';
   });
 
-  // 2. Playback State
-  const [lowLatency, setLowLatency] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('bss_low_latency') === 'true';
+  const [streamQualityMode, setStreamQualityMode] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_stream_quality_mode')) || 'auto';
   });
 
-  const [cacheCleared, setCacheCleared] = useState(false);
+  const [problemReported, setProblemReported] = useState(false);
 
-  // Team Selector Search & Dropdown State
-  const [isSearchingTeam, setIsSearchingTeam] = useState(false);
-  const [teamSearchQuery, setTeamSearchQuery] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape key
+  // Keyboard shortcut: Escape to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (isSearchingTeam) {
-          setIsSearchingTeam(false);
-        } else {
-          onClose();
-        }
-      }
+      if (e.key === 'Escape') onClose();
     };
-    window.addEventListener('keydown', handleKeyDown);
+    if (isOpen) window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isSearchingTeam]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        searchInputRef.current &&
-        !searchInputRef.current.contains(e.target as Node)
-      ) {
-        setIsSearchingTeam(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  // Membership Determination: sandhu.suhail@gmail.com is the ONLY VIP member account
   const isVip = Boolean(
     currentUser?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
-    currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com'
+    currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+    currentUser?.username?.toLowerCase() === 'bigsuu' ||
+    currentUser?.role === 'vip' ||
+    currentUser?.isVip === true
   );
 
-  const displayName = currentUser?.displayName || currentUser?.username || 'Member';
-  const email = currentUser?.email || (currentUser?.username ? `${currentUser.username}@bss.internal` : 'member@bss.internal');
-  const userInitials = (displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) || 'ME').toUpperCase();
+  const displayName = currentUser?.displayName || currentUser?.username || 'Big Suu';
+  const roleName = isVip ? 'VIP PASS' : 'MEMBER PASS';
+  const initials = (displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) || 'BS').toUpperCase();
 
-  // Handlers
-  const handleSelectTeam = (team: SportsTeam) => {
-    setSelectedTeam(team);
-    localStorage.setItem('bss_favorite_team', team.id);
-    setIsSearchingTeam(false);
-    setTeamSearchQuery('');
-    onSettingsChange?.();
-  };
-
-  const handleClearTeam = () => {
-    setSelectedTeam(null);
-    localStorage.removeItem('bss_favorite_team');
-    setIsSearchingTeam(false);
-    setTeamSearchQuery('');
+  const handleFavoriteTeamChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setFavoriteTeamId(val);
+    if (val) localStorage.setItem('bss_favorite_team', val);
+    else localStorage.removeItem('bss_favorite_team');
     onSettingsChange?.();
   };
 
@@ -117,341 +70,248 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onSettingsChange?.();
   };
 
-  const handleToggleLatency = () => {
-    const next = !lowLatency;
-    setLowLatency(next);
-    localStorage.setItem('bss_low_latency', next ? 'true' : 'false');
+  const handleToggleQuality = () => {
+    const next = streamQualityMode === 'highest' ? 'auto' : 'highest';
+    setStreamQualityMode(next);
+    localStorage.setItem('bss_stream_quality_mode', next);
     onSettingsChange?.();
   };
 
-  const handleClearCache = () => {
-    try {
-      sessionStorage.removeItem('hls_buffer_cache');
-      sessionStorage.removeItem('stream_metrics');
-      setCacheCleared(true);
-      setTimeout(() => setCacheCleared(false), 2500);
-    } catch {
-      // ignore
-    }
+  const handleReport = () => {
+    setProblemReported(true);
+    setTimeout(() => setProblemReported(false), 3000);
   };
 
-  const searchResults = searchSportsTeams(teamSearchQuery);
+  // Ultra-crisp, premium pure white card for the FRONT (only username, pass type & initials)
+  const frontBadgeDataUrl = () => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+        <rect width="600" height="900" rx="46" fill="#ffffff" stroke="#e2e8f0" stroke-width="4"/>
+        
+        <!-- Top Strap Ring Slot -->
+        <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
+
+        <!-- Header Tag -->
+        <text x="300" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="30" fill="#0f172a" text-anchor="middle" letter-spacing="4">
+          COURTSIDE
+        </text>
+        <rect x="210" y="220" width="180" height="38" rx="19" fill="${isVip ? '#fef3c7' : '#f1f5f9'}" stroke="${isVip ? '#fbbf24' : '#e2e8f0'}" stroke-width="2"/>
+        <text x="300" y="245" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="15" fill="${isVip ? '#b45309' : '#64748b'}" text-anchor="middle" letter-spacing="2">
+          ${roleName}
+        </text>
+
+        <!-- Premium Avatar Circle -->
+        <circle cx="300" cy="440" r="105" fill="${isVip ? '#fffbeb' : '#f8fafc'}" stroke="${isVip ? '#d97706' : '#0f172a'}" stroke-width="4"/>
+        <text x="300" y="475" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="82" fill="${isVip ? '#b45309' : '#0f172a'}" text-anchor="middle">
+          ${initials}
+        </text>
+
+        <!-- Username Only (Clean & Bold) -->
+        <text x="300" y="625" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
+          ${displayName}
+        </text>
+
+        <!-- Subtle Barcode / Security Strip -->
+        <line x1="90" y1="720" x2="510" y2="720" stroke="#e2e8f0" stroke-width="2"/>
+        <g fill="#94a3b8" opacity="0.6">
+          <rect x="110" y="745" width="8" height="50"/>
+          <rect x="125" y="745" width="18" height="50"/>
+          <rect x="150" y="745" width="6" height="50"/>
+          <rect x="165" y="745" width="24" height="50"/>
+          <rect x="195" y="745" width="12" height="50"/>
+          <rect x="215" y="745" width="8" height="50"/>
+          <rect x="230" y="745" width="20" height="50"/>
+          <rect x="260" y="745" width="12" height="50"/>
+          <rect x="280" y="745" width="28" height="50"/>
+          <rect x="320" y="745" width="8" height="50"/>
+          <rect x="335" y="745" width="16" height="50"/>
+          <rect x="360" y="745" width="22" height="50"/>
+          <rect x="390" y="745" width="10" height="50"/>
+          <rect x="410" y="745" width="30" height="50"/>
+          <rect x="450" y="745" width="14" height="50"/>
+          <rect x="475" y="745" width="8" height="50"/>
+        </g>
+        <text x="300" y="830" font-family="monospace" font-weight="700" font-size="16" fill="#94a3b8" text-anchor="middle" letter-spacing="5">
+          TOUCH CARD TO FLIP
+        </text>
+      </svg>
+    `;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
+
+  // Ultra-crisp, premium pure white card for the BACK (All Settings directly printed on the back of the card)
+  const backBadgeDataUrl = () => {
+    const selectedTeamObj = ALL_TEAMS.find(t => t.id === favoriteTeamId);
+    const teamText = selectedTeamObj ? selectedTeamObj.displayName : 'None Selected';
+    const qualityText = streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)';
+    const spoilerText = hideScores ? 'Scores Hidden (Active)' : 'Show Live Scores';
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+        <rect width="600" height="900" rx="46" fill="#ffffff" stroke="#ea580c" stroke-width="4"/>
+        
+        <!-- Top Slot -->
+        <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
+
+        <!-- Header -->
+        <text x="300" y="170" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle" letter-spacing="3">
+          CARD SETTINGS
+        </text>
+        <line x1="80" y1="210" x2="520" y2="210" stroke="#f1f5f9" stroke-width="3"/>
+
+        <!-- Setting 1: Favorite Team -->
+        <text x="80" y="270" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#94a3b8" letter-spacing="2">
+          FAVORITE TEAM
+        </text>
+        <rect x="80" y="295" width="440" height="70" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="340" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22" fill="#0f172a">
+          ${teamText.length > 22 ? teamText.slice(0, 22) + '...' : teamText}
+        </text>
+
+        <!-- Setting 2: Spoiler Shield -->
+        <text x="80" y="425" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#94a3b8" letter-spacing="2">
+          HIDE FINAL SCORES
+        </text>
+        <rect x="80" y="450" width="440" height="70" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="495" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22" fill="${hideScores ? '#ea580c' : '#0f172a'}">
+          ${spoilerText}
+        </text>
+
+        <!-- Setting 3: Playback Quality -->
+        <text x="80" y="580" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="18" fill="#94a3b8" letter-spacing="2">
+          PLAYBACK STREAM
+        </text>
+        <rect x="80" y="605" width="440" height="70" rx="16" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="110" y="650" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22" fill="#0f172a">
+          ${qualityText}
+        </text>
+
+        <!-- Footer Help -->
+        <line x1="80" y1="730" x2="520" y2="730" stroke="#f1f5f9" stroke-width="3"/>
+        <text x="300" y="790" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="18" fill="#64748b" text-anchor="middle">
+          Tap controls below to edit card
+        </text>
+      </svg>
+    `;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs select-none">
-      <div className="relative w-full max-w-lg bg-white rounded-t-[28px] sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 select-none bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
+      
+      {/* Direct Full-Screen Lanyard Experience (Zero Big White Box Overlay) */}
+      <div className="relative w-full max-w-sm sm:max-w-md h-[88vh] flex flex-col items-center justify-between">
         
-        {/* iOS Mobile Sheet Handle */}
-        <div className="w-full flex justify-center pt-3 pb-1 sm:hidden">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
-        </div>
-
-        {/* Modal Top Navigation Bar */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">
-            Account & Settings
-          </h2>
+        {/* Floating Close Button Top Right */}
+        <div className="w-full flex justify-end px-2 pt-2">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 transition flex items-center justify-center cursor-pointer active:scale-95"
+            className="w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer active:scale-95 shadow-lg border border-white/20"
             title="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 text-gray-800">
+        {/* 3D Interactive Swinging Lanyard Badge (White finish, flips on click/drag) */}
+        <div className="w-full flex-1 relative flex items-center justify-center overflow-hidden">
+          <Lanyard
+            frontImage={frontBadgeDataUrl()}
+            backImage={backBadgeDataUrl()}
+            cardColor="#ffffff"
+            strapColor={isVip ? '#d97706' : '#1e293b'}
+            metal={isVip ? 'gold' : 'silver'}
+            size={0.8}
+            strapLength={0.4}
+            strapWidth={0.65}
+            finish="glossy"
+            gravity={1.2}
+            damping={0.45}
+            elasticity={0.45}
+            breeze={0.25}
+            interactive={true}
+            intro={true}
+            className="w-full h-full cursor-grab active:cursor-grabbing"
+          />
+        </div>
+
+        {/* Minimal Transparent Floating Control Dock (No box around badge) */}
+        <div className="w-full px-2 pb-4 space-y-2 z-20">
           
-          {/* SECTION 1: Clean, Minimal Profile Header */}
-          <div className="flex items-center space-x-4 pb-2">
-            <div className="w-14 h-14 rounded-2xl bg-gray-100 border border-gray-200/80 flex items-center justify-center text-gray-800 font-extrabold text-lg tracking-wider shrink-0 shadow-2xs">
-              {userInitials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center space-x-2">
-                <span className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                  {displayName}
-                </span>
-                {isVip ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
-                    VIP Member
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200/60">
-                    Basic Member
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 truncate mt-0.5 font-normal">
-                {email}
-              </p>
-            </div>
-          </div>
-
-          {/* SECTION 2: General Preferences Panel */}
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1">
-              Preferences & Schedule
-            </h3>
+          {/* Quick Team / Shield / Stream Toggle Pills */}
+          <div className="flex items-center justify-center space-x-2">
             
-            <div className="bg-neutral-50/80 rounded-2xl border border-gray-200/70 p-4 space-y-4">
-              {/* Setting: Add Favorite Team (NBA & NFL) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-semibold text-gray-900">
-                      Add Favorite Team
-                    </div>
-                    <div className="text-[11px] text-gray-400 mt-0.5">
-                      Subtly highlights your team's game cards with their official colors
-                    </div>
-                  </div>
-
-                  {selectedTeam && !isSearchingTeam && (
-                    <button
-                      type="button"
-                      onClick={handleClearTeam}
-                      className="text-[11px] text-gray-400 hover:text-red-500 font-medium transition cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-
-                {/* Selected Team Pill or Search Field */}
-                {!isSearchingTeam ? (
-                  selectedTeam ? (
-                    <div
-                      onClick={() => {
-                        setIsSearchingTeam(true);
-                        setTimeout(() => searchInputRef.current?.focus(), 50);
-                      }}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-gray-200 hover:border-gray-300 transition cursor-pointer group shadow-2xs"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={selectedTeam.logo}
-                          alt={selectedTeam.displayName}
-                          className="w-7 h-7 object-contain"
-                        />
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-bold text-gray-900">
-                            {selectedTeam.displayName}
-                          </span>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
-                            {selectedTeam.league}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1.5 text-xs text-gray-400 group-hover:text-gray-700">
-                        <span className="text-[11px] font-medium">Change</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSearchingTeam(true);
-                        setTimeout(() => searchInputRef.current?.focus(), 50);
-                      }}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-gray-200 hover:border-gray-300 transition text-left cursor-pointer shadow-2xs"
-                    >
-                      <div className="flex items-center space-x-2 text-xs text-gray-400">
-                        <Search className="w-3.5 h-3.5 text-gray-400" />
-                        <span>Search teams (e.g. Lakers, Chiefs, Celtics, 49ers)...</span>
-                      </div>
-                      <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-                        Select
-                      </span>
-                    </button>
-                  )
-                ) : (
-                  /* Autocomplete Search Dropdown Container */
-                  <div className="relative">
-                    <div className="relative flex items-center">
-                      <Search className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        value={teamSearchQuery}
-                        onChange={(e) => setTeamSearchQuery(e.target.value)}
-                        placeholder="Type team name, city, or abbreviation..."
-                        className="w-full pl-9 pr-9 py-2 bg-white border border-black rounded-xl text-xs font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none shadow-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSearchingTeam(false);
-                          setTeamSearchQuery('');
-                        }}
-                        className="absolute right-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Results Dropdown Menu */}
-                    <div
-                      ref={dropdownRef}
-                      className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto z-20 py-1 divide-y divide-gray-50"
-                    >
-                      {searchResults.length > 0 ? (
-                        searchResults.map((t) => {
-                          const isSelected = selectedTeam?.id === t.id;
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => handleSelectTeam(t)}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-left transition cursor-pointer ${
-                                isSelected ? 'bg-gray-50 font-bold' : 'hover:bg-gray-50/80'
-                              }`}
-                            >
-                              <div className="flex items-center space-x-2.5">
-                                <img
-                                  src={t.logo}
-                                  alt={t.displayName}
-                                  className="w-5 h-5 object-contain"
-                                />
-                                <span className="text-xs text-gray-900">
-                                  {t.displayName}
-                                </span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-gray-100 text-gray-500">
-                                  {t.league}
-                                </span>
-                              </div>
-                              {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-gray-900" />
-                              )}
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <div className="px-3 py-4 text-center text-xs text-gray-400">
-                          No matching teams found
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
-              {/* Setting 3: Hide Final Scores (Spoiler Shield) */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Hide Final Scores (Spoiler Shield)
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Hides final scores on completed games until tapped
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleHideScores}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    hideScores ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Hide Final Scores"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      hideScores ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
+            {/* Quick Favorite Team Selector */}
+            <div className="relative">
+              <select
+                value={favoriteTeamId}
+                onChange={handleFavoriteTeamChange}
+                className="bg-black/75 hover:bg-black/90 text-white text-xs font-bold py-2 px-3.5 rounded-full border border-white/20 shadow-lg backdrop-blur-md transition cursor-pointer focus:outline-none"
+              >
+                <option value="" className="text-gray-900 bg-white">Team: None</option>
+                <optgroup label="🏀 NBA Basketball" className="text-gray-900 bg-white">
+                  {ALL_TEAMS.filter(t => t.league === 'NBA').map(team => (
+                    <option key={team.id} value={team.id} className="text-gray-900 bg-white">
+                      Team: {team.displayName}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="🏈 NFL Football" className="text-gray-900 bg-white">
+                  {ALL_TEAMS.filter(t => t.league === 'NFL').map(team => (
+                    <option key={team.id} value={team.id} className="text-gray-900 bg-white">
+                      Team: {team.displayName}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
             </div>
-          </div>
 
-          {/* SECTION 2: Playback Settings */}
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1">
-              Playback & Video Engine
-            </h3>
-
-            <div className="bg-neutral-50/80 rounded-2xl border border-gray-200/70 p-4 space-y-4">
-              {/* Ultra-Low Latency Mode */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Ultra-Low Latency Mode
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Minimizes broadcast delay behind live real-time action (1–2s buffer)
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleLatency}
-                  className={`w-11 h-6 rounded-full transition-colors relative shrink-0 cursor-pointer ${
-                    lowLatency ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}
-                  aria-label="Toggle Ultra-Low Latency Mode"
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                      lowLatency ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="border-t border-gray-200/60" />
-
-              {/* Clear Stream Cache */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    Clear Stream Cache
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    Flush temporary video buffer data and reset player state
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleClearCache}
-                  className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-xs font-semibold text-gray-700 transition cursor-pointer flex items-center space-x-1.5 shadow-2xs"
-                >
-                  {cacheCleared ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700 font-bold">Cleared</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-3.5 h-3.5 text-gray-400" />
-                      <span>Clear Cache</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-          {/* SECTION 5: Subtle Account Actions & Sign Out */}
-          <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-            <span className="text-[11px] text-gray-400">
-              Encrypted Session
-            </span>
-
+            {/* Quick Spoiler Toggle Pill */}
             <button
-              type="button"
+              onClick={handleToggleHideScores}
+              className={`text-xs font-bold py-2 px-3.5 rounded-full border shadow-lg backdrop-blur-md transition cursor-pointer active:scale-95 ${
+                hideScores
+                  ? 'bg-orange-600 text-white border-orange-500'
+                  : 'bg-black/75 hover:bg-black/90 text-white border-white/20'
+              }`}
+            >
+              {hideScores ? 'Scores: Hidden' : 'Scores: Visible'}
+            </button>
+
+            {/* Quality Mode Toggle Pill */}
+            <button
+              onClick={handleToggleQuality}
+              className="bg-black/75 hover:bg-black/90 text-white text-xs font-bold py-2 px-3.5 rounded-full border border-white/20 shadow-lg backdrop-blur-md transition cursor-pointer active:scale-95"
+            >
+              {streamQualityMode === 'highest' ? 'Quality: 1080p' : 'Quality: Auto'}
+            </button>
+
+          </div>
+
+          {/* Report a Problem Button with 'i' icon & Caption underneath */}
+          <div className="flex flex-col items-center justify-center pt-1">
+            <button
+              onClick={handleReport}
+              className="bg-black/80 hover:bg-black text-white text-xs font-bold py-2 px-5 rounded-full border border-white/20 shadow-lg backdrop-blur-md transition cursor-pointer flex items-center space-x-1.5 active:scale-95"
+            >
+              <span className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-black italic">
+                i
+              </span>
+              <span>{problemReported ? 'Problem Reported!' : 'Report a problem'}</span>
+            </button>
+            <span className="text-[11px] font-semibold text-white/90 drop-shadow-sm mt-1">
+              It'll be fixed ASAP
+            </span>
+          </div>
+
+          {/* Clean Sign Out link */}
+          <div className="flex justify-center pt-0.5">
+            <button
               onClick={() => {
                 onClose();
                 onLogout();
               }}
-              className="text-xs font-medium text-gray-500 hover:text-gray-900 transition underline underline-offset-4 cursor-pointer"
+              className="text-[11px] font-bold text-white/70 hover:text-white transition cursor-pointer"
             >
               Sign Out
             </button>
@@ -460,6 +320,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         </div>
 
       </div>
+
     </div>
   );
 };
+
+export default ProfileModal;
