@@ -38,7 +38,7 @@ export const ProfileBadgeLanyard: React.FC<ProfileBadgeLanyardProps> = ({
 
         <!-- Header Branding -->
         <text x="300" y="160" font-family="-apple-system, sans-serif" font-weight="900" font-size="34" fill="#ffffff" text-anchor="middle" letter-spacing="4">
-          COURTSIDE
+          BSS STREAMS
         </text>
         <text x="300" y="195" font-family="-apple-system, sans-serif" font-weight="700" font-size="20" fill="${isVip ? '#fbbf24' : '#ea580c'}" text-anchor="middle" letter-spacing="3">
           LIVE STREAM ACCESS

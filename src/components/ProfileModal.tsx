@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Copy, ChevronRight, AlertCircle, Shield, Sliders, Tv, LogOut } from 'lucide-react';
+import { X, Check, ChevronRight, AlertCircle, Sliders, LogOut, Send, CheckCircle2 } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 import Lanyard from './Lanyard';
 
@@ -30,12 +30,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     return (typeof window !== 'undefined' && localStorage.getItem('bss_stream_quality_mode')) || 'auto';
   });
 
-  const [problemReported, setProblemReported] = useState(false);
-  const [copiedIptv, setCopiedIptv] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
 
-  // Sub-dialogs when clicking into a setting on the back of the card
-  const [activeDialog, setActiveDialog] = useState<'team' | null>(null);
+  // Sub-dialogs: 'team' picker or 'report' problem dialog
+  const [activeDialog, setActiveDialog] = useState<'team' | 'report' | null>(null);
+
+  // Report a problem state
+  const [problemMessage, setProblemMessage] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [teamTab, setTeamTab] = useState<'ALL' | 'NBA' | 'NFL'>('NBA');
+  const [teamSearch, setTeamSearch] = useState('');
 
   // Keyboard shortcut: Escape to close
   useEffect(() => {
@@ -88,47 +93,64 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onSettingsChange?.();
   };
 
-  const handleReport = () => {
-    setProblemReported(true);
-    setTimeout(() => setProblemReported(false), 2500);
-  };
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!problemMessage.trim() || isSubmittingReport) return;
+    setIsSubmittingReport(true);
 
-  const handleCopyIptv = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bigsuustreams.com';
-    const cleanOrigin = origin.includes('localhost') ? 'https://bigsuustreams.com' : origin;
-    const url = `${cleanOrigin}/playlist.m3u`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).catch(() => {});
+    try {
+      await fetch('/api/report-problem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: problemMessage.trim(),
+          user: displayName,
+          email: currentUser?.email || 'anonymous',
+          url: window.location.href,
+          userAgent: navigator.userAgent
+        })
+      });
+    } catch {
+      // safe fallback
     }
-    setCopiedIptv(true);
-    setTimeout(() => setCopiedIptv(false), 2500);
+
+    setIsSubmittingReport(false);
+    setReportSubmitted(true);
+    setProblemMessage('');
+    setTimeout(() => {
+      setReportSubmitted(false);
+      setActiveDialog(null);
+    }, 2200);
   };
 
-  // Ultra-crisp SVG for the FRONT of the 3D card
+  // Ultra-crisp SVG for the FRONT of the 3D card (now says BSS STREAMS)
   const frontBadgeDataUrl = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
         <rect width="600" height="900" rx="46" fill="#ffffff" stroke="#e2e8f0" stroke-width="4"/>
         <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
 
-        <text x="300" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="30" fill="#0f172a" text-anchor="middle" letter-spacing="4">
-          COURTSIDE
+        <!-- Header Tag: BSS STREAMS -->
+        <text x="300" y="180" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="32" fill="#0f172a" text-anchor="middle" letter-spacing="3">
+          BSS STREAMS
         </text>
         <rect x="210" y="220" width="180" height="38" rx="19" fill="${isVip ? '#fef3c7' : '#f1f5f9'}" stroke="${isVip ? '#fbbf24' : '#e2e8f0'}" stroke-width="2"/>
         <text x="300" y="245" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="15" fill="${isVip ? '#b45309' : '#64748b'}" text-anchor="middle" letter-spacing="2">
           ${roleName}
         </text>
 
+        <!-- Premium Avatar Circle -->
         <circle cx="300" cy="440" r="105" fill="${isVip ? '#fffbeb' : '#f8fafc'}" stroke="${isVip ? '#d97706' : '#0f172a'}" stroke-width="4"/>
         <text x="300" y="475" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="82" fill="${isVip ? '#b45309' : '#0f172a'}" text-anchor="middle">
           ${initials}
         </text>
 
+        <!-- Username -->
         <text x="300" y="625" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
           ${displayName}
         </text>
 
+        <!-- Barcode / Strip -->
         <line x1="90" y1="720" x2="510" y2="720" stroke="#e2e8f0" stroke-width="2"/>
         <g fill="#94a3b8" opacity="0.6">
           <rect x="110" y="745" width="8" height="50"/>
@@ -155,6 +177,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     `;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
+
+  const filteredTeams = ALL_TEAMS.filter(t => {
+    if (teamTab !== 'ALL' && t.league !== teamTab) return false;
+    if (teamSearch.trim()) {
+      const q = teamSearch.toLowerCase();
+      return t.displayName.toLowerCase().includes(q) || t.abbreviation.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 select-none bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
@@ -202,11 +233,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 className="w-full h-full pointer-events-none"
               />
               
-              {/* Tap to Flip Hint Button directly over/below badge */}
+              {/* Tap to Flip Button directly over/below badge */}
               <div className="absolute bottom-4 inset-x-0 flex justify-center pointer-events-auto">
                 <button
                   onClick={() => setIsFlipped(true)}
-                  className="bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-xl border border-orange-400/50 backdrop-blur-md transition active:scale-95 flex items-center space-x-2"
+                  className="bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-xl border border-orange-400/50 backdrop-blur-md transition active:scale-95 flex items-center space-x-2 cursor-pointer"
                 >
                   <Sliders className="w-4 h-4" />
                   <span>Card Settings ⚙️</span>
@@ -214,10 +245,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             </div>
           ) : (
-            /* BACK: Interactive HTML Settings Card (matching lanyard card proportions) */
-            <div className="relative w-[300px] sm:w-[320px] bg-white rounded-3xl p-5 shadow-2xl border-4 border-orange-500 flex flex-col justify-between max-h-[92%] overflow-y-auto animate-in zoom-in-95 duration-200">
+            /* BACK: Interactive HTML Settings Card */
+            <div className="relative w-[300px] sm:w-[325px] bg-white rounded-3xl p-5 shadow-2xl border-4 border-orange-500 flex flex-col justify-between max-h-[92%] overflow-y-auto animate-in zoom-in-95 duration-200">
               
-              {/* Lanyard Top Ring Slot (decorative) */}
+              {/* Lanyard Top Ring Slot */}
               <div className="w-full flex items-center justify-between pb-2 border-b border-gray-100">
                 <button
                   onClick={() => setIsFlipped(false)}
@@ -232,35 +263,53 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {/* Editable Setting Rows inside the Card */}
               <div className="space-y-3 pt-3">
                 
-                {/* 1. Your Team */}
+                {/* 1. Your Team (With Logo Display) */}
                 <div 
                   onClick={() => setActiveDialog('team')}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98]"
+                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98]"
                 >
                   <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
                     <span>Your Team</span>
-                    <span className="text-orange-600 text-[11px] font-bold">Edit ✎</span>
+                    <span className="text-orange-600 text-[11px] font-bold">Change ✎</span>
                   </div>
-                  <div className="text-sm font-black text-slate-900 mt-0.5 truncate flex items-center justify-between">
-                    <span>{selectedTeamName}</span>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      {selectedTeamObj ? (
+                        <div className="w-9 h-9 rounded-xl bg-white p-1 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
+                          <img src={selectedTeamObj.logo} alt={selectedTeamObj.name} className="w-7 h-7 object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-9 h-9 rounded-xl bg-slate-200/80 flex items-center justify-center text-slate-400 text-xs font-black shrink-0">
+                          -
+                        </div>
+                      )}
+                      <div className="truncate">
+                        <div className="text-xs font-black text-slate-900 truncate">
+                          {selectedTeamName}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-semibold">
+                          {selectedTeamObj ? `${selectedTeamObj.league} • Tap to switch` : 'Tap to select team'}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                   </div>
                 </div>
 
                 {/* 2. Show or Hide Final Scores */}
                 <div 
                   onClick={handleToggleHideScores}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
+                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
                 >
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
                       Show or Hide Final Scores
                     </div>
-                    <div className="text-sm font-black text-slate-900 mt-0.5">
+                    <div className="text-xs font-black text-slate-900 mt-0.5">
                       {hideScores ? 'Scores Hidden (Spoiler Shield)' : 'Show Live Scores'}
                     </div>
                   </div>
-                  <div className={`w-11 h-6 rounded-full p-1 transition-colors ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}>
+                  <div className={`w-11 h-6 rounded-full p-1 transition-colors shrink-0 ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}>
                     <div className={`w-4 h-4 rounded-full bg-white transition-transform ${hideScores ? 'translate-x-5' : 'translate-x-0'}`} />
                   </div>
                 </div>
@@ -268,55 +317,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 {/* 3. Playback Stream */}
                 <div 
                   onClick={handleToggleQuality}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
+                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
                 >
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
                       Playback Stream
                     </div>
-                    <div className="text-sm font-black text-slate-900 mt-0.5">
+                    <div className="text-xs font-black text-slate-900 mt-0.5">
                       {streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)'}
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-orange-600">Toggle</span>
+                  <span className="text-xs font-bold text-orange-600 shrink-0">Toggle</span>
                 </div>
 
-                {/* 4. Cyberdash / IPTV Playlist */}
+                {/* 4. Report a Problem (Click opens interactive textbox modal) */}
                 <div 
-                  onClick={handleCopyIptv}
-                  className="bg-orange-50 hover:bg-orange-100/80 rounded-xl p-3 border border-orange-200 transition cursor-pointer active:scale-[0.98]"
+                  onClick={() => setActiveDialog('report')}
+                  className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
                 >
-                  <div className="text-[10px] font-black uppercase tracking-wider text-orange-700 flex items-center justify-between">
-                    <span className="flex items-center space-x-1">
-                      <Tv className="w-3 h-3" />
-                      <span>Cyberdash / IPTV</span>
-                    </span>
-                    <span className="text-xs font-bold text-orange-600">
-                      {copiedIptv ? '✓ Copied!' : 'Copy'}
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono font-bold text-slate-800 mt-1 truncate">
-                    /playlist.m3u
-                  </div>
-                </div>
-
-                {/* 5. Report a Problem */}
-                <div 
-                  onClick={handleReport}
-                  className="bg-slate-50 hover:bg-slate-100 rounded-xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-orange-600" />
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                      <AlertCircle className="w-4 h-4" />
+                    </div>
                     <div>
                       <div className="text-xs font-black text-slate-900">
-                        {problemReported ? 'Problem Reported!' : 'Report a problem'}
+                        Report a problem
                       </div>
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        It'll be fixed ASAP
+                      <div className="text-[10px] text-slate-400 font-medium">
+                        Send issue details to admin
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                 </div>
 
               </div>
@@ -325,7 +357,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-3">
                 <button
                   onClick={() => setIsFlipped(false)}
-                  className="text-xs font-bold text-slate-500 hover:text-slate-800"
+                  className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
                 >
                   Done
                 </button>
@@ -348,64 +380,202 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
       </div>
 
-      {/* Pop-up Dialog to Select Your Team when clicked inside the card */}
+      {/* Pop-up Dialog: Visual Grid of Team Logos with Smooth Scroll */}
       {activeDialog === 'team' && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white rounded-2xl p-5 max-w-sm w-full max-h-[80vh] flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-5 max-w-sm sm:max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150">
+            
+            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Select Your Team</h3>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">Choose Your Favorite Team</h3>
+                <p className="text-[11px] text-slate-400 font-semibold">Select your team logo</p>
+              </div>
               <button 
                 onClick={() => setActiveDialog(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 cursor-pointer transition active:scale-95"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 divide-y divide-slate-100 my-2">
-              <button
-                onClick={() => handleSelectTeam('')}
-                className="w-full text-left py-2.5 px-3 rounded-lg hover:bg-slate-100 text-xs font-bold text-slate-700 flex items-center justify-between"
-              >
-                <span>None (No favorite)</span>
-                {!favoriteTeamId && <Check className="w-4 h-4 text-orange-600" />}
-              </button>
-
-              <div className="py-2 text-[10px] font-black uppercase tracking-wider text-slate-400 px-3">
-                🏀 NBA Teams
-              </div>
-              {ALL_TEAMS.filter(t => t.league === 'NBA').map(team => (
+            {/* League Tabs & Search Bar */}
+            <div className="pt-3 pb-2 space-y-2">
+              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
                 <button
-                  key={team.id}
-                  onClick={() => handleSelectTeam(team.id)}
-                  className="w-full text-left py-2 px-3 rounded-lg hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-between"
+                  onClick={() => setTeamTab('NBA')}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-lg transition cursor-pointer ${
+                    teamTab === 'NBA' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
-                  <span>{team.displayName}</span>
-                  {favoriteTeamId === team.id && <Check className="w-4 h-4 text-orange-600" />}
+                  🏀 NBA
                 </button>
-              ))}
-
-              <div className="py-2 text-[10px] font-black uppercase tracking-wider text-slate-400 px-3">
-                🏈 NFL Teams
-              </div>
-              {ALL_TEAMS.filter(t => t.league === 'NFL').map(team => (
                 <button
-                  key={team.id}
-                  onClick={() => handleSelectTeam(team.id)}
-                  className="w-full text-left py-2 px-3 rounded-lg hover:bg-slate-100 text-xs font-bold text-slate-800 flex items-center justify-between"
+                  onClick={() => setTeamTab('NFL')}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-lg transition cursor-pointer ${
+                    teamTab === 'NFL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
-                  <span>{team.displayName}</span>
-                  {favoriteTeamId === team.id && <Check className="w-4 h-4 text-orange-600" />}
+                  🏈 NFL
                 </button>
-              ))}
+                <button
+                  onClick={() => setTeamTab('ALL')}
+                  className={`flex-1 py-1.5 text-xs font-black rounded-lg transition cursor-pointer ${
+                    teamTab === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Teams
+                </button>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Search team name or city..."
+                value={teamSearch}
+                onChange={e => setTeamSearch(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"
+              />
             </div>
 
-            <button
-              onClick={() => setActiveDialog(null)}
-              className="w-full py-2 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl transition"
-            >
-              Close
-            </button>
+            {/* Visual Grid with Team Logos */}
+            <div className="overflow-y-auto flex-1 my-1 pr-1 grid grid-cols-3 sm:grid-cols-4 gap-2.5 py-2">
+              
+              {/* No Favorite / Reset Option */}
+              <button
+                onClick={() => handleSelectTeam('')}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border transition cursor-pointer active:scale-95 text-center ${
+                  !favoriteTeamId
+                    ? 'border-orange-500 bg-orange-50/70 shadow-xs'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                }`}
+              >
+                <div className="w-11 h-11 rounded-full bg-slate-200/80 flex items-center justify-center text-slate-400 text-xs font-black mb-1">
+                  ✕
+                </div>
+                <span className="text-[11px] font-black text-slate-800 line-clamp-1">None</span>
+              </button>
+
+              {filteredTeams.map(team => {
+                const isSelected = favoriteTeamId === team.id;
+                return (
+                  <button
+                    key={team.id}
+                    onClick={() => handleSelectTeam(team.id)}
+                    className={`group relative flex flex-col items-center justify-center p-2.5 rounded-2xl border transition cursor-pointer active:scale-95 text-center ${
+                      isSelected
+                        ? 'border-orange-500 bg-orange-50 shadow-md ring-2 ring-orange-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 shadow-xs'
+                    }`}
+                  >
+                    {isSelected && (
+                      <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-xs">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                    <div className="w-12 h-12 flex items-center justify-center p-1 mb-1 transition-transform group-hover:scale-110 duration-200">
+                      <img
+                        src={team.logo}
+                        alt={team.displayName}
+                        className="max-h-full max-w-full object-contain filter drop-shadow-xs"
+                        loading="lazy"
+                      />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-900 leading-tight line-clamp-1">
+                      {team.name}
+                    </span>
+                    <span className="text-[9px] font-semibold text-slate-400 uppercase">
+                      {team.abbreviation}
+                    </span>
+                  </button>
+                );
+              })}
+
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setActiveDialog(null)}
+                className="w-full py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up Dialog: Report a Problem with Text Box */}
+      {activeDialog === 'report' && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Report a problem</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold">It'll be fixed ASAP</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveDialog(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {reportSubmitted ? (
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-2 animate-in zoom-in-95">
+                <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+                <h4 className="text-sm font-black text-slate-900">Problem Reported!</h4>
+                <p className="text-xs text-slate-500 max-w-[220px]">
+                  Thank you for letting us know. We are on it and it will be fixed ASAP.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReport} className="pt-3 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    What is the issue?
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={problemMessage}
+                    onChange={e => setProblemMessage(e.target.value)}
+                    placeholder="Describe the issue (e.g. stream buffering, audio lag, broken link)..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500 resize-none font-medium"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDialog(null)}
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black rounded-xl transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReport || !problemMessage.trim()}
+                    className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-lg transition cursor-pointer flex items-center justify-center space-x-1.5"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isSubmittingReport ? 'Sending...' : 'Send Report'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
           </div>
         </div>
       )}
