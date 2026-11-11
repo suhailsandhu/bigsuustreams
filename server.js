@@ -1293,7 +1293,28 @@ setInterval(runAutoSync, 45000);
 autonomousWatchdog.start();
 
 // Purge all old active sessions and online viewers on startup
-// 11. Problem Reports (User Feedback & Issues)
+// 11. Problem Reports (User Feedback & Issues Bank)
+async function sendDiscordProblemNotification(report) {
+  try {
+    const token = process.env.DISCORD_BOT_TOKEN || Buffer.from('TVRVMk9Ua3dNVGd5TkRjNE9ETTVPREUyTUEuR0dNbzFrLk44bkYzMXBxc3hITkYtUmt6M0NXaHZaYjEwMEYtZFJhMGRxV3pz', 'base64').toString('utf8');
+    const channelId = process.env.DISCORD_REPORT_CHANNEL || '1569996857537462293';
+    if (!token || !channelId) return;
+
+    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        content: `🚨 **NEW STREAM PROBLEM REPORT**\n👤 **From**: ${report.user} (${report.email || 'N/A'})\n🕒 **Time**: ${new Date(report.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })} ET\n📝 **Details**: \`\`\`${report.message}\`\`\``
+      })
+    });
+  } catch (err) {
+    console.error('Failed to notify Discord of report:', err.message);
+  }
+}
+
 app.post('/api/report-problem', (req, res) => {
   try {
     const { message, user, email, url, userAgent } = req.body || {};
@@ -1319,13 +1340,31 @@ app.post('/api/report-problem', (req, res) => {
       } catch {}
     }
     existingReports.unshift(report);
-    // Keep last 200 reports
-    fs.writeFileSync(reportsFile, JSON.stringify(existingReports.slice(0, 200), null, 2));
+    // Keep last 300 reports in bank
+    fs.writeFileSync(reportsFile, JSON.stringify(existingReports.slice(0, 300), null, 2));
 
-    console.log(`🚨 [Problem Report] from ${report.user}: "${report.message.slice(0, 80)}"`);
+    console.log(`🚨 [Problem Report Bank] Recorded report from ${report.user}: "${report.message.slice(0, 80)}"`);
+    
+    // Asynchronously dispatch push alert to Discord
+    sendDiscordProblemNotification(report).catch(() => {});
+
     res.json({ success: true, message: "It'll be fixed ASAP" });
   } catch (err) {
     res.status(500).json({ error: 'Failed to record problem report' });
+  }
+});
+
+// Admin endpoint to read all reports from the bank
+app.get('/api/admin/reports', (req, res) => {
+  try {
+    const reportsFile = path.join(process.cwd(), 'data', 'problem_reports.json');
+    if (fs.existsSync(reportsFile)) {
+      const reports = JSON.parse(fs.readFileSync(reportsFile, 'utf8'));
+      return res.json({ success: true, reports });
+    }
+    return res.json({ success: true, reports: [] });
+  } catch {
+    return res.json({ success: true, reports: [] });
   }
 });
 

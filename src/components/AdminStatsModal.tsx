@@ -3,7 +3,7 @@ import {
   X, RefreshCw, Tv, UserCheck,
   Search, Download, Globe, Activity,
   Shield, Smartphone, LayoutGrid, List, Radio,
-  ArrowLeft, Check, Monitor, Laptop
+  ArrowLeft, Check, Monitor, Laptop, AlertCircle
 } from 'lucide-react';
 import { setUmamiConfig, sendUmamiTestEvent } from '../utils/analyticsClient';
 import { AnalyticsChart } from './analytics/AnalyticsChart';
@@ -147,8 +147,9 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
   const [stats, setStats] = useState<StatsData | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Navigation & Search State (Only Online Now and Members tabs per user instruction)
-  const [activeTab, setActiveTab] = useState<'live' | 'users'>('live');
+  // Navigation & Search State (Online Now, Members, Reports Bank)
+  const [activeTab, setActiveTab] = useState<'live' | 'users' | 'reports'>('live');
+  const [reports, setReports] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
   const [chartMetric, setChartMetric] = useState<'views' | 'visitors'>('views');
@@ -261,6 +262,10 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
         const hData = await healthRes.json();
         setHealthData(hData);
       }
+
+      fetch('/api/admin/reports').then(r => r.json()).then(d => {
+        if (d?.reports) setReports(d.reports);
+      }).catch(() => {});
     } catch {
       // silent
     } finally {
@@ -682,6 +687,19 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   {onlineMembersCount > 0 && (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('reports');
+                    setSelectedUser(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center space-x-1.5 ${
+                    activeTab === 'reports' ? 'bg-white text-neutral-900 font-semibold shadow-2xs border border-neutral-200/60' : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Reports ({reports.length})</span>
                 </button>
               </div>
 
@@ -1549,6 +1567,73 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                   </div>
                 </div>
 
+              </div>
+            )}
+
+            {/* TAB: PROBLEM REPORTS BANK */}
+            {activeTab === 'reports' && (
+              <div className="p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-black text-neutral-900 tracking-tight flex items-center space-x-2">
+                      <AlertCircle className="w-4 h-4 text-orange-600" />
+                      <span>Problem Reports Bank ({reports.length})</span>
+                    </h3>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      Visitor and member feedback reported directly from streams or header (alerts your Discord in real-time)
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      fetch('/api/admin/reports').then(r => r.json()).then(d => {
+                        if (d?.reports) setReports(d.reports);
+                      });
+                    }}
+                    className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-xs font-bold text-neutral-700 hover:bg-neutral-50 flex items-center space-x-1.5 shadow-2xs transition active:scale-95 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refresh Reports</span>
+                  </button>
+                </div>
+
+                {reports.length === 0 ? (
+                  <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center shadow-2xs">
+                    <Check className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                    <h4 className="text-sm font-black text-neutral-900 mb-1">No Problems Reported</h4>
+                    <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                      All streams and features are running smoothly. Any user issues submitted will appear here and alert your Discord.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {reports.map((rpt: any) => (
+                      <div key={rpt.id} className="bg-white border border-neutral-200/90 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition">
+                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-neutral-100">
+                          <div>
+                            <div className="font-bold text-xs text-neutral-900 flex items-center space-x-2">
+                              <span>{rpt.user}</span>
+                              <span className="text-[10px] font-semibold text-neutral-400">({rpt.email || 'N/A'})</span>
+                            </div>
+                            <div className="text-[10px] text-neutral-400 mt-0.5">
+                              {new Date(rpt.timestamp).toLocaleString()}
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-50 text-orange-700 border border-orange-200 shrink-0">
+                            Problem Report
+                          </span>
+                        </div>
+                        <div className="mt-2.5 text-xs text-neutral-800 bg-neutral-50 p-3 rounded-xl font-medium leading-relaxed">
+                          "{rpt.message}"
+                        </div>
+                        {rpt.url && (
+                          <div className="mt-2 text-[10px] text-neutral-400 truncate">
+                            URL: {rpt.url}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

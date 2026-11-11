@@ -4230,6 +4230,28 @@ async function runAutoSync() {
 runAutoSync();
 setInterval(runAutoSync, 45e3);
 autonomousWatchdog.start();
+async function sendDiscordProblemNotification(report) {
+  try {
+    const token = process.env.DISCORD_BOT_TOKEN || Buffer.from("TVRVMk9Ua3dNVGd5TkRjNE9ETTVPREUyTUEuR0dNbzFrLk44bkYzMXBxc3hITkYtUmt6M0NXaHZaYjEwMEYtZFJhMGRxV3pz", "base64").toString("utf8");
+    const channelId = process.env.DISCORD_REPORT_CHANNEL || "1569996857537462293";
+    if (!token || !channelId) return;
+    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bot ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        content: `\u{1F6A8} **NEW STREAM PROBLEM REPORT**
+\u{1F464} **From**: ${report.user} (${report.email || "N/A"})
+\u{1F552} **Time**: ${new Date(report.timestamp).toLocaleString("en-US", { timeZone: "America/New_York" })} ET
+\u{1F4DD} **Details**: \`\`\`${report.message}\`\`\``
+      })
+    });
+  } catch (err) {
+    console.error("Failed to notify Discord of report:", err.message);
+  }
+}
 app.post("/api/report-problem", (req, res) => {
   try {
     const { message, user, email, url, userAgent } = req.body || {};
@@ -4255,11 +4277,25 @@ app.post("/api/report-problem", (req, res) => {
       }
     }
     existingReports.unshift(report);
-    fs3.writeFileSync(reportsFile, JSON.stringify(existingReports.slice(0, 200), null, 2));
-    console.log(`\u{1F6A8} [Problem Report] from ${report.user}: "${report.message.slice(0, 80)}"`);
+    fs3.writeFileSync(reportsFile, JSON.stringify(existingReports.slice(0, 300), null, 2));
+    console.log(`\u{1F6A8} [Problem Report Bank] Recorded report from ${report.user}: "${report.message.slice(0, 80)}"`);
+    sendDiscordProblemNotification(report).catch(() => {
+    });
     res.json({ success: true, message: "It'll be fixed ASAP" });
   } catch (err) {
     res.status(500).json({ error: "Failed to record problem report" });
+  }
+});
+app.get("/api/admin/reports", (req, res) => {
+  try {
+    const reportsFile = path3.join(process.cwd(), "data", "problem_reports.json");
+    if (fs3.existsSync(reportsFile)) {
+      const reports = JSON.parse(fs3.readFileSync(reportsFile, "utf8"));
+      return res.json({ success: true, reports });
+    }
+    return res.json({ success: true, reports: [] });
+  } catch {
+    return res.json({ success: true, reports: [] });
   }
 });
 console.log("\u26A1 [Auth] Preserving active user sessions across server updates.");

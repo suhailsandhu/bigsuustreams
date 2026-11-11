@@ -22,8 +22,14 @@ import { isSmartTv } from './utils/tvDetector.ts';
 import { AlertCircle, RefreshCw, Trophy, Tv } from 'lucide-react';
 
 export const App: React.FC = () => {
-  // Current sport state ('nba' | 'nfl')
-  const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>('nba');
+  // Current sport state ('nba' | 'nfl') initialized from user's saved default sport setting
+  const [currentSport, setCurrentSport] = useState<'nba' | 'nfl'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bss_default_sport');
+      if (saved === 'nba' || saved === 'nfl') return saved;
+    }
+    return 'nba';
+  });
 
   // iOS-style Account Authentication state (auto-kick all 7777 VIP passes immediately)
   // On Smart TVs: Auto-authenticate as TV Guest so the TV viewer directly sees live games without needing mouse/keyboard sign-in
@@ -109,8 +115,6 @@ export const App: React.FC = () => {
         localStorage.removeItem('bigsuu_admin_authorized');
         localStorage.removeItem('bigsuu_admin_pin');
         localStorage.removeItem('bigsuu_admin_bypass');
-        localStorage.removeItem('bss_theme');
-        document.documentElement.classList.remove('dark');
         localStorage.setItem('bss_kick_epoch_v4', '7865_purged');
       }
     } catch {}
@@ -125,8 +129,20 @@ export const App: React.FC = () => {
     ) {
       handleLogout();
     }
-    // Always enforce pure light mode
-    document.documentElement.classList.remove('dark');
+    // Initialize user's preferred theme mode (Light / Dark / System)
+    try {
+      const theme = localStorage.getItem('bss_theme_mode') || 'light';
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        document.body.style.backgroundColor = '#0b0f19';
+        document.body.style.color = '#f8fafc';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.color = '#0f172a';
+      }
+    } catch {}
   }, []);
 
   // Self-healing account sync: ensures registered member accounts are persisted permanently on server
@@ -162,6 +178,34 @@ export const App: React.FC = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [settingsTick, setSettingsTick] = useState(0);
+
+  // Dynamic Theme & Density reactivity on settings change
+  useEffect(() => {
+    try {
+      const theme = localStorage.getItem('bss_theme_mode') || 'light';
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        document.body.style.backgroundColor = '#0b0f19';
+        document.body.style.color = '#f8fafc';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.color = '#0f172a';
+      }
+
+      // Sync default sport if changed
+      const savedSport = localStorage.getItem('bss_default_sport');
+      if (savedSport === 'nba' || savedSport === 'nfl') {
+        setCurrentSport(savedSport as 'nba' | 'nfl');
+      }
+    } catch {}
+  }, [settingsTick]);
+
+  const layoutDensity = useMemo(() => {
+    if (typeof window === 'undefined') return 'comfortable';
+    return localStorage.getItem('bss_layout_density') || 'comfortable';
+  }, [settingsTick]);
 
   // Website is Updating / Maintenance State
   const [isSiteUpdating, setIsSiteUpdating] = useState<boolean>(() => {
@@ -531,6 +575,49 @@ export const App: React.FC = () => {
     loadScoreboardData(newDateStr);
   };
 
+  // Step forward or backward in dates (for iPhone swipe gesture)
+  const handleStepDate = useCallback((deltaDays: number) => {
+    if (!selectedDate || selectedDate.length !== 8) return;
+    const y = parseInt(selectedDate.slice(0, 4), 10);
+    const m = parseInt(selectedDate.slice(4, 6), 10) - 1;
+    const d = parseInt(selectedDate.slice(6, 8), 10);
+    const dt = new Date(y, m, d);
+    dt.setDate(dt.getDate() + deltaDays);
+    const nextY = dt.getFullYear();
+    const nextM = String(dt.getMonth() + 1).padStart(2, '0');
+    const nextD = String(dt.getDate()).padStart(2, '0');
+    const newDateStr = `${nextY}${nextM}${nextD}`;
+    handleSelectDate(newDateStr);
+  }, [selectedDate, handleSelectDate]);
+
+  // Touch Swipe Gesture Handlers on Games Section for iPhone
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleGamesTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleGamesTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Detect horizontal swipe if deltaX > 40px and predominantly horizontal (avoids interfering with vertical scroll)
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      if (deltaX < 0) {
+        // Swiped Left (finger dragged left) -> Advance to Next Day
+        handleStepDate(1);
+      } else {
+        // Swiped Right (finger dragged right) -> Go back to Previous Day
+        handleStepDate(-1);
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   const handleWatchGame = async (game: ScoreboardGame) => {
     setSelectedGame(game);
     const isNflGame = game.league === 'NFL' || (game as any).sport === 'nfl';
@@ -758,6 +845,8 @@ export const App: React.FC = () => {
           />
         ) : (
           <div 
+            onTouchStart={handleGamesTouchStart}
+            onTouchEnd={handleGamesTouchEnd}
             style={{ maxWidth: isTv ? '896px' : '1400px', margin: '0 auto', width: '100%' }}
             className={`mx-auto space-y-2 sm:space-y-2.5 ${isTv ? 'max-w-4xl' : 'max-w-7xl'}`}
           >
@@ -807,7 +896,13 @@ export const App: React.FC = () => {
 
             {/* Games List (Scoreboard & Live Feeds & Highlights) */}
             {!isLoading && !error && (
-              <div className={isTv ? "space-y-2 sm:space-y-2.5" : "grid grid-cols-1 md:grid-cols-2 gap-3"}>
+              <div className={
+                isTv 
+                  ? "space-y-2 sm:space-y-2.5" 
+                  : layoutDensity === 'compact'
+                    ? "grid grid-cols-1 md:grid-cols-2 gap-2"
+                    : "grid grid-cols-1 md:grid-cols-2 gap-3"
+              }>
                 {allGames.length > 0 ? (
                   allGames.map((game, idx) => (
                     <GameRow
