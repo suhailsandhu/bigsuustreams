@@ -8,6 +8,8 @@ import {
 import { setUmamiConfig, sendUmamiTestEvent } from '../utils/analyticsClient';
 import { AnalyticsChart } from './analytics/AnalyticsChart';
 import type { ChartDataPoint } from './analytics/AnalyticsChart';
+import { CountUp } from './ui/CountUp';
+import { SpotlightCard } from './ui/SpotlightCard';
 
 interface AdminStatsModalProps {
   isOpen: boolean;
@@ -712,71 +714,86 @@ export const AdminStatsModal: React.FC<AdminStatsModalProps> = ({ isOpen, onClos
                 {/* 1. PRIMARY METRICS ROW (5 Compact Umami-Style KPI Cards) */}
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   {/* Metric 1: Unique Visitors */}
-                  <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+                  <SpotlightCard 
+                    spotlightColor="rgba(0, 0, 0, 0.05)"
+                    className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs"
+                  >
                     <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                       Unique Visitors
                     </div>
                     <div className="text-2xl font-bold text-neutral-900 tracking-tight tabular-nums mt-1">
-                      {stats?.totalVisitorsToday || 1}
+                      <CountUp to={stats?.totalVisitorsToday || 1} duration={1.2} />
                     </div>
                     <div className="text-[11px] text-neutral-500 font-medium mt-0.5">
                       Unique client devices today
                     </div>
-                  </div>
+                  </SpotlightCard>
 
                   {/* Metric 2: Visits / Sessions */}
-                  <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+                  <SpotlightCard 
+                    spotlightColor="rgba(0, 0, 0, 0.05)"
+                    className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs"
+                  >
                     <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                       Total Sessions
                     </div>
                     <div className="text-2xl font-bold text-neutral-900 tracking-tight tabular-nums mt-1">
-                      {stats?.retention?.totalDevices || stats?.totalVisitorsToday || 1}
+                      <CountUp to={stats?.retention?.totalDevices || stats?.totalVisitorsToday || 1} duration={1.2} />
                     </div>
                     <div className="text-[11px] text-neutral-500 font-medium mt-0.5">
                       {stats?.retention?.retentionRate || 58}% returning rate
                     </div>
-                  </div>
+                  </SpotlightCard>
 
                   {/* Metric 3: Pageviews */}
-                  <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+                  <SpotlightCard 
+                    spotlightColor="rgba(0, 0, 0, 0.05)"
+                    className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs"
+                  >
                     <div className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                       Pageviews
                     </div>
                     <div className="text-2xl font-bold text-neutral-900 tracking-tight tabular-nums mt-1">
-                      {stats?.totalPageViewsToday || 1}
+                      <CountUp to={stats?.totalPageViewsToday || 1} duration={1.4} />
                     </div>
                     <div className="text-[11px] text-neutral-500 font-medium mt-0.5">
                       {((stats?.totalPageViewsToday || 1) / Math.max(stats?.totalVisitorsToday || 1, 1)).toFixed(1)} views / visitor
                     </div>
-                  </div>
+                  </SpotlightCard>
 
                   {/* Metric 4: Currently Active Visitors */}
-                  <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs">
+                  <SpotlightCard 
+                    spotlightColor="rgba(16, 185, 129, 0.1)"
+                    className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs"
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Active Now</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     </div>
                     <div className="text-2xl font-bold text-neutral-900 tracking-tight tabular-nums mt-1">
-                      {stats?.liveVisitors || 1}
+                      <CountUp to={stats?.liveVisitors || 1} duration={1.2} />
                     </div>
                     <div className="text-[11px] font-medium text-emerald-600 mt-0.5">
                       Concurrent site visitors
                     </div>
-                  </div>
+                  </SpotlightCard>
 
                   {/* Metric 5: Active Stream Watchers */}
-                  <div className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs col-span-2 lg:col-span-1">
+                  <SpotlightCard 
+                    spotlightColor="rgba(16, 185, 129, 0.1)"
+                    className="bg-white border border-neutral-200/90 rounded-xl p-3.5 sm:p-4 shadow-2xs col-span-2 lg:col-span-1"
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">Stream Watchers</span>
                       <Tv className="w-3.5 h-3.5 text-neutral-400" />
                     </div>
                     <div className="text-2xl font-bold text-neutral-900 tracking-tight tabular-nums mt-1">
-                      {stats?.liveWatchers || 0}
+                      <CountUp to={stats?.liveWatchers || 0} duration={1.2} />
                     </div>
                     <div className="text-[11px] font-medium text-emerald-600 mt-0.5">
                       Active video streams
                     </div>
-                  </div>
+                  </SpotlightCard>
                 </div>
 
                 {/* 2. TIME-SERIES VISUALIZATION (Umami SVG Bar & Area Chart) */}

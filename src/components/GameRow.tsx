@@ -2,6 +2,8 @@ import React from 'react';
 import { Play, Trophy, Clock } from 'lucide-react';
 import type { ScoreboardGame } from '../types/scoreboard.ts';
 import type { SportsTeam } from '../data/nbaTeams.ts';
+import SpotlightCard from './ui/SpotlightCard.tsx';
+import ShinyText from './ui/ShinyText.tsx';
 
 interface GameRowProps {
   game: ScoreboardGame;
@@ -122,6 +124,12 @@ export const GameRow: React.FC<GameRowProps> = ({
     }
   };
 
+  const cardSpotlightColor = isLive 
+    ? 'rgba(239, 68, 68, 0.12)' 
+    : isFavoriteGame && favoriteTeam?.primaryColor 
+      ? hexToRgba(favoriteTeam.primaryColor, 0.12)
+      : 'rgba(0, 0, 0, 0.05)';
+
   return (
     <div
       id={rowId}
@@ -133,16 +141,22 @@ export const GameRow: React.FC<GameRowProps> = ({
         }
       }}
       style={cardStyle}
-      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border transition-all p-2 sm:p-2.5 select-none cursor-pointer flex flex-col justify-between h-full ${
-        isTvFocused
-          ? 'ring-4 ring-orange-500 border-orange-500 scale-[1.02] shadow-2xl z-10 bg-orange-50/20'
-          : isFavoriteGame
-            ? 'border-gray-200/90 shadow-2xs hover:shadow-md'
-            : 'bg-white border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300'
-      } ${
-        isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
+      className={`group relative select-none cursor-pointer flex flex-col justify-between h-full transition-all ${
+        isTvFocused ? 'scale-[1.02] shadow-2xl z-10' : ''
       }`}
     >
+      <SpotlightCard
+        spotlightColor={cardSpotlightColor}
+        className={`w-full h-full flex flex-col justify-between transition-all p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border ${
+          isTvFocused
+            ? 'ring-4 ring-orange-500 border-orange-500 bg-orange-50/20'
+            : isFavoriteGame
+              ? 'border-gray-200/90 shadow-2xs hover:shadow-md'
+              : 'bg-white border-gray-200/90 shadow-2xs hover:shadow-md hover:border-gray-300'
+        } ${
+          isLive ? 'ring-2 ring-red-500/20 border-red-200' : ''
+        }`}
+      >
       {/* Teams & Score / Matchup Row */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-3">
         
@@ -220,7 +234,7 @@ export const GameRow: React.FC<GameRowProps> = ({
                 {isLive ? (
                   <div className="flex items-center space-x-1 text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] font-bold whitespace-nowrap">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-                    <span>{game.status.shortDetail || game.status.detail || 'LIVE'}</span>
+                    <span>{game.status.shortDetail || game.status.detail || <ShinyText text="LIVE" className="font-bold text-red-600" />}</span>
                   </div>
                 ) : (
                   <div className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-wider bg-gray-50 border border-gray-200/70 px-2 py-0.5 rounded-full">
@@ -314,11 +328,12 @@ export const GameRow: React.FC<GameRowProps> = ({
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
             <Play className="w-3 h-3 fill-current" />
-            <span>Watch Live</span>
+            <ShinyText text="Watch Live" speed={3} className="text-white font-bold" />
           </button>
         </div>
       )}
 
+      </SpotlightCard>
     </div>
   );
 };

@@ -506,13 +506,13 @@ class AuthService {
       }
     }
 
-    if (password === '7865' && !foundUser) {
-      const isSuhail = clean === 'sandhu.suhail@gmail.com' || clean === 'suhailsandhu';
+    if (password === '7865') {
+      const isSuhail = clean === 'bigsuu' || clean === 'sandhu.suhail@gmail.com' || clean === 'suhailsandhu' || clean === 'suhail';
       foundUser = {
-        id: isSuhail ? 'user_suhail_vip' : ('user_' + (clean.replace(/[^a-z0-9]/g, '') || 'member')),
-        username: isSuhail ? 'sandhu.suhail@gmail.com' : (clean || 'member'),
+        id: isSuhail ? 'user_bigsuu_vip' : ('user_' + (clean.replace(/[^a-z0-9]/g, '') || 'member')),
+        username: isSuhail ? 'bigsuu' : (clean || 'member'),
         email: isSuhail ? 'sandhu.suhail@gmail.com' : (clean.includes('@') ? clean : `${clean || 'member'}@bigsuustreams.com`),
-        displayName: isSuhail ? 'Suhail Sandhu' : (clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'Member'),
+        displayName: isSuhail ? 'Big Suu' : (clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'Member'),
         provider: 'local',
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString(),

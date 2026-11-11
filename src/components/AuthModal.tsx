@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Mail, ArrowRight, ShieldCheck, Key } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 
 interface AuthModalProps {
@@ -39,17 +39,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Verification helper: sandhu.suhail@gmail.com is the ONLY authorized VIP account
+  // Verification helper: sandhu.suhail@gmail.com and bigsuu is the authorized VIP account
   const isSuhailUser = (uName?: string, uEmail?: string) => {
     const cleanU = (uName || '').trim().toLowerCase();
     const cleanE = (uEmail || '').trim().toLowerCase();
-    return cleanU === 'sandhu.suhail@gmail.com' || cleanU === 'suhailsandhu' || cleanE === 'sandhu.suhail@gmail.com';
+    return cleanU === 'sandhu.suhail@gmail.com' || cleanU === 'bigsuu' || cleanU === 'suhailsandhu' || cleanU === 'suhail' || cleanE === 'sandhu.suhail@gmail.com';
   };
 
   const suhailVipUser = {
-    id: 'user_suhail_vip',
-    username: 'sandhu.suhail@gmail.com',
-    displayName: 'Suhail Sandhu',
+    id: 'user_bigsuu_vip',
+    username: 'bigsuu',
+    displayName: 'Big Suu',
     email: 'sandhu.suhail@gmail.com',
     role: 'vip',
     isVip: true,
@@ -67,22 +67,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setPasscodeError(null);
 
-    // Quick Login: Grants standard viewer access (VIP removed per owner instruction)
+    // Quick Passcode: 7865 grants VIP access to Big Suu
     if (clean === '7865') {
-      const guestUser = {
-        id: `guest_${Date.now()}`,
-        username: 'guest_viewer',
-        displayName: 'Guest Viewer',
-        email: 'guest@bigsuustreams.com',
-        role: 'member',
-        isVip: false,
-        membership: 'basic'
-      };
-      localStorage.setItem('bigsuu_auth_token', 'token_guest_' + Date.now());
-      localStorage.setItem('bigsuu_auth_user', JSON.stringify(guestUser));
-      sessionStorage.setItem('bigsuu_auth_token', 'token_guest_' + Date.now());
+      localStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
+      localStorage.setItem('bigsuu_auth_user', JSON.stringify(suhailVipUser));
+      sessionStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
       setLoading(false);
-      onSuccess(guestUser);
+      onSuccess(suhailVipUser);
       return;
     }
 
@@ -95,22 +86,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        const user = data.user || {
-          id: `guest_${Date.now()}`,
-          username: 'guest_viewer',
-          displayName: 'Guest Viewer',
-          email: 'guest@bigsuustreams.com',
-          role: 'member',
-          isVip: false,
-          membership: 'basic'
-        };
-        // Enforce: No VIP through quick login
-        user.isVip = false;
-        user.role = 'member';
-        user.membership = 'basic';
-        localStorage.setItem('bigsuu_auth_token', data.token || 'token_guest');
+        const user = data.user || suhailVipUser;
+        localStorage.setItem('bigsuu_auth_token', data.token || 'token_bigsuu_vip');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
-        sessionStorage.setItem('bigsuu_auth_token', data.token || 'token_guest');
+        sessionStorage.setItem('bigsuu_auth_token', data.token || 'token_bigsuu_vip');
         onSuccess(user);
       } else {
         setPasscodeError('Incorrect passcode. Access denied.');
@@ -151,11 +130,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      // If Suhail logs in with 7865 passcode, grant exclusive VIP account
-      if (password === '7865' && isSuhail) {
-        localStorage.setItem('bigsuu_auth_token', 'token_suhail_vip');
+      // If Suhail / Big Suu logs in with 7865 passcode, grant exclusive VIP account
+      if (password === '7865' && (isSuhail || username.trim().toLowerCase() === 'bigsuu')) {
+        localStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(suhailVipUser));
-        sessionStorage.setItem('bigsuu_auth_token', 'token_suhail_vip');
+        sessionStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
         onSuccess(suhailVipUser);
         return;
       }
@@ -260,9 +239,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       {/* iOS-Style Modal Card / Bottom Sheet */}
       <div className="relative w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[94vh] transition-all">
         
-        {/* Top Header Handle (Key icon removed - accessible only via /quickaccess) */}
-        <div className="flex items-center justify-center px-6 pt-4 pb-1">
+        {/* Top Header Handle & Quick Access Key Icon */}
+        <div className="relative flex items-center justify-center px-6 pt-4 pb-1">
           <div className="w-10 h-1 bg-gray-300 rounded-full sm:hidden" />
+          <button
+            type="button"
+            onClick={() => {
+              setShowPasscodeMode((prev) => !prev);
+              setPasscodeError(null);
+            }}
+            className="absolute right-4 top-3 p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer"
+            title={showPasscodeMode ? 'Back to Account Sign-In' : 'Quick Access Passcode'}
+            aria-label="Quick Access"
+          >
+            <Key className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="p-6 sm:p-8 pt-3 overflow-y-auto">

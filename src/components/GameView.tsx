@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
-import { CourtsidePlayer } from './CourtsidePlayer';
+import { CourtsidePlayer } from './CourtsidePlayer.tsx';
 import { formatTipoffTime, fetchGameSummary } from '../services/api';
 import { isSmartTv, TV_KEYS } from '../utils/tvDetector';
 

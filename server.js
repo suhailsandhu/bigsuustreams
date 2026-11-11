@@ -79,14 +79,16 @@ app.post('/api/auth/login', siteAuthLimiter, (req, res) => {
   try {
     const { identifier, password } = req.body || {};
     const result = authService.login(identifier || '', password || '');
-    const isVip = (result.user.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || result.user.username?.toLowerCase() === 'sandhu.suhail@gmail.com');
+    const cleanEmail = (result.user.email || '').toLowerCase();
+    const cleanUser = (result.user.username || '').toLowerCase();
+    const isVip = (cleanEmail === 'sandhu.suhail@gmail.com' || cleanUser === 'bigsuu' || cleanUser === 'suhailsandhu');
     res.json({
       success: true,
       user: {
         id: result.user.id,
-        username: result.user.username,
-        email: result.user.email,
-        displayName: isVip ? 'Suhail Sandhu' : result.user.displayName,
+        username: isVip ? 'bigsuu' : result.user.username,
+        email: isVip ? 'sandhu.suhail@gmail.com' : result.user.email,
+        displayName: isVip ? 'Big Suu' : result.user.displayName,
         avatarUrl: result.user.avatarUrl,
         isVip,
         role: isVip ? 'vip' : 'member',
@@ -241,20 +243,20 @@ app.post('/api/user/preferences', (req, res) => {
   res.json({ success: true });
 });
 
-// Passcode gate support (Passcode 7865) -> Quick Access Guest View (NOT VIP)
+// Passcode gate support (Passcode 7865) -> Quick Access VIP Account
 app.post('/api/auth/site-gate', siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || '').trim().toLowerCase();
   if (clean === '7865') {
-    const token = Buffer.from(`bigsuu_${Date.now()}_guest`).toString('base64');
+    const token = Buffer.from(`bigsuu_${Date.now()}_vip`).toString('base64');
     const user = { 
-      id: `guest_${Date.now()}`, 
-      username: 'guest_viewer', 
-      displayName: 'Guest Viewer', 
-      email: 'guest@bigsuustreams.com',
-      role: 'member',
-      isVip: false,
-      membership: 'basic'
+      id: 'user_bigsuu_vip', 
+      username: 'bigsuu', 
+      displayName: 'Big Suu', 
+      email: 'sandhu.suhail@gmail.com',
+      role: 'vip',
+      isVip: true,
+      membership: 'vip'
     };
     return res.json({ success: true, token, user });
   }
@@ -569,7 +571,7 @@ async function handleChunkProxy(req, res) {
           const r = await fetch(targetUrl, {
             signal: controller.signal,
             headers: {
-              'Referer': hostOrigin,
+              'Referer': record.embedUrl || hostOrigin,
               'Origin': hostOrigin,
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
             }
@@ -591,7 +593,7 @@ async function handleChunkProxy(req, res) {
               const r = await fetch(httpUrl, {
                 signal: controller.signal,
                 headers: {
-                  'Referer': hostOrigin,
+                  'Referer': record.embedUrl || hostOrigin,
                   'Origin': hostOrigin,
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
                 }

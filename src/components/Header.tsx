@@ -1,6 +1,7 @@
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, KeyRound } from 'lucide-react';
 import { NflLogo } from './NflLogo';
+import { ShinyText } from './ui/ShinyText';
 
 interface HeaderProps {
   onNavigateHome: () => void;
@@ -9,6 +10,7 @@ interface HeaderProps {
   currentUser?: any;
   onLogout?: () => void;
   onOpenProfile?: () => void;
+  onOpenAuth?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,21 +18,36 @@ export const Header: React.FC<HeaderProps> = ({
   currentSport,
   onToggleSport,
   currentUser,
-  onOpenProfile
+  onOpenProfile,
+  onOpenAuth
 }) => {
-  // sandhu.suhail@gmail.com is the ONLY VIP member account
+  // sandhu.suhail@gmail.com and bigsuu are VIP member accounts
   const isVip = Boolean(
     currentUser?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
-    currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com'
+    currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+    currentUser?.username?.toLowerCase() === 'bigsuu' ||
+    currentUser?.role === 'vip' ||
+    currentUser?.isVip === true
   );
 
-  const initial = (currentUser?.displayName || currentUser?.username || 'S')[0].toUpperCase();
+  const initial = (currentUser?.displayName || currentUser?.username || 'B')[0].toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-2xs select-none relative">
 
-      {/* Account / Membership Status in Top Right */}
-      <div className="absolute right-3 sm:right-6 top-2.5 sm:top-3.5 flex flex-col items-end space-y-1.5 z-20">
+      {/* Account / Membership Status & Quick Key in Top Right */}
+      <div className="absolute right-3 sm:right-6 top-2.5 sm:top-3.5 flex items-center space-x-2 z-20">
+        {onOpenAuth && (
+          <button
+            onClick={onOpenAuth}
+            className="p-1.5 rounded-full text-gray-500 hover:text-black hover:bg-gray-100 transition active:scale-95 cursor-pointer shadow-2xs border border-gray-200/80 bg-white"
+            title="Sign In / Passcode Access"
+            aria-label="Sign In"
+          >
+            <KeyRound className="w-4 h-4 text-gray-600 hover:text-black" />
+          </button>
+        )}
+
         {currentUser && onOpenProfile && (
           isVip ? (
             <button
@@ -42,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {initial}
               </div>
               <span className="truncate max-w-[85px] sm:max-w-[120px] font-semibold">
-                VIP Member
+                <ShinyText text="VIP Member" speed={4} className="font-bold text-amber-900" />
               </span>
             </button>
           ) : (

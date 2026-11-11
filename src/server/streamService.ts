@@ -324,6 +324,7 @@ export interface StreamTargetRecord {
   backupBaseUrls: string[];
   workingHost: string;
   backupHosts: string[];
+  embedUrl?: string;
   qStr: string;
   expires: number;
   segmentMap?: Map<string, string>;
@@ -397,11 +398,12 @@ export async function resolveHlsStream(
       const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
       const v = `${streamKey}${activeVariantSuffix}`;
       const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
+      const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
       try {
         const res = await fetch(fastUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Referer': `${workingHost}/`,
+            'Referer': fastEmbedUrl,
             'Origin': workingHost
           }
         });
@@ -459,9 +461,7 @@ export async function resolveHlsStream(
             const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
             const res = await fetch(embedUrl, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'Referer': `${mirror}/`,
-                'Origin': mirror
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
               }
             });
             if (!res.ok) continue;
@@ -632,6 +632,7 @@ export async function resolveHlsStream(
     backupBaseUrls,
     workingHost,
     backupHosts,
+    embedUrl: `${workingHost}/embed/${sportCategory}/${streamKey}${activeVariantSuffix}`,
     qStr,
     expires: Date.now() + 3600000, // 1 hour validity
     segmentMap

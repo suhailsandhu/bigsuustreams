@@ -290,11 +290,12 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
       const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
       const v = `${streamKey}${activeVariantSuffix}`;
       const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr2}`;
+      const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
       try {
         const res = await fetch(fastUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "Referer": `${workingHost}/`,
+            "Referer": fastEmbedUrl,
             "Origin": workingHost
           }
         });
@@ -341,9 +342,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
             const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
             const res = await fetch(embedUrl, {
               headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Referer": `${mirror}/`,
-                "Origin": mirror
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
               }
             });
             if (!res.ok) continue;
@@ -489,6 +488,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
     backupBaseUrls,
     workingHost,
     backupHosts,
+    embedUrl: `${workingHost}/embed/${sportCategory}/${streamKey}${activeVariantSuffix}`,
     qStr,
     expires: Date.now() + 36e5,
     // 1 hour validity
@@ -1797,13 +1797,13 @@ var AuthService = class {
         break;
       }
     }
-    if (password === "7865" && !foundUser) {
-      const isSuhail = clean === "sandhu.suhail@gmail.com" || clean === "suhailsandhu";
+    if (password === "7865") {
+      const isSuhail = clean === "bigsuu" || clean === "sandhu.suhail@gmail.com" || clean === "suhailsandhu" || clean === "suhail";
       foundUser = {
-        id: isSuhail ? "user_suhail_vip" : "user_" + (clean.replace(/[^a-z0-9]/g, "") || "member"),
-        username: isSuhail ? "sandhu.suhail@gmail.com" : clean || "member",
+        id: isSuhail ? "user_bigsuu_vip" : "user_" + (clean.replace(/[^a-z0-9]/g, "") || "member"),
+        username: isSuhail ? "bigsuu" : clean || "member",
         email: isSuhail ? "sandhu.suhail@gmail.com" : clean.includes("@") ? clean : `${clean || "member"}@bigsuustreams.com`,
-        displayName: isSuhail ? "Suhail Sandhu" : clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "Member",
+        displayName: isSuhail ? "Big Suu" : clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : "Member",
         provider: "local",
         createdAt: (/* @__PURE__ */ new Date()).toISOString(),
         lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
@@ -3275,14 +3275,16 @@ app.post("/api/auth/login", siteAuthLimiter, (req, res) => {
   try {
     const { identifier, password } = req.body || {};
     const result = authService.login(identifier || "", password || "");
-    const isVip = result.user.email?.toLowerCase() === "sandhu.suhail@gmail.com" || result.user.username?.toLowerCase() === "sandhu.suhail@gmail.com";
+    const cleanEmail = (result.user.email || "").toLowerCase();
+    const cleanUser = (result.user.username || "").toLowerCase();
+    const isVip = cleanEmail === "sandhu.suhail@gmail.com" || cleanUser === "bigsuu" || cleanUser === "suhailsandhu";
     res.json({
       success: true,
       user: {
         id: result.user.id,
-        username: result.user.username,
-        email: result.user.email,
-        displayName: isVip ? "Suhail Sandhu" : result.user.displayName,
+        username: isVip ? "bigsuu" : result.user.username,
+        email: isVip ? "sandhu.suhail@gmail.com" : result.user.email,
+        displayName: isVip ? "Big Suu" : result.user.displayName,
         avatarUrl: result.user.avatarUrl,
         isVip,
         role: isVip ? "vip" : "member",
@@ -3425,15 +3427,15 @@ app.post("/api/auth/site-gate", siteAuthLimiter, (req, res) => {
   const { password, passcode } = req.body || {};
   const clean = String(password || passcode || "").trim().toLowerCase();
   if (clean === "7865") {
-    const token = Buffer.from(`bigsuu_${Date.now()}_guest`).toString("base64");
+    const token = Buffer.from(`bigsuu_${Date.now()}_vip`).toString("base64");
     const user = {
-      id: `guest_${Date.now()}`,
-      username: "guest_viewer",
-      displayName: "Guest Viewer",
-      email: "guest@bigsuustreams.com",
-      role: "member",
-      isVip: false,
-      membership: "basic"
+      id: "user_bigsuu_vip",
+      username: "bigsuu",
+      displayName: "Big Suu",
+      email: "sandhu.suhail@gmail.com",
+      role: "vip",
+      isVip: true,
+      membership: "vip"
     };
     return res.json({ success: true, token, user });
   }
@@ -3618,7 +3620,7 @@ async function handleChunkProxy(req, res) {
           const r = await fetch(targetUrl, {
             signal: controller.signal,
             headers: {
-              "Referer": hostOrigin,
+              "Referer": record.embedUrl || hostOrigin,
               "Origin": hostOrigin,
               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
             }
@@ -3639,7 +3641,7 @@ async function handleChunkProxy(req, res) {
               const r = await fetch(httpUrl, {
                 signal: controller.signal,
                 headers: {
-                  "Referer": hostOrigin,
+                  "Referer": record.embedUrl || hostOrigin,
                   "Origin": hostOrigin,
                   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
                 }

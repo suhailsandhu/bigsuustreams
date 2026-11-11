@@ -719,6 +719,7 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenProfile={() => setShowProfileModal(true)}
+        onOpenAuth={() => setIsQuickAccessOpen(true)}
         onToggleSport={() => {
           setSelectedStream(null);
           setSelectedGame(null);
