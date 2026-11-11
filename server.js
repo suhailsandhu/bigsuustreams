@@ -1065,9 +1065,9 @@ async function buildXmlTvEpg(req, sportFilter = 'all') {
 }
 
 // ============================================================================
-// IPTV M3U / M3U8 Playlist Engine (720p Smooth, 1080p FHD, or Combined)
+// IPTV M3U / M3U8 Playlist Engine (100% 720p 60fps Smooth & Stable across all URLs)
 // ============================================================================
-async function buildIptvPlaylist(req, sportFilter = 'all', targetQuality = 'all') {
+async function buildIptvPlaylist(req, sportFilter = 'all', targetQuality = '720p') {
   const host = req.get('x-forwarded-host') || req.get('host') || 'bigsuustreams.com';
   const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
   const protocol = isLocal ? 'http' : (req.get('x-forwarded-proto') || (req.secure ? 'https' : 'https'));
@@ -1085,12 +1085,8 @@ async function buildIptvPlaylist(req, sportFilter = 'all', targetQuality = 'all'
   const nbaStreams = bball?.streams || [];
   const nflStreams = fball?.streams || [];
 
-  const playlistTitle = targetQuality === '720p'
-    ? 'BigSuuStreams (Smooth 720p)'
-    : (targetQuality === '1080p' ? 'BigSuuStreams (FHD 1080p)' : 'BigSuuStreams Live Sports');
-
   const lines = [
-    `#EXTM3U name="${playlistTitle}" x-tvg-url="${epgUrl}"`
+    `#EXTM3U name="BigSuuStreams Live Sports (720p 60fps)" x-tvg-url="${epgUrl}"`
   ];
 
   const addStreamEntry = (s, category, leagueLabel) => {
@@ -1102,34 +1098,11 @@ async function buildIptvPlaylist(req, sportFilter = 'all', targetQuality = 'all'
     const group = isLive ? `${leagueLabel} Live` : `${leagueLabel} Scheduled`;
     const tvgId = `${category}-${s.stream_key}`;
 
-    // Mode A: 720p Smooth Only Playlist
-    if (targetQuality === '720p') {
-      const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
-      const title = `${statusEmoji} [${leagueLabel}] ${cleanName}`;
-      lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
-      lines.push(streamUrl);
-      return;
-    }
-
-    // Mode B: 1080p FHD Only Playlist
-    if (targetQuality === '1080p') {
-      const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
-      const title = `${statusEmoji} [${leagueLabel}] ${cleanName}`;
-      lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
-      lines.push(streamUrl);
-      return;
-    }
-
-    // Mode C: Combined Playlist (with 720p Smooth default + 1080p variant)
-    const smoothUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
-    const smoothTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (720p Smooth)`;
-    lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName} (720p)" tvg-logo="${logo}" group-title="${group}",${smoothTitle}`);
-    lines.push(smoothUrl);
-
-    const fhdUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
-    const fhdTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (1080p FHD)`;
-    lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName} (1080p)" tvg-logo="${logo}" group-title="${group}",${fhdTitle}`);
-    lines.push(fhdUrl);
+    // Exactly one single, ultra-stable 720p 60fps stream entry per game (No clutter, zero desync)
+    const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
+    const title = `${statusEmoji} [${leagueLabel}] ${cleanName}`;
+    lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
+    lines.push(streamUrl);
   };
 
   const liveNba = nbaStreams.filter(s => s.is_live);
@@ -1145,9 +1118,9 @@ async function buildIptvPlaylist(req, sportFilter = 'all', targetQuality = 'all'
   return lines.join('\n');
 }
 
-async function handleIptvPlaylist(req, res, sportFilter = 'all', targetQuality = 'all') {
+async function handleIptvPlaylist(req, res, sportFilter = 'all') {
   try {
-    const playlistText = await buildIptvPlaylist(req, sportFilter, targetQuality);
+    const playlistText = await buildIptvPlaylist(req, sportFilter, '720p');
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl; charset=utf-8');
     res.setHeader('Content-Disposition', 'inline; filename="playlist.m3u8"');
     res.setHeader('Access-Control-Allow-Origin', '*');

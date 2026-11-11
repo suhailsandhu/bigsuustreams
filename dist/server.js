@@ -4040,7 +4040,7 @@ async function buildXmlTvEpg(req, sportFilter = "all") {
   xmlLines.push("</tv>");
   return xmlLines.join("\n");
 }
-async function buildIptvPlaylist(req, sportFilter = "all", targetQuality = "all") {
+async function buildIptvPlaylist(req, sportFilter = "all", targetQuality = "720p") {
   const host = req.get("x-forwarded-host") || req.get("host") || "bigsuustreams.com";
   const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
   const protocol = isLocal ? "http" : req.get("x-forwarded-proto") || (req.secure ? "https" : "https");
@@ -4054,9 +4054,8 @@ async function buildIptvPlaylist(req, sportFilter = "all", targetQuality = "all"
   ]);
   const nbaStreams = bball?.streams || [];
   const nflStreams = fball?.streams || [];
-  const playlistTitle = targetQuality === "720p" ? "BigSuuStreams (Smooth 720p)" : targetQuality === "1080p" ? "BigSuuStreams (FHD 1080p)" : "BigSuuStreams Live Sports";
   const lines = [
-    `#EXTM3U name="${playlistTitle}" x-tvg-url="${epgUrl}"`
+    `#EXTM3U name="BigSuuStreams Live Sports (720p 60fps)" x-tvg-url="${epgUrl}"`
   ];
   const addStreamEntry = (s, category, leagueLabel) => {
     if (!s || !s.stream_key) return;
@@ -4066,28 +4065,10 @@ async function buildIptvPlaylist(req, sportFilter = "all", targetQuality = "all"
     const statusEmoji = isLive ? "\u{1F534}" : "\u23F0";
     const group = isLive ? `${leagueLabel} Live` : `${leagueLabel} Scheduled`;
     const tvgId = `${category}-${s.stream_key}`;
-    if (targetQuality === "720p") {
-      const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
-      const title = `${statusEmoji} [${leagueLabel}] ${cleanName}`;
-      lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
-      lines.push(streamUrl);
-      return;
-    }
-    if (targetQuality === "1080p") {
-      const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
-      const title = `${statusEmoji} [${leagueLabel}] ${cleanName}`;
-      lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
-      lines.push(streamUrl);
-      return;
-    }
-    const smoothUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
-    const smoothTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (720p Smooth)`;
-    lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName} (720p)" tvg-logo="${logo}" group-title="${group}",${smoothTitle}`);
-    lines.push(smoothUrl);
-    const fhdUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/1080p.m3u8${tokenQuery}`;
-    const fhdTitle = `${statusEmoji} [${leagueLabel}] ${cleanName} (1080p FHD)`;
-    lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName} (1080p)" tvg-logo="${logo}" group-title="${group}",${fhdTitle}`);
-    lines.push(fhdUrl);
+    const streamUrl = `${baseUrl}/api/${category}/hls/${s.stream_key}/720p.m3u8${tokenQuery}`;
+    const title = `${statusEmoji} [${leagueLabel}] ${cleanName}`;
+    lines.push(`#EXTINF:-1 tvg-id="${tvgId}" tvg-name="${cleanName}" tvg-logo="${logo}" group-title="${group}",${title}`);
+    lines.push(streamUrl);
   };
   const liveNba = nbaStreams.filter((s) => s.is_live);
   const liveNfl = nflStreams.filter((s) => s.is_live);
@@ -4099,9 +4080,9 @@ async function buildIptvPlaylist(req, sportFilter = "all", targetQuality = "all"
   for (const s of schedNfl) addStreamEntry(s, "football", "NFL");
   return lines.join("\n");
 }
-async function handleIptvPlaylist(req, res, sportFilter = "all", targetQuality = "all") {
+async function handleIptvPlaylist(req, res, sportFilter = "all") {
   try {
-    const playlistText = await buildIptvPlaylist(req, sportFilter, targetQuality);
+    const playlistText = await buildIptvPlaylist(req, sportFilter, "720p");
     res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
     res.setHeader("Content-Disposition", 'inline; filename="playlist.m3u8"');
     res.setHeader("Access-Control-Allow-Origin", "*");
