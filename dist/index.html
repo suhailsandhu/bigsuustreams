@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" style="background-color: #f8fafc; color: #0f172a;">
+<html lang="en" style="background-color: #ffffff; color: #0f172a;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -28,15 +28,19 @@
           var isDark = t === 'dark' || (t === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (isDark) {
             document.documentElement.classList.add('dark');
-            document.documentElement.style.backgroundColor = '#121212';
+            document.documentElement.style.backgroundColor = '#141414';
             document.documentElement.style.color = '#f5f5f5';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.style.backgroundColor = '#ffffff';
+            document.documentElement.style.color = '#0f172a';
           }
         } catch(e) {}
       })();
     </script>
 
     <!-- Baseline Universal CSS Reset & TV Living Room Standards -->
-    <style>*,:before,:after{box-sizing:border-box}html,body{color:#0f172a;-webkit-font-smoothing:antialiased;background-color:#f8fafc;min-height:100vh;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}#root{min-height:100vh}img{max-width:100%;height:auto}button{font-family:inherit}</style>
+    <style>*,:before,:after{box-sizing:border-box}html,body{color:#0f172a;-webkit-font-smoothing:antialiased;background-color:#fff;min-height:100vh;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}html.dark,html.dark body{color:#f5f5f5!important;background-color:#141414!important}#root{min-height:100vh}img{max-width:100%;height:auto}button{font-family:inherit}</style>
 
     <!-- Font Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -81,15 +85,15 @@
         } catch(e) {}
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-C4U8IkHs.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BddP1i82.css">
+    <script type="module" crossorigin src="/assets/index-BPeioV2l.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C5BtIbuS.css">
     <script type="module">import'data:text/javascript,if(!import.meta.resolve)throw Error("import.meta.resolve not supported")';import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
     <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
   </head>
-  <body style="background-color: #f8fafc; color: #0f172a;">
+  <body>
     <div id="root">
       <!-- Fast initial placeholder while React hydrates -->
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #f8fafc; color: #ea580c;">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: inherit; color: #ea580c;">
         <div style="width: 44px; height: 44px; border: 4px solid #fed7aa; border-top-color: #ea580c; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
         <div style="margin-top: 14px; font-weight: 900; font-size: 13px; letter-spacing: 0.1em; color: #0f172a;">NBA GAMES & SCORES</div>
       </div>
@@ -147,6 +151,6 @@
     </script>
     <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
     <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-CR1oT-cq.js"></script>
-    <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-DX4hoNM9.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+    <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-CweiDROM.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
   </body>
 </html>

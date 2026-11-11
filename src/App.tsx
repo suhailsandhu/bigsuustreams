@@ -135,11 +135,11 @@ export const App: React.FC = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) {
         document.documentElement.classList.add('dark');
-        document.body.style.backgroundColor = '#121212';
+        document.body.style.backgroundColor = '#141414';
         document.body.style.color = '#f5f5f5';
       } else {
         document.documentElement.classList.remove('dark');
-        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.backgroundColor = '#ffffff';
         document.body.style.color = '#0f172a';
       }
     } catch {}
@@ -186,11 +186,11 @@ export const App: React.FC = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) {
         document.documentElement.classList.add('dark');
-        document.body.style.backgroundColor = '#121212';
+        document.body.style.backgroundColor = '#141414';
         document.body.style.color = '#f5f5f5';
       } else {
         document.documentElement.classList.remove('dark');
-        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.backgroundColor = '#ffffff';
         document.body.style.color = '#0f172a';
       }
 
@@ -830,7 +830,7 @@ export const App: React.FC = () => {
   // Render iOS-Style Account Auth Modal if user has not yet signed in or created an account
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col justify-between items-center p-4 select-none">
+      <div className="min-h-screen bg-white dark:bg-[#141414] flex flex-col justify-between items-center p-4 select-none">
         <AuthModal
           isOpen={true}
           currentSport={currentSport}
@@ -858,8 +858,8 @@ export const App: React.FC = () => {
 
   return (
     <div 
-      style={{ minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column' }}
-      className="min-h-screen flex flex-col bg-[#f8f9fa] text-gray-900 selection:bg-orange-500/20 selection:text-orange-900"
+      style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}
+      className="min-h-screen flex flex-col bg-white dark:bg-[#141414] text-gray-900 dark:text-neutral-100 selection:bg-blue-500/20 selection:text-blue-900"
     >
       {/* Top Header with Sport Logo and Switcher */}
       <Header

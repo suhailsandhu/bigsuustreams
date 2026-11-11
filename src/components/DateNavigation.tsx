@@ -122,7 +122,7 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
 
   return (
     <div
-      className="w-full bg-white border border-gray-200/90 rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 mb-2 sm:mb-2.5 shadow-2xs select-none"
+      className="w-full bg-white dark:bg-[#181818] border border-gray-100 dark:border-white/[0.06] rounded-xl px-2.5 py-1.5 sm:px-3 sm:py-2 mb-2 sm:mb-2.5 shadow-2xs select-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -201,8 +201,8 @@ export const DateNavigation: React.FC<DateNavigationProps> = ({
               style={{ minWidth: '48px', flexShrink: 0 }}
               className={`flex flex-col items-center justify-center flex-shrink-0 w-[48px] sm:w-[56px] py-1 sm:py-1.5 px-1 rounded-lg transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-gray-200 border-2 border-gray-300 text-gray-950 shadow-2xs font-black scale-102'
-                  : 'bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 border border-gray-200/70'
+                  ? 'bg-gray-100 dark:bg-white/[0.12] border-2 border-gray-300 dark:border-white/[0.2] text-gray-950 dark:text-white shadow-2xs font-black scale-102'
+                  : 'bg-white dark:bg-transparent text-gray-700 dark:text-neutral-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/[0.05] border border-gray-200/70 dark:border-white/[0.06]'
               }`}
             >
               <span

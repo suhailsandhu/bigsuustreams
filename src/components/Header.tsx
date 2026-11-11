@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   const initial = (currentUser?.displayName || currentUser?.username || 'B')[0].toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-2xs select-none relative">
+    <header className="sticky top-0 z-40 w-full bg-white dark:bg-[#141414] border-b border-gray-100 dark:border-white/[0.06] shadow-2xs select-none relative">
 
       {/* Account / Membership Status in Top Right with Report button directly underneath */}
       <div className="absolute right-3 sm:right-6 top-2 sm:top-2.5 flex flex-col items-end z-20">
@@ -56,13 +56,13 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={onOpenProfile}
-              className="flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1 rounded-full border shadow-2xs transition active:scale-95 cursor-pointer bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+              className="flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1 rounded-full border shadow-2xs transition active:scale-95 cursor-pointer bg-slate-100 dark:bg-white/[0.08] text-slate-700 dark:text-neutral-200 border-slate-200 dark:border-white/[0.1] hover:bg-slate-200 dark:hover:bg-white/[0.12]"
               title="Account & Settings"
             >
-              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold uppercase shrink-0 bg-slate-300 text-slate-800">
+              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold uppercase shrink-0 bg-slate-300 dark:bg-neutral-700 text-slate-800 dark:text-neutral-200">
                 {initial}
               </div>
-              <span className="font-semibold text-[11px]">Member Pass</span>
+              <span className="font-semibold text-[11px]">Basic Membership</span>
             </button>
           )
         )}
