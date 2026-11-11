@@ -135,8 +135,8 @@ export const App: React.FC = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) {
         document.documentElement.classList.add('dark');
-        document.body.style.backgroundColor = '#0b0f19';
-        document.body.style.color = '#f8fafc';
+        document.body.style.backgroundColor = '#121212';
+        document.body.style.color = '#f5f5f5';
       } else {
         document.documentElement.classList.remove('dark');
         document.body.style.backgroundColor = '#f8fafc';
@@ -186,8 +186,8 @@ export const App: React.FC = () => {
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (isDark) {
         document.documentElement.classList.add('dark');
-        document.body.style.backgroundColor = '#0b0f19';
-        document.body.style.color = '#f8fafc';
+        document.body.style.backgroundColor = '#121212';
+        document.body.style.color = '#f5f5f5';
       } else {
         document.documentElement.classList.remove('dark');
         document.body.style.backgroundColor = '#f8fafc';
@@ -590,32 +590,79 @@ export const App: React.FC = () => {
     handleSelectDate(newDateStr);
   }, [selectedDate, handleSelectDate]);
 
-  // Touch Swipe Gesture Handlers on Games Section for iPhone
+  // Interactive Smooth Touch Drag between game dates (iPhone gesture)
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+  const [isSwipeAnimating, setIsSwipeAnimating] = useState(false);
+
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+  const isHorizontalLockRef = useRef<boolean | null>(null);
 
   const handleGamesTouchStart = (e: React.TouchEvent) => {
+    if (isSwipeAnimating) return;
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
+    isHorizontalLockRef.current = null;
+    setIsSwipeDragging(false);
   };
 
-  const handleGamesTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
-    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+  const handleGamesTouchMove = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null || isSwipeAnimating) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - touchStartXRef.current;
+    const dy = currentY - touchStartYRef.current;
 
-    // Detect horizontal swipe if deltaX > 40px and predominantly horizontal (avoids interfering with vertical scroll)
-    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
-      if (deltaX < 0) {
-        // Swiped Left (finger dragged left) -> Advance to Next Day
-        handleStepDate(1);
-      } else {
-        // Swiped Right (finger dragged right) -> Go back to Previous Day
-        handleStepDate(-1);
+    // Determine direction lock on initial movement
+    if (isHorizontalLockRef.current === null) {
+      if (Math.abs(dx) > 7 || Math.abs(dy) > 7) {
+        isHorizontalLockRef.current = Math.abs(dx) > Math.abs(dy) * 1.1;
       }
     }
+
+    if (isHorizontalLockRef.current === true) {
+      setIsSwipeDragging(true);
+      // Direct 1:1 smooth drag translation
+      setSwipeOffset(dx);
+    }
+  };
+
+  const handleGamesTouchEnd = () => {
+    if (touchStartXRef.current === null) return;
+    const finalOffset = swipeOffset;
+    const isHorizontal = isHorizontalLockRef.current;
+
     touchStartXRef.current = null;
     touchStartYRef.current = null;
+    isHorizontalLockRef.current = null;
+    setIsSwipeDragging(false);
+
+    if (isHorizontal && Math.abs(finalOffset) > 65) {
+      setIsSwipeAnimating(true);
+      const isNext = finalOffset < 0;
+      // Animate off-screen in the drag direction
+      setSwipeOffset(isNext ? -window.innerWidth : window.innerWidth);
+
+      setTimeout(() => {
+        handleStepDate(isNext ? 1 : -1);
+        // Position on opposite side and smoothly glide in
+        setSwipeOffset(isNext ? 80 : -80);
+        setTimeout(() => {
+          setSwipeOffset(0);
+          setTimeout(() => {
+            setIsSwipeAnimating(false);
+          }, 220);
+        }, 30);
+      }, 180);
+    } else {
+      // Snap back smoothly
+      setIsSwipeAnimating(true);
+      setSwipeOffset(0);
+      setTimeout(() => {
+        setIsSwipeAnimating(false);
+      }, 220);
+    }
   };
 
   const handleWatchGame = async (game: ScoreboardGame) => {
@@ -846,8 +893,17 @@ export const App: React.FC = () => {
         ) : (
           <div 
             onTouchStart={handleGamesTouchStart}
+            onTouchMove={handleGamesTouchMove}
             onTouchEnd={handleGamesTouchEnd}
-            style={{ maxWidth: isTv ? '896px' : '1400px', margin: '0 auto', width: '100%' }}
+            onTouchCancel={handleGamesTouchEnd}
+            style={{ 
+              maxWidth: isTv ? '896px' : '1400px', 
+              margin: '0 auto', 
+              width: '100%',
+              transform: swipeOffset !== 0 ? `translateX(${swipeOffset}px)` : 'none',
+              transition: isSwipeDragging ? 'none' : 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)',
+              willChange: isSwipeDragging ? 'transform' : 'auto'
+            }}
             className={`mx-auto space-y-2 sm:space-y-2.5 ${isTv ? 'max-w-4xl' : 'max-w-7xl'}`}
           >
             {/* Smart TV Remote Navigation Helper Banner */}

@@ -21,6 +21,20 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('bss_theme_mode') || 'light';
+          var isDark = t === 'dark' || (t === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.backgroundColor = '#121212';
+            document.documentElement.style.color = '#f5f5f5';
+          }
+        } catch(e) {}
+      })();
+    </script>
+
     <!-- Baseline Universal CSS Reset & TV Living Room Standards -->
     <style>
       *, *::before, *::after {

@@ -86,8 +86,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
     if (isDark) {
       root.classList.add('dark');
-      document.body.style.backgroundColor = '#0b0f19';
-      document.body.style.color = '#f8fafc';
+      document.body.style.backgroundColor = '#121212';
+      document.body.style.color = '#f5f5f5';
     } else {
       root.classList.remove('dark');
       document.body.style.backgroundColor = '#f8fafc';
@@ -592,43 +592,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </div>
                 </div>
 
-              </div>
-            )}
-          </div>
-
-          {/* 5. About Dropdown */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
-            <button
-              onClick={() => toggleAccordion('about')}
-              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
-            >
-              <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-                  <Info className="w-4 h-4" />
-                </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900">About</span>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'about' ? 'rotate-180 text-orange-600' : ''}`} />
-            </button>
-
-            {openAccordion === 'about' && (
-              <div className="p-3.5 pt-1 space-y-2 border-t border-slate-100 bg-white/50 text-xs">
-                <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-semibold">App Version</span>
-                  <span className="font-bold text-slate-900">v2.9.0 (PWA & Smart TV)</span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-semibold">Server Health</span>
-                  <span className="font-bold text-emerald-600">All Systems Operational 🟢</span>
-                </div>
-
-                <button
-                  onClick={() => setActiveDialog('report')}
-                  className="w-full mt-1.5 py-2.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-98"
-                >
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>Report an Issue to Admin</span>
-                </button>
               </div>
             )}
           </div>
