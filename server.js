@@ -1223,76 +1223,6 @@ app.all(['/epg.xml', '/guide.xml', '/xmltv.xml', '/api/iptv/epg.xml', '/api/iptv
 app.all(['/epg-nba.xml', '/guide-nba.xml'], (req, res) => handleEpg(req, res, 'nba'));
 app.all(['/epg-nfl.xml', '/guide-nfl.xml'], (req, res) => handleEpg(req, res, 'nfl'));
 
-// Detect dist directory whether running from root or dist/
-let distPath = path.join(__dirname, 'dist');
-if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html'))) {
-  distPath = __dirname;
-}
-
-// Explicit Admin and QuickAccess route direct access (compatible with Express 5 path-to-regexp)
-app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(distPath, 'index.html'));
-});
-
-// Dedicated /updating route
-app.get('/updating', (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  const updatingHtml = path.join(distPath, 'updating.html');
-  if (fs.existsSync(updatingHtml)) {
-    return res.sendFile(updatingHtml);
-  }
-  res.sendFile(path.join(distPath, 'index.html'));
-});
-
-// Service worker must never be cached aggressively
-app.get('/sw.js', (req, res) => {
-  res.setHeader('Content-Type', 'text/javascript');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(distPath, 'sw.js'));
-});
-
-// Serve assets - return 404 for missing assets instead of falling through to HTML
-app.use('/assets', express.static(path.join(distPath, 'assets')), (req, res) => {
-  res.status(404).send('Asset not found');
-});
-
-// General static files (manifest, icons, etc.)
-app.use(express.static(distPath));
-
-// Express 5 SPA fallback with no-cache on HTML to ensure updates load immediately
-app.use((req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(distPath, 'index.html'));
-});
-
-// ============================================================================
-// Automated Background Stream Pre-Warm & Sync Engine
-// Automatically polls upstream streams, syncs tomorrow's games, and pre-warms cache
-// ============================================================================
-async function runAutoSync() {
-  try {
-    await Promise.allSettled([
-      getBasketballStreams(true),
-      getFootballStreams(true),
-      getScoreboard(),
-      getNflScoreboard()
-    ]);
-  } catch {
-    // silent catch
-  }
-}
-
-// Initial sync on boot
-runAutoSync();
-
-// Continuous automatic sync every 45 seconds so all upcoming games are ready without manual intervention
-setInterval(runAutoSync, 45000);
-
-// Start autonomous background watchdog (pregame stream preparation & health monitor)
-autonomousWatchdog.start();
-
-// Purge all old active sessions and online viewers on startup
 // 11. Problem Reports (User Feedback & Issues Bank)
 async function sendDiscordProblemNotification(report) {
   try {
@@ -1367,6 +1297,75 @@ app.get('/api/admin/reports', (req, res) => {
     return res.json({ success: true, reports: [] });
   }
 });
+
+// Detect dist directory whether running from root or dist/
+let distPath = path.join(__dirname, 'dist');
+if (!fs.existsSync(distPath) && fs.existsSync(path.join(__dirname, 'index.html'))) {
+  distPath = __dirname;
+}
+
+// Explicit Admin and QuickAccess route direct access (compatible with Express 5 path-to-regexp)
+app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Dedicated /updating route
+app.get('/updating', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const updatingHtml = path.join(distPath, 'updating.html');
+  if (fs.existsSync(updatingHtml)) {
+    return res.sendFile(updatingHtml);
+  }
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Service worker must never be cached aggressively
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'text/javascript');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(distPath, 'sw.js'));
+});
+
+// Serve assets - return 404 for missing assets instead of falling through to HTML
+app.use('/assets', express.static(path.join(distPath, 'assets')), (req, res) => {
+  res.status(404).send('Asset not found');
+});
+
+// General static files (manifest, icons, etc.)
+app.use(express.static(distPath));
+
+// Express 5 SPA fallback with no-cache on HTML to ensure updates load immediately
+app.use((req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// ============================================================================
+// Automated Background Stream Pre-Warm & Sync Engine
+// Automatically polls upstream streams, syncs tomorrow's games, and pre-warms cache
+// ============================================================================
+async function runAutoSync() {
+  try {
+    await Promise.allSettled([
+      getBasketballStreams(true),
+      getFootballStreams(true),
+      getScoreboard(),
+      getNflScoreboard()
+    ]);
+  } catch {
+    // silent catch
+  }
+}
+
+// Initial sync on boot
+runAutoSync();
+
+// Continuous automatic sync every 45 seconds so all upcoming games are ready without manual intervention
+setInterval(runAutoSync, 45000);
+
+// Start autonomous background watchdog (pregame stream preparation & health monitor)
+autonomousWatchdog.start();
 
 // Persist active user sessions across server reboots so users never get kicked out during updates
 // (Sessions remain valid until explicit user logout)

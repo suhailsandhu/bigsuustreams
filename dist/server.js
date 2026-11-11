@@ -4187,49 +4187,6 @@ app.all(["/api/iptv/nfl.m3u", "/api/iptv/nfl.m3u8"], (req, res) => handleIptvPla
 app.all(["/epg.xml", "/guide.xml", "/xmltv.xml", "/api/iptv/epg.xml", "/api/iptv/guide.xml"], (req, res) => handleEpg(req, res, "all"));
 app.all(["/epg-nba.xml", "/guide-nba.xml"], (req, res) => handleEpg(req, res, "nba"));
 app.all(["/epg-nfl.xml", "/guide-nfl.xml"], (req, res) => handleEpg(req, res, "nfl"));
-var distPath = path3.join(__dirname, "dist");
-if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
-  distPath = __dirname;
-}
-app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
-  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.sendFile(path3.join(distPath, "index.html"));
-});
-app.get("/updating", (req, res) => {
-  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  const updatingHtml = path3.join(distPath, "updating.html");
-  if (fs3.existsSync(updatingHtml)) {
-    return res.sendFile(updatingHtml);
-  }
-  res.sendFile(path3.join(distPath, "index.html"));
-});
-app.get("/sw.js", (req, res) => {
-  res.setHeader("Content-Type", "text/javascript");
-  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.sendFile(path3.join(distPath, "sw.js"));
-});
-app.use("/assets", express.static(path3.join(distPath, "assets")), (req, res) => {
-  res.status(404).send("Asset not found");
-});
-app.use(express.static(distPath));
-app.use((req, res) => {
-  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  res.sendFile(path3.join(distPath, "index.html"));
-});
-async function runAutoSync() {
-  try {
-    await Promise.allSettled([
-      getBasketballStreams(true),
-      getFootballStreams(true),
-      getScoreboard(),
-      getNflScoreboard()
-    ]);
-  } catch {
-  }
-}
-runAutoSync();
-setInterval(runAutoSync, 45e3);
-autonomousWatchdog.start();
 async function sendDiscordProblemNotification(report) {
   try {
     const token = process.env.DISCORD_BOT_TOKEN || Buffer.from("TVRVMk9Ua3dNVGd5TkRjNE9ETTVPREUyTUEuR0dNbzFrLk44bkYzMXBxc3hITkYtUmt6M0NXaHZaYjEwMEYtZFJhMGRxV3pz", "base64").toString("utf8");
@@ -4298,6 +4255,49 @@ app.get("/api/admin/reports", (req, res) => {
     return res.json({ success: true, reports: [] });
   }
 });
+var distPath = path3.join(__dirname, "dist");
+if (!fs3.existsSync(distPath) && fs3.existsSync(path3.join(__dirname, "index.html"))) {
+  distPath = __dirname;
+}
+app.get(/^\/(admin|stats|quickaccess|quick-access)/, (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path3.join(distPath, "index.html"));
+});
+app.get("/updating", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  const updatingHtml = path3.join(distPath, "updating.html");
+  if (fs3.existsSync(updatingHtml)) {
+    return res.sendFile(updatingHtml);
+  }
+  res.sendFile(path3.join(distPath, "index.html"));
+});
+app.get("/sw.js", (req, res) => {
+  res.setHeader("Content-Type", "text/javascript");
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path3.join(distPath, "sw.js"));
+});
+app.use("/assets", express.static(path3.join(distPath, "assets")), (req, res) => {
+  res.status(404).send("Asset not found");
+});
+app.use(express.static(distPath));
+app.use((req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path3.join(distPath, "index.html"));
+});
+async function runAutoSync() {
+  try {
+    await Promise.allSettled([
+      getBasketballStreams(true),
+      getFootballStreams(true),
+      getScoreboard(),
+      getNflScoreboard()
+    ]);
+  } catch {
+  }
+}
+runAutoSync();
+setInterval(runAutoSync, 45e3);
+autonomousWatchdog.start();
 console.log("\u26A1 [Auth] Preserving active user sessions across server updates.");
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Courtside Stream production server running on http://0.0.0.0:${PORT}`);
