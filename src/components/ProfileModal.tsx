@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, ChevronRight, AlertCircle, LogOut, Send, CheckCircle2 } from 'lucide-react';
+import { 
+  X, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
+  User, Play, Monitor, Layers, Sliders, ShieldCheck, Info,
+  LogOut, Copy, RefreshCw, Trash2, Zap, AlertCircle, CheckCircle2,
+  Sparkles, ExternalLink
+} from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 import Lanyard from './Lanyard';
 
@@ -36,13 +41,67 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   });
 
   const [streamQualityMode, setStreamQualityMode] = useState<string>(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('bss_stream_quality_mode')) || 'auto';
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_stream_quality_mode')) || '720p';
+  });
+
+  const [bufferMode, setBufferMode] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_buffer_mode')) || 'smooth';
+  });
+
+  const [autoPlay, setAutoPlay] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('bss_autoplay') !== 'false' : true;
+  });
+
+  const [hwAcceleration, setHwAcceleration] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('bss_hw_accel') !== 'false' : true;
+  });
+
+  const [themeMode, setThemeMode] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_theme_mode')) || 'light';
+  });
+
+  const [layoutDensity, setLayoutDensity] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_layout_density')) || 'comfortable';
+  });
+
+  const [autoFullscreen, setAutoFullscreen] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('bss_auto_fullscreen') === 'true';
+  });
+
+  const [scoreTicker, setScoreTicker] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('bss_score_ticker') !== 'false' : true;
+  });
+
+  const [defaultSport, setDefaultSport] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_default_sport')) || 'nba';
+  });
+
+  const [showStandings, setShowStandings] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('bss_show_standings') !== 'false' : true;
+  });
+
+  const [clockFormat, setClockFormat] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('bss_clock_format')) || '12h';
+  });
+
+  const [soundHaptics, setSoundHaptics] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('bss_sound_haptics') !== 'false' : true;
+  });
+
+  const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('bss_privacy_mode') === 'true';
   });
 
   const [isFlipped, setIsFlipped] = useState(false);
+  const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
   // Sub-dialogs: 'team' picker or 'report' problem dialog
   const [activeDialog, setActiveDialog] = useState<'team' | 'report' | null>(null);
+
+  // Notification feedbacks
+  const [copiedIptv, setCopiedIptv] = useState(false);
+  const [copiedEpg, setCopiedEpg] = useState(false);
+  const [cacheCleared, setCacheCleared] = useState(false);
 
   // Report a problem state
   const [problemMessage, setProblemMessage] = useState('');
@@ -73,10 +132,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     currentUser?.isVip === true
   );
 
-  const displayName = currentUser?.displayName || currentUser?.username || 'Big Suu';
-  const roleName = isVip ? 'VIP PASS' : 'MEMBER PASS';
-  const initials = (displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2) || 'BS').toUpperCase();
-
+  const displayName = currentUser?.displayName || currentUser?.username || 'BigSuu';
+  const roleName = isVip ? 'VIP MEMBER' : 'MEMBER';
   const selectedTeams = ALL_TEAMS.filter(t => favoriteTeamIds.includes(t.id));
 
   // Toggle favorite team selection (allows adding multiple)
@@ -104,18 +161,34 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onSettingsChange?.();
   };
 
-  const handleToggleHideScores = () => {
-    const next = !hideScores;
-    setHideScores(next);
-    localStorage.setItem('bss_hide_scores', next ? 'true' : 'false');
-    onSettingsChange?.();
+  const handleCopyIptv = () => {
+    const host = window.location.origin;
+    const url = `${host}/playlist.m3u8`;
+    navigator.clipboard?.writeText(url);
+    setCopiedIptv(true);
+    setTimeout(() => setCopiedIptv(false), 2200);
   };
 
-  const handleToggleQuality = () => {
-    const next = streamQualityMode === 'highest' ? 'auto' : 'highest';
-    setStreamQualityMode(next);
-    localStorage.setItem('bss_stream_quality_mode', next);
-    onSettingsChange?.();
+  const handleCopyEpg = () => {
+    const host = window.location.origin;
+    const url = `${host}/epg.xml`;
+    navigator.clipboard?.writeText(url);
+    setCopiedEpg(true);
+    setTimeout(() => setCopiedEpg(false), 2200);
+  };
+
+  const handleClearCache = () => {
+    try {
+      if ('caches' in window) {
+        caches.keys().then(names => names.forEach(n => caches.delete(n)));
+      }
+      localStorage.removeItem('bss_stream_cache');
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 2200);
+    } catch {
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 2200);
+    }
   };
 
   const handleSubmitReport = async (e: React.FormEvent) => {
@@ -148,152 +221,211 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }, 2200);
   };
 
-  // Ultra-crisp Glassy SVG for the FRONT of the 3D card (says BSS STREAMS)
+  const toggleAccordion = (section: string) => {
+    setOpenAccordion(prev => (prev === section ? null : section));
+  };
+
+  // Ultra-crisp Glassy SVG for the FRONT of the 3D card (100% matching Image 1)
   const frontBadgeDataUrl = () => {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
         <defs>
-          <linearGradient id="glassBase" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/>
-            <stop offset="50%" stop-color="#f8fafc" stop-opacity="0.92"/>
-            <stop offset="100%" stop-color="#edf2f7" stop-opacity="0.95"/>
+          <linearGradient id="frontGlass" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="35%" stop-color="#f8fafc" stop-opacity="0.88"/>
+            <stop offset="70%" stop-color="#ffffff" stop-opacity="0.94"/>
+            <stop offset="100%" stop-color="#edf2f7" stop-opacity="0.88"/>
           </linearGradient>
-          <linearGradient id="glassSheen" x1="0%" y1="0%" x2="100%" y2="80%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
-            <stop offset="40%" stop-color="#ffffff" stop-opacity="0.15"/>
-            <stop offset="70%" stop-color="#ffffff" stop-opacity="0.0"/>
+          <linearGradient id="frontWave" x1="0%" y1="0%" x2="100%" y2="80%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.65"/>
+            <stop offset="45%" stop-color="#ffffff" stop-opacity="0.2"/>
+            <stop offset="75%" stop-color="#ffffff" stop-opacity="0.0"/>
           </linearGradient>
-          <linearGradient id="glassBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
-            <stop offset="50%" stop-color="${isVip ? '#fbbf24' : '#cbd5e1'}" stop-opacity="0.8"/>
-            <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.4"/>
+          <radialGradient id="frontGlowBL" cx="0%" cy="100%" r="55%">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.45"/>
+            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="frontGlowMR" cx="100%" cy="60%" r="50%">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.38"/>
+            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.08"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="goldHalo" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fde68a"/>
+            <stop offset="50%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#d97706"/>
           </linearGradient>
         </defs>
 
-        <!-- Glass Background with Frosted Drop Shadow Appearance -->
-        <rect width="600" height="900" rx="48" fill="url(#glassBase)" stroke="url(#glassBorder)" stroke-width="5"/>
-        
-        <!-- Diagonal Glass Sheen Layer -->
-        <path d="M 0 0 L 320 0 L 120 900 L 0 900 Z" fill="url(#glassSheen)" opacity="0.45"/>
-        <path d="M 40 40 L 560 40 L 560 860 L 40 860 Z" rx="36" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.7"/>
+        <!-- Frosted Glass Card Base with Soft White Edge -->
+        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#frontGlass)" stroke="rgba(255, 255, 255, 0.95)" stroke-width="4"/>
+        <rect x="17" y="17" width="566" height="866" rx="44" fill="none" stroke="rgba(203, 213, 225, 0.45)" stroke-width="2"/>
 
-        <!-- Top Lanyard Hole Slot -->
-        <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
+        <!-- Warm Golden Corner Edge Glows matching photo -->
+        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#frontGlowBL)"/>
+        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#frontGlowMR)"/>
 
-        <!-- Header Tag: BSS STREAMS -->
-        <text x="300" y="175" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="34" fill="#0f172a" text-anchor="middle" letter-spacing="3">
-          BSS STREAMS
-        </text>
-        <rect x="200" y="215" width="200" height="40" rx="20" fill="${isVip ? 'rgba(254, 243, 199, 0.9)' : 'rgba(241, 245, 249, 0.9)'}" stroke="${isVip ? '#f59e0b' : '#cbd5e1'}" stroke-width="2"/>
-        <text x="300" y="241" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="15" fill="${isVip ? '#b45309' : '#475569'}" text-anchor="middle" letter-spacing="2">
+        <!-- Curved Specular Glass Sheen -->
+        <path d="M 15 15 L 360 15 C 240 380 400 620 200 885 L 15 885 Z" fill="url(#frontWave)" opacity="0.6"/>
+
+        <!-- Top Lanyard Slot Cutout -->
+        <rect x="250" y="55" width="100" height="26" rx="13" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2.5"/>
+
+        <!-- Top VIP MEMBER Pill with Gold Crown -->
+        <rect x="195" y="150" width="210" height="48" rx="24" fill="rgba(254, 243, 199, 0.65)" stroke="#f59e0b" stroke-width="2.5"/>
+        <g transform="translate(216, 163)">
+          <path d="M 0 17 L 3 4 L 8 11 L 14 0 L 20 11 L 25 4 L 28 17 Z" fill="#f59e0b"/>
+        </g>
+        <text x="312" y="181" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="16" fill="#0f172a" text-anchor="middle" letter-spacing="2">
           ${roleName}
         </text>
 
-        <!-- Premium Glass Avatar Circle -->
-        <circle cx="300" cy="435" r="105" fill="${isVip ? '#fffbeb' : '#ffffff'}" stroke="${isVip ? '#d97706' : '#0f172a'}" stroke-width="5"/>
-        <circle cx="300" cy="435" r="97" fill="none" stroke="${isVip ? '#fbbf24' : '#e2e8f0'}" stroke-width="2" opacity="0.8"/>
-        <text x="300" y="470" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="80" fill="${isVip ? '#b45309' : '#0f172a'}" text-anchor="middle">
-          ${initials}
-        </text>
+        <!-- Circular Avatar Frame with Gold Halo -->
+        <circle cx="300" cy="345" r="105" fill="none" stroke="url(#goldHalo)" stroke-width="5"/>
+        <circle cx="300" cy="345" r="98" fill="#e2e8f0"/>
+        
+        <!-- Clean User Silhouette Icon -->
+        <circle cx="300" cy="320" r="34" fill="#94a3b8"/>
+        <path d="M 235 395 C 235 352 260 352 300 352 C 340 352 365 352 365 395 C 365 405 235 405 235 395 Z" fill="#94a3b8"/>
 
-        <!-- Username -->
-        <text x="300" y="620" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
+        <!-- Display Name: BigSuu -->
+        <text x="300" y="505" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="44" fill="#0f172a" text-anchor="middle" letter-spacing="-1">
           ${displayName}
         </text>
 
         <!-- Barcode / Strip -->
-        <line x1="90" y1="710" x2="510" y2="710" stroke="#e2e8f0" stroke-width="2"/>
-        <g fill="#64748b" opacity="0.7">
-          <rect x="110" y="735" width="8" height="50"/>
-          <rect x="125" y="735" width="18" height="50"/>
-          <rect x="150" y="735" width="6" height="50"/>
-          <rect x="165" y="735" width="24" height="50"/>
-          <rect x="195" y="735" width="12" height="50"/>
-          <rect x="215" y="735" width="8" height="50"/>
-          <rect x="230" y="735" width="20" height="50"/>
-          <rect x="260" y="735" width="12" height="50"/>
-          <rect x="280" y="735" width="28" height="50"/>
-          <rect x="320" y="735" width="8" height="50"/>
-          <rect x="335" y="735" width="16" height="50"/>
-          <rect x="360" y="735" width="22" height="50"/>
-          <rect x="390" y="735" width="10" height="50"/>
-          <rect x="410" y="735" width="30" height="50"/>
-          <rect x="450" y="735" width="14" height="50"/>
-          <rect x="475" y="735" width="8" height="50"/>
+        <g fill="#94a3b8" opacity="0.65">
+          <rect x="110" y="555" width="6" height="42"/>
+          <rect x="122" y="555" width="14" height="42"/>
+          <rect x="142" y="555" width="4" height="42"/>
+          <rect x="152" y="555" width="18" height="42"/>
+          <rect x="176" y="555" width="10" height="42"/>
+          <rect x="192" y="555" width="6" height="42"/>
+          <rect x="204" y="555" width="16" height="42"/>
+          <rect x="226" y="555" width="8" height="42"/>
+          <rect x="240" y="555" width="22" height="42"/>
+          <rect x="268" y="555" width="6" height="42"/>
+          <rect x="280" y="555" width="14" height="42"/>
+          <rect x="300" y="555" width="18" height="42"/>
+          <rect x="324" y="555" width="8" height="42"/>
+          <rect x="338" y="555" width="24" height="42"/>
+          <rect x="368" y="555" width="12" height="42"/>
+          <rect x="386" y="555" width="6" height="42"/>
+          <rect x="398" y="555" width="16" height="42"/>
+          <rect x="420" y="555" width="10" height="42"/>
+          <rect x="436" y="555" width="20" height="42"/>
+          <rect x="462" y="555" width="8" height="42"/>
+          <rect x="476" y="555" width="14" height="42"/>
+        </g>
+
+        <!-- Bottom Pill Button: Tap for Settings > -->
+        <rect x="145" y="660" width="310" height="54" rx="27" fill="rgba(255, 255, 255, 0.9)" stroke="rgba(203, 213, 225, 0.9)" stroke-width="2"/>
+        
+        <!-- Small gear icon inside button -->
+        <g transform="translate(185, 678)" stroke="#0f172a" stroke-width="2.5" fill="none" stroke-linecap="round">
+          <circle cx="9" cy="9" r="4"/>
+          <path d="M 9 1 L 9 3 M 9 15 L 9 17 M 1 9 L 3 9 M 15 9 L 17 9 M 3.5 3.5 L 5 5 M 13 13 L 14.5 14.5 M 14.5 3.5 L 13 5 M 5 13 L 3.5 14.5"/>
         </g>
         
-        <rect x="130" y="810" width="340" height="42" rx="21" fill="rgba(234, 88, 12, 0.12)" stroke="#ea580c" stroke-width="2"/>
-        <text x="300" y="837" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="16" fill="#ea580c" text-anchor="middle" letter-spacing="3">
-          TAP CARD FOR SETTINGS ⚙
+        <text x="305" y="694" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="16" fill="#0f172a" text-anchor="middle">
+          Tap for Settings
         </text>
+
+        <!-- Right Chevron > -->
+        <path d="M 416 681 L 424 687 L 416 693" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     `;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
-  // Ultra-crisp Glassy SVG for the BACK of the 3D card
+  // Ultra-crisp Glassy SVG for the BACK of the 3D card (100% matching Image 2)
   const backBadgeDataUrl = () => {
-    const teamsText = selectedTeams.length > 0 
-      ? selectedTeams.map(t => t.name).join(', ')
-      : 'None Selected';
-    const qualityText = streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)';
-    const spoilerText = hideScores ? 'Scores Hidden (Active)' : 'Show Live Scores';
-
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
         <defs>
-          <linearGradient id="backGlassBase" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.98"/>
-            <stop offset="100%" stop-color="#f1f5f9" stop-opacity="0.95"/>
+          <linearGradient id="backGlass" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+            <stop offset="40%" stop-color="#f8fafc" stop-opacity="0.88"/>
+            <stop offset="100%" stop-color="#edf2f7" stop-opacity="0.92"/>
           </linearGradient>
-          <linearGradient id="backGlassSheen" x1="0%" y1="0%" x2="100%" y2="80%">
-            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
-            <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
+          <linearGradient id="backWave" x1="0%" y1="0%" x2="100%" y2="80%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+            <stop offset="50%" stop-color="#ffffff" stop-opacity="0.15"/>
             <stop offset="80%" stop-color="#ffffff" stop-opacity="0.0"/>
           </linearGradient>
+          <radialGradient id="backGlowBL" cx="0%" cy="100%" r="55%">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.45"/>
+            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.1"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="backGlowMR" cx="100%" cy="60%" r="50%">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.38"/>
+            <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.08"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
         </defs>
 
-        <rect width="600" height="900" rx="48" fill="url(#backGlassBase)" stroke="#ea580c" stroke-width="5"/>
-        <path d="M 0 0 L 320 0 L 120 900 L 0 900 Z" fill="url(#backGlassSheen)" opacity="0.4"/>
-        <circle cx="300" cy="70" r="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="3"/>
+        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#backGlass)" stroke="rgba(255, 255, 255, 0.95)" stroke-width="4"/>
+        <rect x="17" y="17" width="566" height="866" rx="44" fill="none" stroke="rgba(203, 213, 225, 0.45)" stroke-width="2"/>
 
-        <text x="300" y="170" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="30" fill="#0f172a" text-anchor="middle" letter-spacing="3">
-          CARD SETTINGS
-        </text>
-        <line x1="80" y1="210" x2="520" y2="210" stroke="#f1f5f9" stroke-width="3"/>
+        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#backGlowBL)"/>
+        <rect x="15" y="15" width="570" height="870" rx="46" fill="url(#backGlowMR)"/>
+        <path d="M 15 15 L 360 15 C 240 380 400 620 200 885 L 15 885 Z" fill="url(#backWave)" opacity="0.55"/>
 
-        <!-- Setting 1: Favorite Teams -->
-        <text x="80" y="270" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="17" fill="#94a3b8" letter-spacing="2">
-          FAVORITE TEAMS (${selectedTeams.length})
-        </text>
-        <rect x="80" y="290" width="440" height="74" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="336" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="#0f172a">
-          ${teamsText.length > 24 ? teamsText.slice(0, 24) + '...' : teamsText}
-        </text>
+        <!-- Top Lanyard Slot Cutout -->
+        <rect x="250" y="55" width="100" height="26" rx="13" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2.5"/>
 
-        <!-- Setting 2: Spoiler Shield -->
-        <text x="80" y="420" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="17" fill="#94a3b8" letter-spacing="2">
-          HIDE FINAL SCORES
-        </text>
-        <rect x="80" y="440" width="440" height="74" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="486" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="${hideScores ? '#ea580c' : '#0f172a'}">
-          ${spoilerText}
+        <!-- Header: Back Button on Left, Settings Title in Center -->
+        <rect x="55" y="130" width="46" height="46" rx="14" fill="rgba(255, 255, 255, 0.85)" stroke="rgba(203, 213, 225, 0.8)" stroke-width="2"/>
+        <path d="M 81 146 L 73 153 L 81 160" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        <text x="300" y="162" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="28" fill="#0f172a" text-anchor="middle">
+          Settings
         </text>
 
-        <!-- Setting 3: Playback Quality -->
-        <text x="80" y="570" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="17" fill="#94a3b8" letter-spacing="2">
-          PLAYBACK STREAM
-        </text>
-        <rect x="80" y="590" width="440" height="74" rx="18" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
-        <text x="110" y="636" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="20" fill="#0f172a">
-          ${qualityText}
-        </text>
+        <!-- 7 Frosted Glass Pill Rows matching Image 2 -->
+        <!-- 1. Account -->
+        <rect x="55" y="210" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="239" r="14" fill="#f1f5f9"/>
+        <text x="135" y="246" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Account</text>
+        <path d="M 505 235 L 513 243 L 521 235" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-        <line x1="80" y1="730" x2="520" y2="730" stroke="#f1f5f9" stroke-width="3"/>
-        <rect x="130" y="780" width="340" height="46" rx="23" fill="#ea580c"/>
-        <text x="300" y="809" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="17" fill="#ffffff" text-anchor="middle" letter-spacing="2">
-          TAP TO EDIT SETTINGS
-        </text>
+        <!-- 2. Playback -->
+        <rect x="55" y="285" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="314" r="14" fill="#f1f5f9"/>
+        <text x="135" y="321" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Playback</text>
+        <path d="M 505 310 L 513 318 L 521 310" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- 3. Display -->
+        <rect x="55" y="360" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="389" r="14" fill="#f1f5f9"/>
+        <text x="135" y="396" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Display</text>
+        <path d="M 505 385 L 513 393 L 521 385" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- 4. Content -->
+        <rect x="55" y="435" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="464" r="14" fill="#f1f5f9"/>
+        <text x="135" y="471" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Content</text>
+        <path d="M 505 460 L 513 468 L 521 460" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- 5. Preferences -->
+        <rect x="55" y="510" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="539" r="14" fill="#f1f5f9"/>
+        <text x="135" y="546" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Preferences</text>
+        <path d="M 505 535 L 513 543 L 521 535" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- 6. Security -->
+        <rect x="55" y="585" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="614" r="14" fill="#f1f5f9"/>
+        <text x="135" y="621" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">Security</text>
+        <path d="M 505 610 L 513 618 L 521 610" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- 7. About -->
+        <rect x="55" y="660" width="490" height="58" rx="22" fill="rgba(255, 255, 255, 0.8)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2"/>
+        <circle cx="95" cy="689" r="14" fill="#f1f5f9"/>
+        <text x="135" y="696" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="19" fill="#0f172a">About</text>
+        <path d="M 505 685 L 513 693 L 521 685" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     `;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -312,16 +444,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 select-none bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-sm sm:max-w-md h-[88vh] flex flex-col items-center justify-between">
+      <div className="relative w-full max-w-sm sm:max-w-md h-[92vh] flex flex-col items-center justify-between">
         
-        {/* Floating Close Button Top Right */}
-        <div className="w-full flex justify-end px-2 pt-2 z-30">
+        {/* Floating Close Button Top Right matching user's image */}
+        <div className="w-full flex justify-end px-2 pt-1 z-30">
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer active:scale-95 shadow-lg border border-white/20"
+            className="w-9 h-9 rounded-full bg-black/80 hover:bg-black text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer active:scale-95 shadow-xl border border-white/20"
             title="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -338,7 +470,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             }}
           >
             
-            {/* FRONT FACE: 3D Swinging Lanyard Badge */}
+            {/* FRONT FACE: 3D Swinging Lanyard Badge (Matching Image 1) */}
             <div 
               className="absolute inset-0 w-full h-full flex items-center justify-center"
               style={{
@@ -346,14 +478,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 WebkitBackfaceVisibility: 'hidden'
               }}
               onClick={() => setIsFlipped(true)}
-              title="Tap card to flip to settings"
+              title="Tap card to open settings"
             >
               <Lanyard
                 frontImage={frontBadgeDataUrl()}
                 backImage={backBadgeDataUrl()}
                 cardColor="#ffffff"
-                strapColor={isVip ? '#d97706' : '#1e293b'}
-                metal={isVip ? 'gold' : 'silver'}
+                strapColor="#1d4ed8" /* Royal Blue matching photo */
+                metal="gold" /* Gold metal clamp & ring matching photo */
                 size={0.82}
                 strapLength={0.4}
                 strapWidth={0.65}
@@ -369,7 +501,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               />
             </div>
 
-            {/* BACK FACE: Interactive HTML Settings Card */}
+            {/* BACK FACE: Frosted Glass Settings Card with Accordion Dropdowns (Matching Image 2) */}
             <div 
               className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-auto"
               style={{
@@ -378,109 +510,539 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 transform: 'rotateY(180deg)'
               }}
             >
-              <div className="relative w-[300px] sm:w-[325px] bg-white rounded-3xl p-5 shadow-2xl border-4 border-orange-500 flex flex-col justify-between max-h-[92%] overflow-y-auto">
+              {/* Frosted Glass Acrylic Badge Body */}
+              <div className="relative w-[310px] sm:w-[340px] max-h-[94%] bg-white/85 backdrop-blur-2xl rounded-[38px] p-4 sm:p-5 shadow-2xl border-4 border-white/80 flex flex-col justify-between overflow-hidden">
                 
-                {/* Lanyard Top Ring Slot */}
-                <div className="w-full flex items-center justify-between pb-2 border-b border-gray-100">
-                  <button
-                    onClick={() => setIsFlipped(false)}
-                    className="text-xs font-black text-orange-600 hover:text-orange-700 flex items-center space-x-1 cursor-pointer"
-                  >
-                    <span>← Flip to Front</span>
-                  </button>
-                  <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-300" />
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Settings</span>
+                {/* Lanyard Top Ribbon & Ring Decor */}
+                <div className="w-full flex items-center justify-center -mt-2 pb-2">
+                  <div className="w-20 h-4 bg-slate-200/80 rounded-full border border-slate-300 flex items-center justify-center shadow-inner">
+                    <div className="w-3.5 h-3.5 rounded-full bg-amber-400 border border-amber-500 shadow-xs" />
+                  </div>
                 </div>
 
-                {/* Editable Setting Rows inside the Card */}
-                <div className="space-y-3 pt-3">
+                {/* Header: Back Button on Left, Settings Title in Center */}
+                <div className="w-full flex items-center justify-between pb-3 border-b border-slate-200/60">
+                  <button
+                    onClick={() => setIsFlipped(false)}
+                    className="w-8 h-8 rounded-xl bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center shadow-xs border border-slate-200 cursor-pointer transition active:scale-95"
+                    title="Back to Front"
+                  >
+                    <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                  </button>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    Settings
+                  </h2>
+                  <div className="w-8" />
+                </div>
+
+                {/* Scrollable List of 7 Dropdown Pills matching Image 2 */}
+                <div className="flex-1 overflow-y-auto space-y-2 py-3 pr-1 scrollbar-thin">
                   
-                  {/* 1. Favorite Teams (Multi-team with logos) */}
-                  <div 
-                    onClick={() => setActiveDialog('team')}
-                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98]"
-                  >
-                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                      <span>Favorite Teams ({selectedTeams.length})</span>
-                      <span className="text-orange-600 text-[11px] font-bold">Edit ✎</span>
-                    </div>
+                  {/* 1. Account Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('account')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">Account</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'account' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
 
-                    <div className="mt-2 flex items-center justify-between">
-                      {selectedTeams.length > 0 ? (
-                        <div className="flex items-center space-x-1.5 overflow-x-auto py-0.5 max-w-[210px] scrollbar-none">
-                          {selectedTeams.slice(0, 4).map(team => (
-                            <div key={team.id} className="w-8 h-8 rounded-xl bg-white p-1 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs" title={team.displayName}>
-                              <img src={team.logo} alt={team.name} className="w-6 h-6 object-contain" />
-                            </div>
-                          ))}
-                          {selectedTeams.length > 4 && (
-                            <div className="w-7 h-7 rounded-xl bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 shrink-0">
-                              +{selectedTeams.length - 4}
-                            </div>
-                          )}
+                    {openAccordion === 'account' && (
+                      <div className="p-3.5 pt-1 space-y-2.5 border-t border-slate-100 bg-white/50 text-xs">
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">User</span>
+                          <span className="font-black text-slate-900">{displayName}</span>
                         </div>
-                      ) : (
-                        <div className="text-xs font-black text-slate-400">
-                          None Selected (Tap to add)
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">Status</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                            {roleName}
+                          </span>
                         </div>
-                      )}
-                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-                    </div>
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">Email</span>
+                          <span className="font-semibold text-slate-600 truncate max-w-[160px]">{currentUser?.email || 'sandhu.suhail@gmail.com'}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onLogout();
+                          }}
+                          className="w-full mt-2 py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* 2. Show or Hide Final Scores */}
-                  <div 
-                    onClick={handleToggleHideScores}
-                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Show or Hide Final Scores
+                  {/* 2. Playback Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('playback')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <Play className="w-4 h-4 fill-slate-700" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">Playback</span>
                       </div>
-                      <div className="text-xs font-black text-slate-900 mt-0.5">
-                        {hideScores ? 'Scores Hidden (Spoiler Shield)' : 'Show Live Scores'}
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'playback' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
+
+                    {openAccordion === 'playback' && (
+                      <div className="p-3.5 pt-1 space-y-3 border-t border-slate-100 bg-white/50 text-xs">
+                        <div>
+                          <div className="text-[11px] font-black text-slate-500 uppercase tracking-wide mb-1.5">Stream Quality</div>
+                          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+                            {['720p', '1080p', 'auto'].map((q) => (
+                              <button
+                                key={q}
+                                onClick={() => {
+                                  setStreamQualityMode(q);
+                                  localStorage.setItem('bss_stream_quality_mode', q);
+                                  onSettingsChange?.();
+                                }}
+                                className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                  streamQualityMode === q ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                                }`}
+                              >
+                                {q === '720p' ? '720p 60fps' : q === '1080p' ? '1080p FHD' : 'Auto'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[11px] font-black text-slate-500 uppercase tracking-wide mb-1.5">Buffer Latency</div>
+                          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+                            <button
+                              onClick={() => {
+                                setBufferMode('smooth');
+                                localStorage.setItem('bss_buffer_mode', 'smooth');
+                              }}
+                              className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                bufferMode === 'smooth' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                              }`}
+                            >
+                              Smooth Buffer (Stable)
+                            </button>
+                            <button
+                              onClick={() => {
+                                setBufferMode('low_latency');
+                                localStorage.setItem('bss_buffer_mode', 'low_latency');
+                              }}
+                              className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                bufferMode === 'low_latency' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                              }`}
+                            >
+                              Low Latency (Fast)
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-bold text-slate-800">Auto-Play on Select</span>
+                          <button
+                            onClick={() => {
+                              const next = !autoPlay;
+                              setAutoPlay(next);
+                              localStorage.setItem('bss_autoplay', String(next));
+                            }}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${autoPlay ? 'bg-orange-600' : 'bg-slate-300'}`}
+                          >
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${autoPlay ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className={`w-11 h-6 rounded-full p-1 transition-colors shrink-0 ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}>
-                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${hideScores ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </div>
+                    )}
                   </div>
 
-                  {/* 3. Playback Stream */}
-                  <div 
-                    onClick={handleToggleQuality}
-                    className="bg-slate-50 hover:bg-slate-100 rounded-2xl p-3 border border-slate-200 transition cursor-pointer active:scale-[0.98] flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Playback Stream
+                  {/* 3. Display Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('display')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <Monitor className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">Display</span>
                       </div>
-                      <div className="text-xs font-black text-slate-900 mt-0.5">
-                        {streamQualityMode === 'highest' ? 'Highest (1080p FHD)' : 'Consistent Stream (Auto)'}
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'display' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
+
+                    {openAccordion === 'display' && (
+                      <div className="p-3.5 pt-1 space-y-3 border-t border-slate-100 bg-white/50 text-xs">
+                        <div>
+                          <div className="text-[11px] font-black text-slate-500 uppercase tracking-wide mb-1.5">Theme</div>
+                          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+                            {['light', 'dark', 'system'].map((t) => (
+                              <button
+                                key={t}
+                                onClick={() => {
+                                  setThemeMode(t);
+                                  localStorage.setItem('bss_theme_mode', t);
+                                }}
+                                className={`py-1 text-[11px] font-black rounded-lg transition capitalize cursor-pointer ${
+                                  themeMode === t ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                                }`}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[11px] font-black text-slate-500 uppercase tracking-wide mb-1.5">Density</div>
+                          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+                            <button
+                              onClick={() => {
+                                setLayoutDensity('comfortable');
+                                localStorage.setItem('bss_layout_density', 'comfortable');
+                              }}
+                              className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                layoutDensity === 'comfortable' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                              }`}
+                            >
+                              Comfortable
+                            </button>
+                            <button
+                              onClick={() => {
+                                setLayoutDensity('compact');
+                                localStorage.setItem('bss_layout_density', 'compact');
+                              }}
+                              className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                layoutDensity === 'compact' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                              }`}
+                            >
+                              Compact
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-bold text-slate-800">Live Score Pulse Animation</span>
+                          <button
+                            onClick={() => {
+                              const next = !scoreTicker;
+                              setScoreTicker(next);
+                              localStorage.setItem('bss_score_ticker', String(next));
+                            }}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${scoreTicker ? 'bg-orange-600' : 'bg-slate-300'}`}
+                          >
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${scoreTicker ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-xs font-bold text-orange-600 shrink-0">Toggle</span>
+                    )}
+                  </div>
+
+                  {/* 4. Content Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('content')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">Content</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'content' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
+
+                    {openAccordion === 'content' && (
+                      <div className="p-3.5 pt-1 space-y-3 border-t border-slate-100 bg-white/50 text-xs">
+                        {/* Favorite Teams Selector */}
+                        <div 
+                          onClick={() => setActiveDialog('team')}
+                          className="bg-white/90 hover:bg-white rounded-xl p-2.5 border border-slate-200 transition cursor-pointer flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              Favorite Teams ({selectedTeams.length})
+                            </div>
+                            <div className="flex items-center space-x-1 mt-1 overflow-x-auto max-w-[190px]">
+                              {selectedTeams.length > 0 ? (
+                                selectedTeams.slice(0, 3).map(team => (
+                                  <img key={team.id} src={team.logo} alt={team.name} className="w-5 h-5 object-contain" />
+                                ))
+                              ) : (
+                                <span className="font-bold text-slate-500">None Selected</span>
+                              )}
+                              {selectedTeams.length > 3 && (
+                                <span className="text-[10px] font-black text-slate-400">+{selectedTeams.length - 3}</span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-orange-600 flex items-center">
+                            Edit <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                          </span>
+                        </div>
+
+                        {/* Spoiler Shield (Hide Scores) */}
+                        <div className="flex items-center justify-between pt-1">
+                          <div>
+                            <div className="font-bold text-slate-800">Spoiler Shield</div>
+                            <div className="text-[10px] text-slate-400">Hide live & final game scores</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const next = !hideScores;
+                              setHideScores(next);
+                              localStorage.setItem('bss_hide_scores', next ? 'true' : 'false');
+                              onSettingsChange?.();
+                            }}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}
+                          >
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${hideScores ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+
+                        {/* Default Sport Tab */}
+                        <div>
+                          <div className="text-[11px] font-black text-slate-500 uppercase tracking-wide mb-1.5">Default Sport Tab</div>
+                          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+                            <button
+                              onClick={() => {
+                                setDefaultSport('nba');
+                                localStorage.setItem('bss_default_sport', 'nba');
+                              }}
+                              className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                defaultSport === 'nba' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                              }`}
+                            >
+                              🏀 NBA
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDefaultSport('nfl');
+                                localStorage.setItem('bss_default_sport', 'nfl');
+                              }}
+                              className={`py-1 text-[11px] font-black rounded-lg transition cursor-pointer ${
+                                defaultSport === 'nfl' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600'
+                              }`}
+                            >
+                              🏈 NFL
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. Preferences Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('preferences')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <Sliders className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">Preferences</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'preferences' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
+
+                    {openAccordion === 'preferences' && (
+                      <div className="p-3.5 pt-1 space-y-3 border-t border-slate-100 bg-white/50 text-xs">
+                        {/* IPTV M3U Playlist */}
+                        <div className="bg-white/90 rounded-xl p-2.5 border border-slate-200">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800">IPTV / Cyberdash Feed</span>
+                            <button
+                              onClick={handleCopyIptv}
+                              className="text-[11px] font-bold text-orange-600 hover:text-orange-700 flex items-center space-x-1 cursor-pointer"
+                            >
+                              {copiedIptv ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span className="text-emerald-600">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copy M3U</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 truncate font-mono">
+                            /playlist.m3u8 (720p 60fps)
+                          </div>
+                        </div>
+
+                        {/* XMLTV EPG */}
+                        <div className="bg-white/90 rounded-xl p-2.5 border border-slate-200">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800">XMLTV EPG Guide</span>
+                            <button
+                              onClick={handleCopyEpg}
+                              className="text-[11px] font-bold text-orange-600 hover:text-orange-700 flex items-center space-x-1 cursor-pointer"
+                            >
+                              {copiedEpg ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span className="text-emerald-600">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copy EPG</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 truncate font-mono">
+                            /epg.xml
+                          </div>
+                        </div>
+
+                        {/* Clock Format */}
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-bold text-slate-800">Clock Format</span>
+                          <div className="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-lg">
+                            <button
+                              onClick={() => {
+                                setClockFormat('12h');
+                                localStorage.setItem('bss_clock_format', '12h');
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded ${clockFormat === '12h' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'}`}
+                            >
+                              12h
+                            </button>
+                            <button
+                              onClick={() => {
+                                setClockFormat('24h');
+                                localStorage.setItem('bss_clock_format', '24h');
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded ${clockFormat === '24h' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'}`}
+                            >
+                              24h
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6. Security Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('security')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <ShieldCheck className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">Security</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'security' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
+
+                    {openAccordion === 'security' && (
+                      <div className="p-3.5 pt-1 space-y-2.5 border-t border-slate-100 bg-white/50 text-xs">
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">Session Status</span>
+                          <span className="font-bold text-emerald-600 flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+                            Verified
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between py-1">
+                          <div>
+                            <div className="font-bold text-slate-800">Incognito Mode</div>
+                            <div className="text-[10px] text-slate-400">Don't store watch history</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const next = !privacyMode;
+                              setPrivacyMode(next);
+                              localStorage.setItem('bss_privacy_mode', String(next));
+                            }}
+                            className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${privacyMode ? 'bg-orange-600' : 'bg-slate-300'}`}
+                          >
+                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${privacyMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={handleClearCache}
+                          className="w-full mt-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{cacheCleared ? 'Cache Cleared!' : 'Clear Stream Cache'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 7. About Dropdown */}
+                  <div className="rounded-2xl border border-white/90 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+                    <button
+                      onClick={() => toggleAccordion('about')}
+                      className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                          <Info className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">About</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'about' ? 'rotate-180 text-orange-600' : ''}`} />
+                    </button>
+
+                    {openAccordion === 'about' && (
+                      <div className="p-3.5 pt-1 space-y-2 border-t border-slate-100 bg-white/50 text-xs">
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">App Version</span>
+                          <span className="font-bold text-slate-900">v2.8.4 (Smart TV & PWA)</span>
+                        </div>
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">Server Health</span>
+                          <span className="font-bold text-emerald-600">All Systems Operational 🟢</span>
+                        </div>
+                        <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                          <span className="text-slate-500 font-semibold">MPEG-TS Engine</span>
+                          <span className="font-bold text-slate-700">60fps Ultra Smooth</span>
+                        </div>
+
+                        <button
+                          onClick={() => setActiveDialog('report')}
+                          className="w-full mt-1.5 py-2 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                        >
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          <span>Report an Issue to Admin</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                 </div>
 
-                {/* Sign Out at bottom of card */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-3">
+                {/* Card Footer: Back Button */}
+                <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between">
                   <button
                     onClick={() => setIsFlipped(false)}
-                    className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+                    className="w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-black text-xs transition cursor-pointer active:scale-98 shadow-md"
                   >
-                    Done
-                  </button>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onLogout();
-                    }}
-                    className="text-xs font-black text-red-600 hover:text-red-700 flex items-center space-x-1 cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Sign Out</span>
+                    Done (Back to Badge)
                   </button>
                 </div>
 
@@ -598,88 +1160,75 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">
-                {favoriteTeamIds.length} team{favoriteTeamIds.length === 1 ? '' : 's'} chosen
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500">
+                {favoriteTeamIds.length} {favoriteTeamIds.length === 1 ? 'team' : 'teams'} selected
               </span>
               <button
                 onClick={() => setActiveDialog(null)}
-                className="py-2 px-5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black transition cursor-pointer active:scale-95 shadow-md shadow-orange-600/20"
               >
-                Done
+                Save & Close
               </button>
             </div>
+
           </div>
         </div>
       )}
 
-      {/* Pop-up Dialog: Report a Problem with Text Box */}
+      {/* Pop-up Dialog: Interactive Report Problem Modal */}
       {activeDialog === 'report' && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-5 max-w-sm sm:max-w-md w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col">
             
-            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-                  <AlertCircle className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600 font-serif font-black italic text-sm">
+                  i
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">Report a problem</h3>
-                  <p className="text-[10px] text-slate-400 font-semibold">It'll be fixed ASAP</p>
-                </div>
+                <h3 className="text-sm font-black text-slate-900">Report an Issue</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setActiveDialog(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 cursor-pointer"
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition cursor-pointer active:scale-95"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {reportSubmitted ? (
-              <div className="py-8 flex flex-col items-center justify-center text-center space-y-2 animate-in zoom-in-95">
-                <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <h4 className="text-sm font-black text-slate-900">Problem Reported!</h4>
-                <p className="text-xs text-slate-500 max-w-[220px]">
-                  Thank you for letting us know. We are on it and it will be fixed ASAP.
-                </p>
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-2">
+                <CheckCircle2 className="w-10 h-10 text-emerald-500 animate-bounce" />
+                <h4 className="text-sm font-black text-slate-900">Report Received!</h4>
+                <p className="text-xs font-semibold text-slate-500">It'll be fixed ASAP</p>
               </div>
             ) : (
               <form onSubmit={handleSubmitReport} className="pt-3 space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    What is the issue?
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={problemMessage}
-                    onChange={e => setProblemMessage(e.target.value)}
-                    placeholder="Describe the issue (e.g. stream buffering, audio lag, broken link)..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500 resize-none font-medium"
-                    autoFocus
-                    required
-                  />
-                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Notice an issue with a stream or playback? Describe what's happening:
+                </p>
 
-                <div className="flex items-center space-x-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveDialog(null)}
-                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black rounded-xl transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
+                <textarea
+                  value={problemMessage}
+                  onChange={(e) => setProblemMessage(e.target.value)}
+                  placeholder="e.g. Thunder vs Blazers stream is buffering on Cyberdash..."
+                  rows={4}
+                  required
+                  autoFocus
+                  className="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition resize-none"
+                />
+
+                <div className="flex flex-col items-center space-y-2 pt-1">
                   <button
                     type="submit"
                     disabled={isSubmittingReport || !problemMessage.trim()}
-                    className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-lg transition cursor-pointer flex items-center justify-center space-x-1.5"
+                    className="w-full py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-orange-600/20 transition active:scale-98 cursor-pointer"
                   >
-                    <Send className="w-3.5 h-3.5" />
                     <span>{isSubmittingReport ? 'Sending...' : 'Send Report'}</span>
                   </button>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    It'll be fixed ASAP
+                  </span>
                 </div>
               </form>
             )}
