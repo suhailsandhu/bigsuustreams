@@ -3,7 +3,7 @@ import {
   X, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
   User, Play, Monitor, Layers, Sliders, ShieldCheck, Info,
   LogOut, Copy, RefreshCw, Trash2, Zap, AlertCircle, CheckCircle2,
-  Sparkles, ExternalLink
+  Sparkles, ExternalLink, Sun, Moon
 } from 'lucide-react';
 import { ALL_TEAMS } from '../data/nbaTeams';
 
@@ -157,7 +157,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   );
 
   const displayName = currentUser?.displayName || currentUser?.username || 'BigSuu';
-  const roleName = isVip ? 'VIP MEMBER' : 'MEMBER';
+  const roleName = isVip ? 'VIP Member' : 'Basic Membership';
   const selectedTeams = ALL_TEAMS.filter(t => favoriteTeamIds.includes(t.id));
 
   // Toggle favorite team selection (allows adding multiple)
@@ -265,24 +265,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       <div className="relative w-full max-w-sm sm:max-w-md bg-white/95 backdrop-blur-2xl rounded-[32px] p-4 sm:p-5 shadow-2xl border border-white/80 flex flex-col max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header: Title and Close button */}
-        <div className="w-full flex items-center justify-between pb-3 border-b border-slate-200/80">
+        <div className="w-full flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-neutral-800">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-[#1d4ed8] flex items-center justify-center">
               <Sliders className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-neutral-100 tracking-tight">
                 Settings
               </h2>
-              <p className="text-[11px] font-semibold text-slate-500">
-                {displayName} • <span className="text-orange-600 font-bold">{roleName}</span>
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                {displayName} • <span className="text-[#1d4ed8] font-bold">{roleName}</span>
               </p>
             </div>
           </div>
           
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-xs"
+            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-600 dark:text-neutral-300 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-xs"
             title="Close"
           >
             <X className="w-4 h-4 stroke-[2.5]" />
@@ -293,45 +293,45 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         <div className="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1 scrollbar-thin">
           
           {/* 1. Account Dropdown */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/60 backdrop-blur-md shadow-xs overflow-hidden transition-all">
             <button
               onClick={() => toggleAccordion('account')}
-              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 dark:hover:bg-neutral-800/60 cursor-pointer transition"
             >
               <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                <div className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-neutral-300">
                   <User className="w-4 h-4" />
                 </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900">Account</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-neutral-100">Account</span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'account' ? 'rotate-180 text-orange-600' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-neutral-500 transition-transform duration-200 ${openAccordion === 'account' ? 'rotate-180 text-[#1d4ed8]' : ''}`} />
             </button>
 
             {openAccordion === 'account' && (
-              <div className="p-3.5 pt-1 space-y-2.5 border-t border-slate-100 bg-white/50 text-xs">
-                <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-semibold">User</span>
-                  <span className="font-black text-slate-900">{displayName}</span>
+              <div className="p-3.5 pt-1 space-y-2.5 border-t border-slate-100 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/40 text-xs">
+                <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-neutral-800/80">
+                  <span className="text-slate-500 dark:text-neutral-400 font-semibold">User</span>
+                  <span className="font-black text-slate-900 dark:text-neutral-100">{displayName}</span>
                 </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-semibold">Status</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-neutral-800/80">
+                  <span className="text-slate-500 dark:text-neutral-400 font-semibold">Status</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                     {roleName}
                   </span>
                 </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-semibold">Email</span>
-                  <span className="font-semibold text-slate-600 truncate max-w-[160px]">{currentUser?.email || 'sandhu.suhail@gmail.com'}</span>
+                <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-neutral-800/80">
+                  <span className="text-slate-500 dark:text-neutral-400 font-semibold">Email</span>
+                  <span className="font-semibold text-slate-600 dark:text-neutral-300 truncate max-w-[160px]">{currentUser?.email || 'sandhu.suhail@gmail.com'}</span>
                 </div>
-                {/* Clean Slate/Orange Theme (No Red Coloring) */}
+                {/* Clean Slate Theme (No Red Coloring) */}
                 <button
                   onClick={() => {
                     onClose();
                     onLogout();
                   }}
-                  className="w-full mt-2 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-98"
+                  className="w-full mt-2 py-2 px-3 rounded-xl bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 font-bold text-xs flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-98"
                 >
-                  <LogOut className="w-3.5 h-3.5 text-slate-500" />
+                  <LogOut className="w-3.5 h-3.5 text-slate-500 dark:text-neutral-400" />
                   <span>Sign Out</span>
                 </button>
               </div>
@@ -339,25 +339,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           {/* 2. Playback Dropdown */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/60 backdrop-blur-md shadow-xs overflow-hidden transition-all">
             <button
               onClick={() => toggleAccordion('playback')}
-              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 dark:hover:bg-neutral-800/60 cursor-pointer transition"
             >
               <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-                  <Play className="w-4 h-4 fill-slate-700" />
+                <div className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-neutral-300">
+                  <Play className="w-4 h-4 fill-slate-700 dark:fill-neutral-300" />
                 </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900">Playback</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-neutral-100">Playback</span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'playback' ? 'rotate-180 text-orange-600' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-neutral-500 transition-transform duration-200 ${openAccordion === 'playback' ? 'rotate-180 text-[#1d4ed8]' : ''}`} />
             </button>
 
             {openAccordion === 'playback' && (
-              <div className="p-3.5 pt-1 space-y-2.5 border-t border-slate-100 bg-white/50 text-xs">
+              <div className="p-3.5 pt-1 space-y-2.5 border-t border-slate-100 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/40 text-xs">
                 <div>
-                  <div className="text-[11px] font-bold text-slate-600 mb-1.5">Stream Quality</div>
-                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-neutral-400 mb-1.5">Stream Quality</div>
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-neutral-800 p-1.5 rounded-2xl">
                     {/* 720p (more stable) */}
                     <button
                       onClick={() => {
@@ -366,11 +366,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         onSettingsChange?.();
                       }}
                       className={`py-2 px-1 rounded-xl transition cursor-pointer text-center flex flex-col items-center justify-center ${
-                        streamQualityMode === '720p' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        streamQualityMode === '720p' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs' : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <span className="text-xs font-black">720p</span>
-                      <span className="text-[9px] font-semibold text-slate-400 leading-tight">(more stable)</span>
+                      <span className="text-[9px] font-semibold text-slate-400 dark:text-neutral-400 leading-tight">(more stable)</span>
                     </button>
 
                     {/* 1080p (better quality) */}
@@ -381,11 +381,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         onSettingsChange?.();
                       }}
                       className={`py-2 px-1 rounded-xl transition cursor-pointer text-center flex flex-col items-center justify-center ${
-                        streamQualityMode === '1080p' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        streamQualityMode === '1080p' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs' : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <span className="text-xs font-black">1080p</span>
-                      <span className="text-[9px] font-semibold text-slate-400 leading-tight">(better quality)</span>
+                      <span className="text-[9px] font-semibold text-slate-400 dark:text-neutral-400 leading-tight">(better quality)</span>
                     </button>
 
                     {/* Auto */}
@@ -396,11 +396,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         onSettingsChange?.();
                       }}
                       className={`py-2 px-1 rounded-xl transition cursor-pointer text-center flex flex-col items-center justify-center ${
-                        streamQualityMode === 'auto' ? 'bg-white text-orange-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        streamQualityMode === 'auto' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs' : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <span className="text-xs font-black">Auto</span>
-                      <span className="text-[9px] font-semibold text-slate-400 leading-tight">(automatic)</span>
+                      <span className="text-[9px] font-semibold text-slate-400 dark:text-neutral-400 leading-tight">(automatic)</span>
                     </button>
                   </div>
                 </div>
@@ -409,66 +409,66 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           {/* 3. Display Dropdown */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/60 backdrop-blur-md shadow-xs overflow-hidden transition-all">
             <button
               onClick={() => toggleAccordion('display')}
-              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 dark:hover:bg-neutral-800/60 cursor-pointer transition"
             >
               <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                <div className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-neutral-300">
                   <Monitor className="w-4 h-4" />
                 </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900">Display</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-neutral-100">Display</span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'display' ? 'rotate-180 text-orange-600' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-neutral-500 transition-transform duration-200 ${openAccordion === 'display' ? 'rotate-180 text-[#1d4ed8]' : ''}`} />
             </button>
 
             {openAccordion === 'display' && (
-              <div className="p-3.5 pt-1 space-y-3 border-t border-slate-100 bg-white/50 text-xs">
-                {/* Theme Selection with Emoticons (Sun, Moon, Laptop/System) */}
+              <div className="p-3.5 pt-1 space-y-3 border-t border-slate-100 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/40 text-xs">
+                {/* Theme Selection: Vector Art Icons of Sun, Moon, Computer (No Text, No Emojis) */}
                 <div>
-                  <div className="text-[11px] font-bold text-slate-600 mb-1.5">Theme</div>
-                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-neutral-400 mb-1.5">Theme</div>
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-neutral-800 p-1.5 rounded-2xl">
                     <button
                       onClick={() => handleThemeChange('light')}
-                      className={`py-2 rounded-xl transition cursor-pointer flex flex-col items-center justify-center space-y-0.5 ${
-                        themeMode === 'light' ? 'bg-white text-orange-600 shadow-xs font-black' : 'text-slate-600 font-bold hover:text-slate-900'
+                      className={`py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center ${
+                        themeMode === 'light' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
                       }`}
+                      title="Light Theme"
                     >
-                      <span className="text-base leading-none">☀️</span>
-                      <span className="text-[10px]">Light</span>
+                      <Sun className="w-4 h-4 stroke-[2.2]" />
                     </button>
 
                     <button
                       onClick={() => handleThemeChange('dark')}
-                      className={`py-2 rounded-xl transition cursor-pointer flex flex-col items-center justify-center space-y-0.5 ${
-                        themeMode === 'dark' ? 'bg-white text-orange-600 shadow-xs font-black' : 'text-slate-600 font-bold hover:text-slate-900'
+                      className={`py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center ${
+                        themeMode === 'dark' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
                       }`}
+                      title="Dark Theme"
                     >
-                      <span className="text-base leading-none">🌙</span>
-                      <span className="text-[10px]">Dark</span>
+                      <Moon className="w-4 h-4 stroke-[2.2]" />
                     </button>
 
                     <button
                       onClick={() => handleThemeChange('system')}
-                      className={`py-2 rounded-xl transition cursor-pointer flex flex-col items-center justify-center space-y-0.5 ${
-                        themeMode === 'system' ? 'bg-white text-orange-600 shadow-xs font-black' : 'text-slate-600 font-bold hover:text-slate-900'
+                      className={`py-2.5 rounded-xl transition cursor-pointer flex items-center justify-center ${
+                        themeMode === 'system' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white'
                       }`}
+                      title="System Theme"
                     >
-                      <span className="text-base leading-none">💻</span>
-                      <span className="text-[10px]">System</span>
+                      <Monitor className="w-4 h-4 stroke-[2.2]" />
                     </button>
                   </div>
                 </div>
 
                 {/* Density Selection */}
                 <div>
-                  <div className="text-[11px] font-bold text-slate-600 mb-1.5">Layout Density</div>
-                  <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-neutral-400 mb-1.5">Layout Density</div>
+                  <div className="grid grid-cols-2 gap-1.5 bg-slate-100 dark:bg-neutral-800 p-1.5 rounded-2xl">
                     <button
                       onClick={() => handleDensityChange('comfortable')}
                       className={`py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
-                        layoutDensity === 'comfortable' ? 'bg-white text-orange-600 shadow-xs font-black' : 'text-slate-600'
+                        layoutDensity === 'comfortable' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs font-black' : 'text-slate-600 dark:text-neutral-400'
                       }`}
                     >
                       Comfortable
@@ -476,7 +476,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <button
                       onClick={() => handleDensityChange('compact')}
                       className={`py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
-                        layoutDensity === 'compact' ? 'bg-white text-orange-600 shadow-xs font-black' : 'text-slate-600'
+                        layoutDensity === 'compact' ? 'bg-white dark:bg-neutral-700 text-[#1d4ed8] shadow-xs font-black' : 'text-slate-600 dark:text-neutral-400'
                       }`}
                     >
                       Compact
@@ -486,7 +486,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 {/* Pulse Animation */}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="font-semibold text-slate-700">Live Pulse Animation</span>
+                  <span className="font-semibold text-slate-700 dark:text-neutral-300">Live Pulse Animation</span>
                   <button
                     onClick={() => {
                       const next = !scoreTicker;
@@ -494,7 +494,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       localStorage.setItem('bss_score_ticker', String(next));
                       onSettingsChange?.();
                     }}
-                    className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${scoreTicker ? 'bg-orange-600' : 'bg-slate-300'}`}
+                    className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${scoreTicker ? 'bg-[#1d4ed8]' : 'bg-slate-300 dark:bg-neutral-700'}`}
                   >
                     <div className={`w-4 h-4 rounded-full bg-white transition-transform ${scoreTicker ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
@@ -504,30 +504,30 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           {/* 4. Content Dropdown */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur-md shadow-xs overflow-hidden transition-all">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/60 backdrop-blur-md shadow-xs overflow-hidden transition-all">
             <button
               onClick={() => toggleAccordion('content')}
-              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 cursor-pointer transition"
+              className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-white/90 dark:hover:bg-neutral-800/60 cursor-pointer transition"
             >
               <div className="flex items-center space-x-2.5">
-                <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                <div className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-neutral-800 flex items-center justify-center text-slate-700 dark:text-neutral-300">
                   <Layers className="w-4 h-4" />
                 </div>
-                <span className="text-xs sm:text-sm font-black text-slate-900">Content</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-neutral-100">Content</span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${openAccordion === 'content' ? 'rotate-180 text-orange-600' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-neutral-500 transition-transform duration-200 ${openAccordion === 'content' ? 'rotate-180 text-[#1d4ed8]' : ''}`} />
             </button>
 
             {openAccordion === 'content' && (
-              <div className="p-3.5 pt-1 space-y-3.5 border-t border-slate-100 bg-white/50 text-xs">
+              <div className="p-3.5 pt-1 space-y-3.5 border-t border-slate-100 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/40 text-xs">
                 
                 {/* Favorite Teams Selector */}
                 <div 
                   onClick={() => setActiveDialog('team')}
-                  className="bg-white/90 hover:bg-white rounded-2xl p-3 border border-slate-200 transition cursor-pointer flex items-center justify-between shadow-xs"
+                  className="bg-white/90 dark:bg-neutral-800 hover:bg-white dark:hover:bg-neutral-750 rounded-2xl p-3 border border-slate-200 dark:border-neutral-700 transition cursor-pointer flex items-center justify-between shadow-xs"
                 >
                   <div>
-                    <div className="font-bold text-slate-800 text-xs">
+                    <div className="font-bold text-slate-800 dark:text-neutral-200 text-xs">
                       Favorite Teams ({selectedTeams.length})
                     </div>
                     <div className="flex items-center space-x-1.5 mt-1 overflow-x-auto max-w-[200px]">
@@ -536,14 +536,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           <img key={team.id} src={team.logo} alt={team.name} className="w-5 h-5 object-contain" />
                         ))
                       ) : (
-                        <span className="text-[11px] text-slate-400">None selected yet</span>
+                        <span className="text-[11px] text-slate-400 dark:text-neutral-400">None selected yet</span>
                       )}
                       {selectedTeams.length > 4 && (
-                        <span className="text-[10px] font-bold text-slate-400">+{selectedTeams.length - 4}</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-400">+{selectedTeams.length - 4}</span>
                       )}
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-orange-600 flex items-center bg-orange-50 px-2.5 py-1 rounded-xl">
+                  <span className="text-xs font-bold text-[#1d4ed8] flex items-center bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-xl">
                     Choose <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                   </span>
                 </div>
@@ -551,8 +551,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 {/* Spoiler Shield (Hide Scores) */}
                 <div className="flex items-center justify-between pt-1">
                   <div>
-                    <div className="font-bold text-slate-800 text-xs">Spoiler Shield</div>
-                    <div className="text-[11px] text-slate-400">Hide live & final game scores</div>
+                    <div className="font-bold text-slate-800 dark:text-neutral-200 text-xs">Spoiler Shield</div>
+                    <div className="text-[11px] text-slate-400 dark:text-neutral-400">Hide live & final game scores</div>
                   </div>
                   <button
                     onClick={() => {
@@ -561,7 +561,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       localStorage.setItem('bss_hide_scores', next ? 'true' : 'false');
                       onSettingsChange?.();
                     }}
-                    className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${hideScores ? 'bg-orange-600' : 'bg-slate-300'}`}
+                    className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${hideScores ? 'bg-[#1d4ed8]' : 'bg-slate-300 dark:bg-neutral-700'}`}
                   >
                     <div className={`w-4 h-4 rounded-full bg-white transition-transform ${hideScores ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
@@ -569,12 +569,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 {/* Default Sport Tab with Official NBA and NFL logos */}
                 <div>
-                  <div className="font-bold text-slate-800 text-xs mb-1.5">Default Sport Tab</div>
-                  <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl">
+                  <div className="font-bold text-slate-800 dark:text-neutral-200 text-xs mb-1.5">Default Sport Tab</div>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-neutral-800 p-1.5 rounded-2xl">
                     <button
                       onClick={() => handleDefaultSportChange('nba')}
                       className={`py-2 px-3 rounded-xl transition cursor-pointer flex items-center justify-center space-x-2 ${
-                        defaultSport === 'nba' ? 'bg-white text-slate-900 shadow-xs font-black ring-1 ring-slate-200' : 'text-slate-600 font-bold hover:text-slate-900'
+                        defaultSport === 'nba' ? 'bg-white dark:bg-neutral-700 text-slate-900 dark:text-white shadow-xs font-black ring-1 ring-slate-200 dark:ring-neutral-600' : 'text-slate-600 dark:text-neutral-400 font-bold hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <img src="/nba-logo.png" alt="NBA" className="h-5 w-auto object-contain" />
@@ -583,7 +583,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <button
                       onClick={() => handleDefaultSportChange('nfl')}
                       className={`py-2 px-3 rounded-xl transition cursor-pointer flex items-center justify-center space-x-2 ${
-                        defaultSport === 'nfl' ? 'bg-white text-slate-900 shadow-xs font-black ring-1 ring-slate-200' : 'text-slate-600 font-bold hover:text-slate-900'
+                        defaultSport === 'nfl' ? 'bg-white dark:bg-neutral-700 text-slate-900 dark:text-white shadow-xs font-black ring-1 ring-slate-200 dark:ring-neutral-600' : 'text-slate-600 dark:text-neutral-400 font-bold hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <img src="/nfl-shield.png" alt="NFL" className="h-5 w-auto object-contain" />
@@ -598,11 +598,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         </div>
 
-        {/* Card Footer: Save Changes Button */}
-        <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between">
+        {/* Card Footer: Save Changes Button in NBA Royal Blue */}
+        <div className="pt-3 border-t border-slate-200/60 dark:border-neutral-800 flex items-center justify-between">
           <button
             onClick={handleSaveChanges}
-            className="w-full py-2.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs transition cursor-pointer active:scale-98 shadow-md shadow-orange-600/20 flex items-center justify-center space-x-1.5"
+            className="w-full py-2.5 rounded-2xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-black text-xs transition cursor-pointer active:scale-98 shadow-md shadow-blue-700/25 flex items-center justify-center space-x-1.5"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>Save Changes</span>
