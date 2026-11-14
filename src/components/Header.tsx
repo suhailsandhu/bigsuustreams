@@ -22,16 +22,16 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   onOpenReport
 }) => {
-  // sandhu.suhail@gmail.com and bigsuu are VIP member accounts
+  // sandhu.suhail@gmail.com is the exclusive VIP account
   const isVip = Boolean(
     currentUser?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
     currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
     currentUser?.username?.toLowerCase() === 'bigsuu' ||
-    currentUser?.role === 'vip' ||
-    currentUser?.isVip === true
+    currentUser?.username?.toLowerCase() === 'suhailsandhu' ||
+    currentUser?.username?.toLowerCase() === 'suhail'
   );
 
-  const initial = (currentUser?.displayName || currentUser?.username || 'B')[0].toUpperCase();
+  const initial = (currentUser?.displayName || currentUser?.username || 'S')[0].toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white dark:bg-[#0b0b0c] border-b border-gray-100 dark:border-white/[0.06] shadow-2xs select-none relative">
@@ -55,13 +55,18 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={onOpenProfile}
-              className="flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1 rounded-full border shadow-2xs transition active:scale-95 cursor-pointer bg-slate-100 dark:bg-white/[0.08] text-slate-700 dark:text-neutral-200 border-slate-200 dark:border-white/[0.1] hover:bg-slate-200 dark:hover:bg-white/[0.12]"
+              className="p-1 rounded-full transition active:scale-95 cursor-pointer hover:opacity-90"
               title="Account & Settings"
             >
-              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold uppercase shrink-0 bg-slate-300 dark:bg-neutral-700 text-slate-800 dark:text-neutral-200">
-                {initial}
+              <div className="w-8 h-8 rounded-full bg-[#d8dee4] dark:bg-neutral-800 flex items-center justify-center overflow-hidden shadow-2xs border border-slate-300/80 dark:border-white/[0.1]">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-5 h-5 text-[#8c9ba5] dark:text-neutral-400 translate-y-0.5"
+                >
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
               </div>
-              <span className="font-semibold text-[11px]">Basic Membership</span>
             </button>
           )
         )}

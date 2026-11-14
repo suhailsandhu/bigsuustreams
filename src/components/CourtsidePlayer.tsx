@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { isSamsungSmartTv, isSmartTv, isTeslaBrowser, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
+import { isSamsungSmartTv, isSmartTv, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
 import Hls from 'hls.js';
 import LatticeLoader from './LatticeLoader.tsx';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle,
-  Settings, Check, Tv, Car
+  Settings, Check, Tv
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
 
@@ -85,7 +85,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   stream,
   selectedQuality,
   onQualityChange,
-  onToggleTeslaMode
+  onToggleTeslaMode: _onToggleTeslaMode
 }) => {
   if (stream.youtubeVideoId) {
     const isNfl = stream.league === 'NFL' || stream.category === 'football' || stream.name.toLowerCase().includes('nfl');
@@ -167,7 +167,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const controlsTimeoutRef = useRef<any>(null);
   const isTv = useMemo(() => isSmartTv(), []);
   const isSamsung = useMemo(() => isSamsungSmartTv(), []);
-  const isTesla = useMemo(() => isTeslaBrowser(), []);
   const [tvAutoplayBlocked, setTvAutoplayBlocked] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(false); // Default OFF for everybody
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -737,18 +736,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     <div className="w-full flex flex-col space-y-2.5">
       {/* Top Header Status */}
       <div className="flex items-center justify-end space-x-1.5 px-0.5">
-        {onToggleTeslaMode && (
-          <button
-            onClick={onToggleTeslaMode}
-            className="flex items-center space-x-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-800/60 px-2.5 py-0.5 rounded-full cursor-pointer transition active:scale-95"
-            title="Launch Tesla In-Motion Mode"
-          >
-            <Car className="w-3 h-3 text-red-600 dark:text-red-400" />
-            <span className="text-[10px] font-black text-red-700 dark:text-red-300 uppercase tracking-wide">
-              {isTesla ? 'Tesla In-Motion' : 'Tesla Mode'}
-            </span>
-          </button>
-        )}
         {isSamsung && (
           <div className="flex items-center space-x-1 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
             <Tv className="w-3 h-3 text-amber-600" />
@@ -1001,25 +988,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                               {captionsEnabled ? 'On ›' : 'Off ›'}
                             </span>
                           </button>
-
-                          {/* Tesla In-Motion Mode toggle */}
-                          {onToggleTeslaMode && (
-                            <button
-                              onClick={() => {
-                                setShowSettingsMenu(false);
-                                onToggleTeslaMode();
-                              }}
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.08] text-left cursor-pointer border-t border-gray-100 dark:border-white/[0.06] mt-1 pt-1.5"
-                            >
-                              <div className="flex items-center space-x-1.5 text-gray-700 dark:text-neutral-300">
-                                <Car className="w-3.5 h-3.5 text-red-500" />
-                                <span>Tesla Mode</span>
-                              </div>
-                              <span className="text-[10px] font-bold bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded">
-                                Open ›
-                              </span>
-                            </button>
-                          )}
                         </div>
                       )}
 

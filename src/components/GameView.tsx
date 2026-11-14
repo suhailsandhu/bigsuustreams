@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Share2, Check, Trophy, RefreshCw, Car } from 'lucide-react';
+import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
 import { CourtsidePlayer } from './CourtsidePlayer.tsx';
@@ -321,20 +321,6 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         </button>
 
         <div className="flex items-center space-x-2">
-          {/* Tesla Mode Toggle */}
-          <button
-            onClick={() => toggleTeslaMode()}
-            className={`flex items-center space-x-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full shadow-2xs transition-all cursor-pointer active:scale-95 border ${
-              isTeslaMode
-                ? 'bg-red-600 text-white border-red-500 shadow-red-500/20'
-                : 'text-gray-700 dark:text-neutral-200 bg-white dark:bg-[#141416] hover:bg-gray-50 dark:hover:bg-white/[0.05] border-gray-200 dark:border-white/[0.08]'
-            }`}
-            title="Toggle Tesla In-Motion Mode"
-          >
-            <Car className={`w-3.5 h-3.5 ${isTeslaMode ? 'text-white' : 'text-red-500'}`} />
-            <span>{isTeslaMode ? 'Tesla Mode Active' : 'Tesla Mode'}</span>
-          </button>
-
           <button
             onClick={handleShare}
             className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 dark:text-neutral-200 bg-white dark:bg-[#141416] hover:bg-gray-50 dark:hover:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] px-3.5 py-1.5 rounded-full shadow-2xs transition-colors cursor-pointer active:scale-95"
@@ -354,8 +340,8 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         </div>
       </div>
 
-      {/* Video Player Section: Tesla In-Motion Mode OR Courtside Player */}
-      {isTeslaMode ? (
+      {/* Video Player Section */}
+      {false && isTeslaMode ? (
         <div className="w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-red-500/30 ring-1 ring-red-500/20 bg-black">
           <TeslaInMotionPlayer
             stream={stream}
@@ -372,7 +358,6 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
           stream={stream}
           selectedQuality={selectedQuality}
           onQualityChange={setSelectedQuality}
-          onToggleTeslaMode={() => toggleTeslaMode(true)}
         />
       )}
 

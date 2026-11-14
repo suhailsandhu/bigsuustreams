@@ -130,8 +130,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     currentUser?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
     currentUser?.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
     currentUser?.username?.toLowerCase() === 'bigsuu' ||
-    currentUser?.role === 'vip' ||
-    currentUser?.isVip === true
+    currentUser?.username?.toLowerCase() === 'suhailsandhu' ||
+    currentUser?.username?.toLowerCase() === 'suhail'
   );
 
   const displayName = currentUser?.displayName || currentUser?.username || 'BigSuu';

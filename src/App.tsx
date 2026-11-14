@@ -48,20 +48,18 @@ export const App: React.FC = () => {
           membership: 'basic'
         };
       }
-      const stored = localStorage.getItem('bigsuu_auth_user');
+      const stored = localStorage.getItem('bigsuu_auth_user') || sessionStorage.getItem('bigsuu_auth_user');
       const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
       
-      // PURGE: Kick off all revoked 7777 VIP passes and old 7777 guest sessions
+      // PURGE: Kick off all revoked 7777 VIP passes and old 7777 guest sessions (never purge suhail)
       if (
-        !token ||
-        token.includes('7777') || 
-        token.includes('verified_7777') || 
-        stored?.includes('7777') || 
-        stored?.includes('vip_7777')
+        (token?.includes('7777') || token?.includes('verified_7777') || stored?.includes('vip_7777')) &&
+        !stored?.includes('sandhu.suhail@gmail.com')
       ) {
         localStorage.removeItem('bigsuu_auth_token');
         localStorage.removeItem('bigsuu_auth_user');
         sessionStorage.removeItem('bigsuu_auth_token');
+        sessionStorage.removeItem('bigsuu_auth_user');
         localStorage.removeItem('bigsuu_site_token');
         sessionStorage.removeItem('bigsuu_site_token');
         sessionStorage.removeItem('bigsuu_admin_authorized');
@@ -69,13 +67,19 @@ export const App: React.FC = () => {
         return null;
       }
 
-      if (token && stored) {
+      if (stored) {
         const u = JSON.parse(stored);
         if (u.id === 'vip_7777') {
           return null;
         }
         // Enforcement: sandhu.suhail@gmail.com is the ONLY VIP account
-        const isSuhail = u?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' || u?.username?.toLowerCase() === 'sandhu.suhail@gmail.com';
+        const isSuhail = Boolean(
+          u?.email?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+          u?.username?.toLowerCase() === 'sandhu.suhail@gmail.com' ||
+          u?.username?.toLowerCase() === 'bigsuu' ||
+          u?.username?.toLowerCase() === 'suhailsandhu' ||
+          u?.username?.toLowerCase() === 'suhail'
+        );
         if (isSuhail) {
           u.role = 'vip';
           u.isVip = true;
@@ -100,6 +104,7 @@ export const App: React.FC = () => {
     localStorage.removeItem('bigsuu_auth_token');
     localStorage.removeItem('bigsuu_auth_user');
     sessionStorage.removeItem('bigsuu_auth_token');
+    sessionStorage.removeItem('bigsuu_auth_user');
     localStorage.removeItem('bigsuu_site_token');
     sessionStorage.removeItem('bigsuu_site_token');
     sessionStorage.removeItem('bigsuu_admin_authorized');
@@ -121,12 +126,10 @@ export const App: React.FC = () => {
     } catch {}
 
     const token = localStorage.getItem('bigsuu_auth_token') || sessionStorage.getItem('bigsuu_auth_token');
-    const stored = localStorage.getItem('bigsuu_auth_user');
+    const stored = localStorage.getItem('bigsuu_auth_user') || sessionStorage.getItem('bigsuu_auth_user');
     if (
-      token?.includes('7777') || 
-      token?.includes('verified_7777') || 
-      stored?.includes('7777') || 
-      stored?.includes('vip_7777')
+      (token?.includes('7777') || token?.includes('verified_7777') || stored?.includes('vip_7777')) &&
+      !stored?.includes('sandhu.suhail@gmail.com')
     ) {
       handleLogout();
     }
@@ -389,6 +392,13 @@ export const App: React.FC = () => {
       return true;
     }
     if (p === '/quickaccess' || p === '/quick-access' || h === '#/quickaccess' || h === '#quickaccess') {
+      const savedUser = localStorage.getItem('bigsuu_auth_user') || sessionStorage.getItem('bigsuu_auth_user');
+      if (savedUser) {
+        if (h.includes('quickaccess')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        return false;
+      }
       setIsQuickAccessOpen(true);
       return true;
     }
@@ -798,8 +808,8 @@ export const App: React.FC = () => {
           onSuccess={(user) => {
             setCurrentUser(user);
             setIsQuickAccessOpen(false);
-            if (window.location.pathname.includes('quickaccess')) {
-              window.history.pushState(null, '', '/');
+            if (window.location.pathname.includes('quickaccess') || window.location.hash.includes('quickaccess')) {
+              window.history.replaceState(null, '', '/');
             }
           }}
           onOpenLegal={(tab) => {
@@ -994,8 +1004,8 @@ export const App: React.FC = () => {
           onSuccess={(user) => {
             setCurrentUser(user);
             setIsQuickAccessOpen(false);
-            if (window.location.pathname.includes('quickaccess')) {
-              window.history.pushState(null, '', '/');
+            if (window.location.pathname.includes('quickaccess') || window.location.hash.includes('quickaccess')) {
+              window.history.replaceState(null, '', '/');
             }
           }}
           onOpenLegal={(tab) => {

@@ -49,8 +49,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const suhailVipUser = {
     id: 'user_bigsuu_vip',
-    username: 'bigsuu',
-    displayName: 'Big Suu',
+    username: 'sandhu.suhail@gmail.com',
+    displayName: 'Suhail Sandhu',
     email: 'sandhu.suhail@gmail.com',
     role: 'vip',
     isVip: true,
@@ -68,13 +68,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setPasscodeError(null);
 
-    // Quick Passcode: 7865 grants VIP access to Big Suu
+    // Quick Passcode: 7865 grants standard member access (VIP is exclusive to sandhu.suhail@gmail.com)
     if (clean === '7865') {
-      localStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
-      localStorage.setItem('bigsuu_auth_user', JSON.stringify(suhailVipUser));
-      sessionStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
+      const guestMember = {
+        id: 'user_member_' + Date.now(),
+        username: 'sportsfan',
+        displayName: 'Sports Fan',
+        email: `fan_${Date.now()}@bigsuustreams.com`,
+        role: 'member',
+        isVip: false,
+        membership: 'basic'
+      };
+      localStorage.setItem('bigsuu_auth_token', 'token_member_' + Date.now());
+      localStorage.setItem('bigsuu_auth_user', JSON.stringify(guestMember));
+      sessionStorage.setItem('bigsuu_auth_token', 'token_member_' + Date.now());
+      sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(guestMember));
       setLoading(false);
-      onSuccess(suhailVipUser);
+      onSuccess(guestMember);
       return;
     }
 
@@ -87,11 +97,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        const user = data.user || suhailVipUser;
-        localStorage.setItem('bigsuu_auth_token', data.token || 'token_bigsuu_vip');
-        localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
-        sessionStorage.setItem('bigsuu_auth_token', data.token || 'token_bigsuu_vip');
-        onSuccess(user);
+        const guestUser = {
+          id: data.user?.id || ('user_member_' + Date.now()),
+          username: data.user?.username || 'sportsfan',
+          displayName: data.user?.displayName || 'Sports Fan',
+          email: data.user?.email || `fan_${Date.now()}@bigsuustreams.com`,
+          role: 'member',
+          isVip: false,
+          membership: 'basic'
+        };
+        const token = data.token || ('token_member_' + Date.now());
+        localStorage.setItem('bigsuu_auth_token', token);
+        localStorage.setItem('bigsuu_auth_user', JSON.stringify(guestUser));
+        sessionStorage.setItem('bigsuu_auth_token', token);
+        sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(guestUser));
+        onSuccess(guestUser);
       } else {
         setPasscodeError('Incorrect passcode. Access denied.');
       }
@@ -136,6 +156,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         localStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(suhailVipUser));
         sessionStorage.setItem('bigsuu_auth_token', 'token_bigsuu_vip');
+        sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(suhailVipUser));
         onSuccess(suhailVipUser);
         return;
       }
@@ -154,6 +175,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         localStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(standardMember));
         sessionStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
+        sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(standardMember));
         onSuccess(standardMember);
         return;
       }
@@ -195,6 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         localStorage.setItem('bigsuu_auth_token', data.token);
         localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
         sessionStorage.setItem('bigsuu_auth_token', data.token);
+        sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
 
         try {
           if (mode === 'register') {
@@ -235,6 +258,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           localStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
           localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
           sessionStorage.setItem('bigsuu_auth_token', 'token_' + Date.now());
+          sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
           onSuccess(user);
         } else {
           setError(data.error || 'Authentication failed. Please check your credentials.');
@@ -252,6 +276,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       };
       localStorage.setItem('bigsuu_auth_token', 'local_token_' + Date.now());
       localStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
+      sessionStorage.setItem('bigsuu_auth_token', 'local_token_' + Date.now());
+      sessionStorage.setItem('bigsuu_auth_user', JSON.stringify(user));
       onSuccess(user);
     } finally {
       setLoading(false);
