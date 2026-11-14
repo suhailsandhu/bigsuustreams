@@ -63,17 +63,17 @@ export function getTvHlsConfig(isTv: boolean): TvHlsConfig {
   if (isTv) {
     return {
       enableWorker: false, // CRITICAL: Samsung Tizen browser worker transfer crashes MediaSource
-      lowLatencyMode: true, // Immediate start
-      backBufferLength: 0, // Immediately free consumed chunks to preserve Tizen video RAM
-      maxBufferLength: 10, // Lean buffer to prevent WiFi starvation and memory crashes
-      maxMaxBufferLength: 18,
-      maxBufferSize: 15 * 1024 * 1024, // 15 MB max memory
-      liveSyncDurationCount: 2, // 2-segment cushion starts in ~1.5s instead of 15s
+      lowLatencyMode: false, // Standard HLS (4s chunks): false prevents buffer-draining playback speedups
+      backBufferLength: 5,
+      maxBufferLength: 20, // 20s forward buffer (~5 chunks) gives TV decoders breathing room
+      maxMaxBufferLength: 30,
+      maxBufferSize: 20 * 1024 * 1024, // 20 MB max memory
+      liveSyncDurationCount: 3, // 3-segment cushion (~12s) prevents live-edge starvation
       liveMaxLatencyDurationCount: 8,
-      nudgeOffset: 0.15,
-      nudgeMaxRetry: 8,
-      fragLoadingTimeOut: 12000,
-      manifestLoadingTimeOut: 10000,
+      nudgeOffset: 0.2,
+      nudgeMaxRetry: 10,
+      fragLoadingTimeOut: 15000,
+      manifestLoadingTimeOut: 12000,
       fragLoadingMaxRetry: 6,
       manifestLoadingMaxRetry: 6
     };
@@ -82,17 +82,17 @@ export function getTvHlsConfig(isTv: boolean): TvHlsConfig {
   // Standard Desktop / Mobile Configuration
   return {
     enableWorker: true,
-    lowLatencyMode: true,
-    backBufferLength: 10,
-    maxBufferLength: 15,
-    maxMaxBufferLength: 25,
-    maxBufferSize: 30 * 1024 * 1024,
-    liveSyncDurationCount: 2, // Fast live-edge startup
-    liveMaxLatencyDurationCount: 6,
-    nudgeOffset: 0.15,
-    nudgeMaxRetry: 8,
-    fragLoadingTimeOut: 12000,
-    manifestLoadingTimeOut: 10000,
+    lowLatencyMode: false, // Standard HLS: false prevents aggressive playback speedups that drain buffer
+    backBufferLength: 15,
+    maxBufferLength: 30, // 30s forward buffer allows smooth, jitter-free playback
+    maxMaxBufferLength: 60,
+    maxBufferSize: 60 * 1024 * 1024,
+    liveSyncDurationCount: 3, // 3-segment cushion (~12s) eliminates live edge buffer dry-out
+    liveMaxLatencyDurationCount: 10,
+    nudgeOffset: 0.2,
+    nudgeMaxRetry: 10,
+    fragLoadingTimeOut: 15000,
+    manifestLoadingTimeOut: 12000,
     fragLoadingMaxRetry: 6,
     manifestLoadingMaxRetry: 6
   };
@@ -103,42 +103,45 @@ export function getMultiViewHlsConfig(isTv: boolean) {
   if (isTv) {
     return {
       enableWorker: false, // Samsung Tizen / webOS stability
-      lowLatencyMode: true,
+      lowLatencyMode: false,
       backBufferLength: 0,
-      maxBufferLength: 6, // Lean buffer for running 4 concurrent streams on TV chipsets
-      maxMaxBufferLength: 10,
-      maxBufferSize: 6 * 1024 * 1024, // 6MB per stream prevents TV browser crashes
-      liveSyncDurationCount: 1, // Instant playback on 1st segment
-      liveMaxLatencyDurationCount: 4,
+      maxBufferLength: 10, // Lean buffer for running 4 concurrent streams on TV chipsets
+      maxMaxBufferLength: 16,
+      maxBufferSize: 8 * 1024 * 1024, // 8MB per stream prevents TV browser crashes
+      liveSyncDurationCount: 2, // 2-segment cushion for multi-view
+      liveMaxLatencyDurationCount: 6,
       initialLiveManifestSize: 1, // Starts playing immediately on 1st manifest
-      nudgeOffset: 0.1,
-      nudgeMaxRetry: 5,
-      fragLoadingTimeOut: 8000,
-      manifestLoadingTimeOut: 6000,
+      nudgeOffset: 0.2,
+      nudgeMaxRetry: 8,
+      fragLoadingTimeOut: 12000,
+      manifestLoadingTimeOut: 8000,
       fragLoadingMaxRetry: 5,
       manifestLoadingMaxRetry: 5,
-      startLevel: 0, // Starts on lowest bitrate in <400ms then smoothly upgrades
-      capLevelToPlayerSize: true // Capping quality to tile size saves bandwidth & CPU
+      startLevel: -1, // Auto level selection
+      capLevelToPlayerSize: true
     };
   }
 
   return {
     enableWorker: true,
-    lowLatencyMode: true,
+    lowLatencyMode: false,
     backBufferLength: 5,
-    maxBufferLength: 8,
-    maxMaxBufferLength: 12,
-    maxBufferSize: 10 * 1024 * 1024,
-    liveSyncDurationCount: 1, // Starts instantly in <1s
-    liveMaxLatencyDurationCount: 5,
+    maxBufferLength: 15,
+    maxMaxBufferLength: 25,
+    maxBufferSize: 20 * 1024 * 1024,
+    liveSyncDurationCount: 2,
+    liveMaxLatencyDurationCount: 8,
     initialLiveManifestSize: 1,
-    nudgeOffset: 0.1,
-    nudgeMaxRetry: 5,
-    fragLoadingTimeOut: 10000,
-    manifestLoadingTimeOut: 6000,
-    fragLoadingMaxRetry: 5,
-    manifestLoadingMaxRetry: 5,
-    startLevel: 0,
+    nudgeOffset: 0.2,
+    nudgeMaxRetry: 8,
+    fragLoadingTimeOut: 12000,
+    manifestLoadingTimeOut: 10000,
+    fragLoadingMaxRetry: 6,
+    manifestLoadingMaxRetry: 6,
+    startLevel: -1,
     capLevelToPlayerSize: true
   };
 }
+
+// Export Tesla in-car browser detection and driving profile
+export * from './teslaDetector';

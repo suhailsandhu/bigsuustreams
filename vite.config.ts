@@ -33,6 +33,29 @@ export default defineConfig({
             return;
           }
 
+          if (url.pathname === '/api/system-status') {
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify({ status: 'ok', updating: false, message: 'System operational' }));
+            return;
+          }
+
+          if (url.pathname === '/api/football/scoreboard') {
+            try {
+              const { getNflScoreboard } = await import('./src/server/scoreboardService.ts');
+              const dateStr = url.searchParams.get('date') || undefined;
+              const data = await getNflScoreboard(dateStr);
+              res.setHeader('Content-Type', 'application/json');
+              res.statusCode = 200;
+              res.end(JSON.stringify(data));
+            } catch (err: any) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ games: [] }));
+            }
+            return;
+          }
+
           // 1. Scoreboard (ESPN real scores, leaders & stream matching)
           if (url.pathname === '/api/basketball/scoreboard') {
             try {

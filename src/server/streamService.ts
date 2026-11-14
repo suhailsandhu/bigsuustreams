@@ -342,9 +342,12 @@ interface StreamTokenCache {
   isExternal?: boolean;
   externalUrl?: string;
   expires: number;
+  lastM3u8Text?: string;
+  lastM3u8Time?: number;
 }
 
 const tokenCacheMap = new Map<string, StreamTokenCache>();
+const inflightResolutions = new Map<string, Promise<ResolvedHls>>();
 
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
@@ -367,201 +370,280 @@ export async function resolveHlsStream(
   requestedQuality = '1080p',
   sportCategory: 'basketball' | 'football' = 'basketball'
 ): Promise<ResolvedHls> {
-  let quality = requestedQuality;
+  let quality = requestedQuality || '1080p';
   if (!quality.endsWith('p')) quality += 'p';
 
-  const mirrors = getSortedHealthyMirrors();
-  let tokens: Record<string, any> = {};
-  let workingHost = '';
-  let serverName = 'origin';
-  let pathPrefix = '/live/';
-  let isExternal = false;
-  let externalUrl = '';
-  let activeVariantSuffix = quality;
-  let rawM3u8Text = '';
-
-  const now = Date.now();
-  const cacheKey = `${streamKey}:${quality}`;
-  const cachedTarget = tokenCacheMap.get(cacheKey);
-
-  // If cached, attempt fast validation to ensure stream is actively healthy
-  if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
-    tokens = cachedTarget.tokens;
-    workingHost = cachedTarget.workingHost;
-    serverName = cachedTarget.serverName;
-    pathPrefix = cachedTarget.pathPrefix;
-    isExternal = Boolean(cachedTarget.isExternal);
-    externalUrl = cachedTarget.externalUrl || '';
-    activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
-
-    if (!isExternal) {
-      const qKey = activeVariantSuffix.replace(/\d+$/, '');
-      const p = tokens[qKey] || tokens[quality] || Object.values(tokens)[0];
-      const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
-      const v = `${streamKey}${activeVariantSuffix}`;
-      const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
-      const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
-      try {
-        const res = await fetch(fastUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Referer': fastEmbedUrl,
-            'Origin': workingHost
-          }
-        });
-        if (res.ok) {
-          const txt = await res.text();
-          if (txt.includes('#EXTM3U')) {
-            rawM3u8Text = txt;
-          }
-        }
-      } catch {}
-    }
+  const inflightKey = `${streamKey}:${quality}:${sportCategory}`;
+  const existingInflight = inflightResolutions.get(inflightKey);
+  if (existingInflight) {
+    return existingInflight;
   }
 
-  // If not cached or fast validation failed, perform full multi-feed failover scan
-  if (!rawM3u8Text && !isExternal) {
-    // 1. Gather all candidate variant suffixes in priority order
-    const candidateSuffixes: string[] = [];
-    const is720Requested = quality.startsWith('720');
+  const resolvePromise = (async () => {
+    const mirrors = getSortedHealthyMirrors();
+    let tokens: Record<string, any> = {};
+    let workingHost = '';
+    let serverName = 'origin';
+    let pathPrefix = '/live/';
+    let isExternal = false;
+    let externalUrl = '';
+    let activeVariantSuffix = quality;
+    let rawM3u8Text = '';
 
-    // Prioritize requested quality variants
-    if (is720Requested) {
-      candidateSuffixes.push('720p', '720p2', '720p3');
-    } else {
-      candidateSuffixes.push(quality, `${quality}2`, `${quality}3`);
+    const now = Date.now();
+    const cacheKey = `${streamKey}:${quality}`;
+    const cachedTarget = tokenCacheMap.get(cacheKey);
+
+    // 1. FAST PATH: Return cached playlist if fetched less than 2s ago
+    if (cachedTarget && cachedTarget.expires > now && cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 2000)) {
+      rawM3u8Text = cachedTarget.lastM3u8Text;
+      tokens = cachedTarget.tokens;
+      workingHost = cachedTarget.workingHost;
+      serverName = cachedTarget.serverName;
+      pathPrefix = cachedTarget.pathPrefix;
+      isExternal = Boolean(cachedTarget.isExternal);
+      externalUrl = cachedTarget.externalUrl || '';
+      activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
     }
+    // 2. If cached route exists, fast-fetch the live playlist
+    else if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
+      tokens = cachedTarget.tokens;
+      workingHost = cachedTarget.workingHost;
+      serverName = cachedTarget.serverName;
+      pathPrefix = cachedTarget.pathPrefix;
+      isExternal = Boolean(cachedTarget.isExternal);
+      externalUrl = cachedTarget.externalUrl || '';
+      activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
 
-    // Extract any explicitly broadcast variant suffixes from upstream streams registry
-    try {
-      const listGetter = sportCategory === 'football' ? getFootballStreams : getBasketballStreams;
-      const streamsData = await listGetter().catch(() => ({ streams: [] }));
-      const matchStream = (streamsData.streams || []).find((s: any) => s.stream_key === streamKey || s.id === streamKey);
-      if (matchStream && Array.isArray(matchStream.sources)) {
-        for (const src of matchStream.sources) {
-          const u = src.url || '';
-          const v = u.split('/').pop()?.split('?')[0];
-          if (v && v.startsWith(streamKey)) {
-            const suf = v.replace(streamKey, '');
-            if (suf && !candidateSuffixes.includes(suf)) {
-              if (is720Requested && suf.includes('720')) {
-                candidateSuffixes.unshift(suf);
-              } else if (!is720Requested) {
-                candidateSuffixes.unshift(suf);
-              } else {
-                candidateSuffixes.push(suf);
-              }
+      if (!isExternal) {
+        const qKey = activeVariantSuffix.replace(/\d+$/, '');
+        const p = tokens[qKey] || tokens[quality] || tokens['1080p'] || Object.values(tokens)[0];
+        const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+        const v = `${streamKey}${activeVariantSuffix}`;
+        const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
+        const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const res = await fetch(fastUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Referer': fastEmbedUrl,
+              'Origin': workingHost
             }
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const txt = await res.text();
+            if (txt.includes('#EXTM3U')) {
+              rawM3u8Text = txt;
+              cachedTarget.lastM3u8Text = txt;
+              cachedTarget.lastM3u8Time = Date.now();
+            }
+          }
+        } catch {
+          // If upstream hiccuped, reuse recent valid playlist to prevent disconnect
+          if (cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 30000)) {
+            rawM3u8Text = cachedTarget.lastM3u8Text;
           }
         }
       }
-    } catch {}
-
-    // Add standard fallbacks
-    const standardFallbacks = is720Requested
-      ? ['720p', '720p2', '720p3', '1080p', '1080p2', '1080p3', '2160p']
-      : ['1080p', '1080p2', '1080p3', '720p', '720p2', '2160p'];
-
-    for (const fb of standardFallbacks) {
-      if (!candidateSuffixes.includes(fb)) candidateSuffixes.push(fb);
     }
 
-    if (is720Requested) {
-      candidateSuffixes.sort((a, b) => {
-        const a720 = a.includes('720') ? 0 : 1;
-        const b720 = b.includes('720') ? 0 : 1;
-        return a720 - b720;
-      });
-    }
+    // 3. Direct Discovery via /api/v1/sources/:streamKey (Ultra-Fast <1s direct resolution)
+    if (!rawM3u8Text && !isExternal) {
+      try {
+        const sourcesData = await getSourcesByKey(streamKey).catch(() => null);
+        if (sourcesData && Array.isArray(sourcesData.sources) && sourcesData.sources.length > 0) {
+          const liveSource = sourcesData.sources.find((s: any) => s.live === true || s.is_live === true) || sourcesData.sources[0];
+          if (liveSource && liveSource.url) {
+            const parsedSourceUrl = new URL(liveSource.url);
+            const sourceOrigin = parsedSourceUrl.origin;
+            const pathParts = parsedSourceUrl.pathname.split('/');
+            const fullSlug = pathParts.pop() || '';
+            const directSuffix = fullSlug.replace(streamKey, '') || '1080p';
 
-    const sportCandidates: ('basketball' | 'football')[] =
-      sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
-
-    let foundWorkingFeed = false;
-
-    for (const suf of candidateSuffixes) {
-      for (const mirror of mirrors) {
-        for (const cat of sportCandidates) {
-          try {
-            const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
-            const res = await fetch(embedUrl, {
+            const embedController = new AbortController();
+            const embedTimeoutId = setTimeout(() => embedController.abort(), 4500);
+            const embedRes = await fetch(liveSource.url, {
+              signal: embedController.signal,
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Referer': `${sourceOrigin}/`,
+                'Origin': sourceOrigin
               }
             });
-            if (!res.ok) continue;
-            const html = await res.text();
-            const match = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
-            if (!match) continue;
+            clearTimeout(embedTimeoutId);
 
-            const isLiveMatch = html.match(/const\s+IS_LIVE\s*=\s*([^;]+);/);
-            if (isLiveMatch && isLiveMatch[1].trim() === 'false' && candidateSuffixes.indexOf(suf) < candidateSuffixes.length - 1) {
-              continue; // If marked offline and we have other candidate variants, try the active feeds first
+            if (embedRes.ok) {
+              const html = await embedRes.text();
+              const match = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
+              if (match) {
+                const parsedTokens = JSON.parse(match[1]);
+                
+                // Determine test qualities: requested quality first, then directSuffix, then 1080p
+                const qualitiesToTry = Array.from(new Set([directSuffix, quality, '1080p', '720p'])).filter(Boolean);
+                for (const testSuf of qualitiesToTry) {
+                  const qKey = testSuf.replace(/\d+$/, '');
+                  const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
+                  if (!p) continue;
+                  const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
+                  const testM3u8Url = `${sourceOrigin}/live/${streamKey}${testSuf}/index.m3u8${qStr}`;
+
+                  try {
+                    const mController = new AbortController();
+                    const mTimeoutId = setTimeout(() => mController.abort(), 4000);
+                    const mRes = await fetch(testM3u8Url, {
+                      signal: mController.signal,
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                        'Referer': liveSource.url,
+                        'Origin': sourceOrigin
+                      }
+                    });
+                    clearTimeout(mTimeoutId);
+                    if (mRes.ok) {
+                      const txt = await mRes.text();
+                      if (txt.includes('#EXTM3U')) {
+                        tokens = parsedTokens;
+                        workingHost = sourceOrigin;
+                        serverName = 'origin';
+                        pathPrefix = '/live/';
+                        activeVariantSuffix = testSuf;
+                        rawM3u8Text = txt;
+                        recordMirrorSuccess(sourceOrigin, 50);
+                        break;
+                      }
+                    }
+                  } catch {}
+                }
+              }
             }
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[StreamService] Direct discovery fast-path notice for ${streamKey}:`, err?.message);
+      }
+    }
 
-            const parsedTokens = JSON.parse(match[1]);
-            const qKey = suf.replace(/\d+$/, '');
-            const p = parsedTokens[qKey] || parsedTokens[quality] || Object.values(parsedTokens)[0];
-            const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+    // 4. Fallback multi-feed failover scan (if direct discovery did not find a working playlist)
+    if (!rawM3u8Text && !isExternal) {
+      const candidateSuffixes: string[] = ['1080p', '1080p2', '720p', '720p2', '2160p'];
+      if (quality && !candidateSuffixes.includes(quality)) {
+        candidateSuffixes.unshift(quality);
+      }
 
-            // Query server metadata
-            let keyData: any = {};
+      const sportCandidates: ('basketball' | 'football')[] =
+        sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
+
+      let foundWorkingFeed = false;
+
+      for (const mirror of mirrors) {
+        for (const cat of sportCandidates) {
+          for (const suf of candidateSuffixes) {
             try {
-              const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+              const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 4000);
+              const res = await fetch(embedUrl, {
+                signal: controller.signal,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                }
+              });
+              clearTimeout(timeoutId);
+              if (!res.ok) continue;
+              const html = await res.text();
+              const match = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
+              if (!match) continue;
+
+              const isLiveMatch = html.match(/const\s+IS_LIVE\s*=\s*([^;]+);/);
+              if (isLiveMatch && isLiveMatch[1].trim() === 'false' && candidateSuffixes.indexOf(suf) < candidateSuffixes.length - 1) {
+                continue;
+              }
+
+              const parsedTokens = JSON.parse(match[1]);
+              const qKey = suf.replace(/\d+$/, '');
+              const p = parsedTokens[qKey] || parsedTokens[quality] || Object.values(parsedTokens)[0];
+              const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+
+              let keyData: any = {};
+              try {
+                const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Referer': embedUrl,
+                    'Origin': mirror
+                  },
+                  signal: AbortSignal.timeout(3000)
+                });
+                if (kRes.ok) keyData = await kRes.json();
+              } catch {}
+
+              if (keyData.is_external && keyData.external_url) {
+                isExternal = true;
+                externalUrl = keyData.external_url;
+                foundWorkingFeed = true;
+                break;
+              }
+
+              const sName = keyData.server_name || 'origin';
+              const prefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+
+              const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr}`;
+              const m3u8Res = await fetch(m3u8Url, {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                   'Referer': embedUrl,
                   'Origin': mirror
-                }
+                },
+                signal: AbortSignal.timeout(4000)
               });
-              if (kRes.ok) keyData = await kRes.json();
-            } catch {}
+              if (!m3u8Res.ok) continue;
+              const m3u8Txt = await m3u8Res.text();
 
-            if (keyData.is_external && keyData.external_url) {
-              isExternal = true;
-              externalUrl = keyData.external_url;
-              foundWorkingFeed = true;
-              break;
-            }
-
-            const sName = keyData.server_name || 'origin';
-            const prefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
-
-            const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr}`;
-            const m3u8Res = await fetch(m3u8Url, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'Referer': embedUrl,
-                'Origin': mirror
+              if (m3u8Txt.includes('#EXTM3U')) {
+                tokens = parsedTokens;
+                workingHost = mirror;
+                serverName = sName;
+                pathPrefix = prefix;
+                activeVariantSuffix = suf;
+                rawM3u8Text = m3u8Txt;
+                foundWorkingFeed = true;
+                recordMirrorSuccess(mirror, 80);
+                break;
               }
-            });
-            if (!m3u8Res.ok) continue;
-            const m3u8Txt = await m3u8Res.text();
-
-            // Strict playlist validation: MUST begin with #EXTM3U
-            if (m3u8Txt.includes('#EXTM3U')) {
-              tokens = parsedTokens;
-              workingHost = mirror;
-              serverName = sName;
-              pathPrefix = prefix;
-              activeVariantSuffix = suf;
-              rawM3u8Text = m3u8Txt;
-              foundWorkingFeed = true;
-              recordMirrorSuccess(mirror, 80);
-              break;
+            } catch {
+              recordMirrorFailure(mirror);
             }
-          } catch {
-            recordMirrorFailure(mirror);
           }
+          if (foundWorkingFeed) break;
         }
         if (foundWorkingFeed) break;
       }
-      if (foundWorkingFeed) break;
+
+      if (!foundWorkingFeed && !isExternal) {
+        tokenCacheMap.delete(cacheKey);
+        throw new Error(`Could not locate active live broadcast or security tokens for ${streamKey}`);
+      }
     }
 
-    if (!foundWorkingFeed && !isExternal) {
-      tokenCacheMap.delete(cacheKey);
-      throw new Error(`Could not locate active live broadcast or security tokens for ${streamKey}`);
+    if (isExternal && externalUrl) {
+      return {
+        isExternal: true,
+        externalUrl,
+        selectedQuality: quality,
+        availableQualities: ['1080p', '720p'],
+        m3u8Text: '',
+        upstreamUrl: externalUrl
+      };
+    }
+
+    const availableQualities = Object.keys(tokens).filter(q => !q.toLowerCase().includes('540'));
+    let selectedQuality = quality;
+    if (!tokens[selectedQuality]) {
+      selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : (tokens['2160p'] ? '2160p' : availableQualities[0]));
     }
 
     tokenCacheMap.set(cacheKey, {
@@ -572,104 +654,96 @@ export async function resolveHlsStream(
       activeVariantSuffix,
       isExternal,
       externalUrl,
-      expires: now + 180000 // Cache active route for 3 minutes
+      expires: now + 300000, // 5 min cache
+      lastM3u8Text: rawM3u8Text,
+      lastM3u8Time: now
     });
-  }
 
-  if (isExternal && externalUrl) {
-    return {
-      isExternal: true,
-      externalUrl,
-      selectedQuality: quality,
-      availableQualities: ['1080p', '720p'],
-      m3u8Text: '',
-      upstreamUrl: externalUrl
-    };
-  }
+    const variant = `${streamKey}${activeVariantSuffix}`;
+    const qKey = activeVariantSuffix.replace(/\d+$/, '');
+    const p = tokens[qKey] || tokens[selectedQuality] || Object.values(tokens)[0];
+    const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-  const availableQualities = Object.keys(tokens).filter(q => !q.toLowerCase().includes('540'));
-  let selectedQuality = quality;
-  if (!tokens[selectedQuality]) {
-    selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : (tokens['2160p'] ? '2160p' : availableQualities[0]));
-  }
+    // STABLE DETERMINISTIC STREAM HASH: Never changes between playlist polls!
+    const streamHash = crypto.createHash('md5').update(`${streamKey}-${selectedQuality}`).digest('hex').substring(0, 16);
+    const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
+    const backupHosts = mirrors.filter(m => m !== workingHost);
+    const backupBaseUrls = backupHosts.map(h => `${h}${pathPrefix}${variant}/`);
 
-  const variant = `${streamKey}${activeVariantSuffix}`;
-  const qKey = activeVariantSuffix.replace(/\d+$/, '');
-  const p = tokens[qKey] || tokens[selectedQuality] || Object.values(tokens)[0];
-  const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+    // Retain existing segment map so in-flight chunks are never dropped
+    const existingRecord = streamTargetMap.get(streamHash);
+    const segmentMap = existingRecord?.segmentMap || new Map<string, string>();
 
-  // STABLE DETERMINISTIC STREAM HASH: Never changes between playlist polls!
-  const streamHash = crypto.createHash('md5').update(`${streamKey}-${selectedQuality}`).digest('hex').substring(0, 16);
-  const baseUrl = `${workingHost}${pathPrefix}${variant}/`;
-  const backupHosts = mirrors.filter(m => m !== workingHost);
-  const backupBaseUrls = backupHosts.map(h => `${h}${pathPrefix}${variant}/`);
+    const m3u8Text = rawM3u8Text.split('\n').map(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
 
-  // Retain existing segment map so in-flight chunks are never dropped
-  const existingRecord = streamTargetMap.get(streamHash);
-  const segmentMap = existingRecord?.segmentMap || new Map<string, string>();
-
-  const m3u8Text = rawM3u8Text.split('\n').map(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return line;
-
-    if (trimmed.startsWith('#')) {
-      if (trimmed.startsWith('#EXT-X-MAP:')) {
-        return trimmed.replace(/URI="([^"]+)"/, (_, uri) => {
-          let fullUri = uri;
-          if (!fullUri.startsWith('http://') && !fullUri.startsWith('https://')) {
-            try {
-              fullUri = new URL(uri, baseUrl).toString();
-            } catch {
-              fullUri = `${baseUrl}${uri}`;
+      if (trimmed.startsWith('#')) {
+        if (trimmed.startsWith('#EXT-X-MAP:')) {
+          return trimmed.replace(/URI="([^"]+)"/, (_, uri) => {
+            let fullUri = uri;
+            if (!fullUri.startsWith('http://') && !fullUri.startsWith('https://')) {
+              try {
+                fullUri = new URL(uri, baseUrl).toString();
+              } catch {
+                fullUri = `${baseUrl}${uri}`;
+              }
             }
-          }
-          const mapKey = 'init.mp4';
-          segmentMap.set(mapKey, fullUri);
-          return `URI="/api/stream/chunk/${streamHash}/${mapKey}"`;
-        });
+            const mapKey = 'init.mp4';
+            segmentMap.set(mapKey, fullUri);
+            return `URI="/api/stream/chunk/${streamHash}/${mapKey}"`;
+          });
+        }
+        return line;
       }
-      return line;
-    }
 
-    let fullSegmentUrl = trimmed;
-    if (!fullSegmentUrl.startsWith('http://') && !fullSegmentUrl.startsWith('https://')) {
-      if (fullSegmentUrl.startsWith('/')) {
-        fullSegmentUrl = `${workingHost}${fullSegmentUrl}`;
-      } else {
-        fullSegmentUrl = `${baseUrl}${fullSegmentUrl}${qStr && !fullSegmentUrl.includes('?') ? qStr : ''}`;
+      let fullSegmentUrl = trimmed;
+      if (!fullSegmentUrl.startsWith('http://') && !fullSegmentUrl.startsWith('https://')) {
+        if (fullSegmentUrl.startsWith('/')) {
+          fullSegmentUrl = `${workingHost}${fullSegmentUrl}`;
+        } else {
+          fullSegmentUrl = `${baseUrl}${fullSegmentUrl}${qStr && !fullSegmentUrl.includes('?') ? qStr : ''}`;
+        }
       }
-    }
 
-    // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only (HTTPS throws ERR_SSL_WRONG_VERSION_NUMBER)
-    if (fullSegmentUrl.includes('strmfree') && fullSegmentUrl.startsWith('https://cdn')) {
-      fullSegmentUrl = fullSegmentUrl.replace('https://', 'http://');
-    }
+      // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only (HTTPS throws ERR_SSL_WRONG_VERSION_NUMBER)
+      if (fullSegmentUrl.includes('strmfree') && fullSegmentUrl.startsWith('https://cdn')) {
+        fullSegmentUrl = fullSegmentUrl.replace('https://', 'http://');
+      }
 
-    // STABLE SEGMENT IDENTIFIER: exact segment file/token name WITHOUT dynamic s1_/s2_ prefix!
-    const segKey = trimmed.split('?')[0].split('/').pop()?.replace(/[^a-zA-Z0-9_.-]/g, '') || 'chunk.ts';
-    segmentMap.set(segKey, fullSegmentUrl);
+      // STABLE SEGMENT IDENTIFIER: exact segment file/token name WITHOUT dynamic s1_/s2_ prefix!
+      const segKey = trimmed.split('?')[0].split('/').pop()?.replace(/[^a-zA-Z0-9_.-]/g, '') || 'chunk.ts';
+      segmentMap.set(segKey, fullSegmentUrl);
 
-    return `/api/stream/chunk/${streamHash}/${segKey}`;
-  }).join('\n');
+      return `/api/stream/chunk/${streamHash}/${segKey}`;
+    }).join('\n');
 
-  streamTargetMap.set(streamHash, {
-    baseUrl,
-    backupBaseUrls,
-    workingHost,
-    backupHosts,
-    embedUrl: `${workingHost}/embed/${sportCategory}/${streamKey}${activeVariantSuffix}`,
-    qStr,
-    expires: Date.now() + 3600000, // 1 hour validity
-    segmentMap
+    streamTargetMap.set(streamHash, {
+      baseUrl,
+      backupBaseUrls,
+      workingHost,
+      backupHosts,
+      embedUrl: `${workingHost}/embed/${sportCategory}/${streamKey}${activeVariantSuffix}`,
+      qStr,
+      expires: Date.now() + 3600000, // 1 hour validity
+      segmentMap
+    });
+
+    return {
+      isExternal: false,
+      selectedQuality,
+      availableQualities,
+      m3u8Text,
+      upstreamUrl: `/api/${sportCategory}/hls/${streamKey}/${selectedQuality}.m3u8`
+    };
+  })();
+
+  inflightResolutions.set(inflightKey, resolvePromise);
+  resolvePromise.finally(() => {
+    inflightResolutions.delete(inflightKey);
   });
 
-  return {
-    isExternal: false,
-    selectedQuality,
-    availableQualities,
-    m3u8Text,
-    upstreamUrl: `/api/${sportCategory}/hls/${streamKey}/${selectedQuality}.m3u8`
-  };
+  return resolvePromise;
 }
 
 // ============================================================================

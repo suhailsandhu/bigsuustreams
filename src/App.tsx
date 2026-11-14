@@ -188,7 +188,7 @@ export const App: React.FC = () => {
     return localStorage.getItem('bss_layout_density') || 'comfortable';
   }, [settingsTick]);
 
-  // Website is Updating / Maintenance State
+  // Website is Updating / Maintenance State (strictly controlled)
   const [isSiteUpdating, setIsSiteUpdating] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.location.pathname.includes('/updating')) {
       return true;
@@ -196,52 +196,31 @@ export const App: React.FC = () => {
     return false;
   });
 
-  // Automated Site Update / Maintenance Heartbeat
+  // Safe, non-invasive Maintenance Check (only activates if server explicitly returns updating: true)
   useEffect(() => {
-    let failureCount = 0;
-
     const checkSystemStatus = async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-
         const res = await fetch('/api/system-status', {
-          cache: 'no-store',
-          signal: controller.signal,
-          headers: { 'Cache-Control': 'no-cache' }
+          cache: 'no-store'
         });
-        clearTimeout(timeoutId);
 
         if (res.ok) {
           const data = await res.json();
           if (data?.updating === true) {
             setIsSiteUpdating(true);
-            failureCount = 0;
           } else if (isSiteUpdating && data?.updating === false) {
+            setIsSiteUpdating(false);
             window.location.reload();
-          } else {
-            failureCount = 0;
           }
-        } else if (res.status === 502 || res.status === 503) {
-          setIsSiteUpdating(true);
         }
       } catch {
-        // If consecutive network pings fail while site is live, server is restarting
-        failureCount++;
-        if (failureCount >= 2) {
-          setIsSiteUpdating(true);
-        }
+        // Never trigger updating screen on client fetch timeout or packet delay!
       }
     };
 
-    const handleCheckTrigger = () => checkSystemStatus();
-    window.addEventListener('bss_check_status', handleCheckTrigger);
-
-    const interval = setInterval(checkSystemStatus, 3000);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('bss_check_status', handleCheckTrigger);
-    };
+    // Low-frequency check (every 30s) so it never interferes with active video streaming
+    const interval = setInterval(checkSystemStatus, 30000);
+    return () => clearInterval(interval);
   }, [isSiteUpdating]);
 
   // Anti-reverse-engineering & client-side security guards

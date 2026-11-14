@@ -1,0 +1,359 @@
+{
+  "version": 1,
+  "historyId": "77970903-86bc-457c-bace-216f5c49abf5",
+  "currentRevision": "94aa700c-6b7d-419a-9650-2fe825437f75",
+  "pendingChanges": false,
+  "files": {
+    "assets/images/logo.png": {
+      "hash": "b99b87c2b8ff4b9a22061561953684293ce2cb2d60b16bd3aae8fb2364777047",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\b9\\b99b87c2b8ff4b9a22061561953684293ce2cb2d60b16bd3aae8fb2364777047"
+    },
+    "assets/images/nba-court-wood.jpg": {
+      "hash": "c9d06e4819a90f91ae4742ab090f4440bc9c361272b456ab8aaa9e82c7497b7b",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\c9\\c9d06e4819a90f91ae4742ab090f4440bc9c361272b456ab8aaa9e82c7497b7b"
+    },
+    "assets/images/nba-logo.png": {
+      "hash": "04b2b9dd2a0bda5310227001f9b48af3bb30ad9919d891a39ac723283e1ffbda",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\04\\04b2b9dd2a0bda5310227001f9b48af3bb30ad9919d891a39ac723283e1ffbda"
+    },
+    "assets/images/ui-nba.jpg": {
+      "hash": "bf4de4990cc925120b80fd45bbbb8baaf84dcad3067239094568307b0851c0e3",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\bf\\bf4de4990cc925120b80fd45bbbb8baaf84dcad3067239094568307b0851c0e3"
+    },
+    "assets/images/ui-nfl.png": {
+      "hash": "7654837cf722ea382c66db6c362864ba5999a11cb90078f424e8ac3fca5b68b1",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\76\\7654837cf722ea382c66db6c362864ba5999a11cb90078f424e8ac3fca5b68b1"
+    },
+    "assets/images/ui-player.jpg": {
+      "hash": "742dc4e6c1cec4b7bf3bc003461986e79ba817726d3f4669ea1cd921196bd6f7",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\74\\742dc4e6c1cec4b7bf3bc003461986e79ba817726d3f4669ea1cd921196bd6f7"
+    },
+    "assets/sfx/hit.ogg": {
+      "hash": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\e0\\e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831"
+    },
+    "assets/sfx/swipe.ogg": {
+      "hash": "006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\00\\006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690"
+    },
+    "assets/sfx/switch1.ogg": {
+      "hash": "efdd1d1e2904fb2d81259cd96bb80101caceae94be02baa4b5310714a6708b19",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\ef\\efdd1d1e2904fb2d81259cd96bb80101caceae94be02baa4b5310714a6708b19"
+    },
+    "assets/sfx/switch2.ogg": {
+      "hash": "aa8ad6e4745e87c84c24a0335e0e0f8629ccbbc474ccfd544fe07d7f3a1b2280",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\aa\\aa8ad6e4745e87c84c24a0335e0e0f8629ccbbc474ccfd544fe07d7f3a1b2280"
+    },
+    "hyperframes.json": {
+      "hash": "e3482479a509c30ea36cc4251a9bdcc286ce656f08471ba1015ca5bb212fd306",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\e3\\e3482479a509c30ea36cc4251a9bdcc286ce656f08471ba1015ca5bb212fd306"
+    },
+    "index.html": {
+      "hash": "d01d77b2d71373a310744aa9495555592f1043226bacfc23ee7cdb58f2653732",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\d0\\d01d77b2d71373a310744aa9495555592f1043226bacfc23ee7cdb58f2653732"
+    },
+    "meta.json": {
+      "hash": "17a542c8830b7fdabad4633ebf5916294ea66051d311b3378293e79c5341ec27",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\17\\17a542c8830b7fdabad4633ebf5916294ea66051d311b3378293e79c5341ec27"
+    },
+    "package.json": {
+      "hash": "61d5a77ecd43377c5602c8d246c4674cb0e6fa1bc132c1f6e3a38b96ec441b98",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\61\\61d5a77ecd43377c5602c8d246c4674cb0e6fa1bc132c1f6e3a38b96ec441b98"
+    },
+    "assets/music/music.mp3": {
+      "hash": "aa56ab1cdcbef6b05566c6a7c114323078580ccf6a740a9e6c6b6c4b40b4389f",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\aa\\aa56ab1cdcbef6b05566c6a7c114323078580ccf6a740a9e6c6b6c4b40b4389f"
+    },
+    "assets/images/walkthrough/1-nba-home.png": {
+      "hash": "3ea69bceecf7995177fb181fd67634695119666e678b5d764226b0dfa7fe89b3",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\3e\\3ea69bceecf7995177fb181fd67634695119666e678b5d764226b0dfa7fe89b3"
+    },
+    "assets/images/walkthrough/2-nba-scrolled.png": {
+      "hash": "abaa6d0cd4ebd4c2dbacff7c468398a68c8dfcae7775a63f72568815f4af0563",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\ab\\abaa6d0cd4ebd4c2dbacff7c468398a68c8dfcae7775a63f72568815f4af0563"
+    },
+    "assets/images/walkthrough/3-nfl-home.png": {
+      "hash": "320d1eb647e6c71f68c125661ddd30a076040d351f4cc915439f97c64e3e1502",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\32\\320d1eb647e6c71f68c125661ddd30a076040d351f4cc915439f97c64e3e1502"
+    },
+    "assets/images/walkthrough/4-live-player.png": {
+      "hash": "5279bd54779f9b5f2b5a84a14188b8debc1e81bfe18cbe04cb755eadf9238d0b",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\52\\5279bd54779f9b5f2b5a84a14188b8debc1e81bfe18cbe04cb755eadf9238d0b"
+    },
+    "assets/images/walkthrough/flow_1_nba_schedule.png": {
+      "hash": "a19b2c2dee25a197c954eeda0d45809f3c95d04451713d03ed43f217ce8455cc",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\a1\\a19b2c2dee25a197c954eeda0d45809f3c95d04451713d03ed43f217ce8455cc"
+    },
+    "assets/images/walkthrough/flow_2_nfl_toggle.png": {
+      "hash": "4d06448af001f728c021eb7b21d469d729e5a24b6409e9fff97aaed59d438b00",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\4d\\4d06448af001f728c021eb7b21d469d729e5a24b6409e9fff97aaed59d438b00"
+    },
+    "assets/images/walkthrough/flow_3_player_live.png": {
+      "hash": "91dd82a8fd9fbe30829ec6974a9198886786f715fd864b57c356ee32837270e1",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\91\\91dd82a8fd9fbe30829ec6974a9198886786f715fd864b57c356ee32837270e1"
+    },
+    "assets/images/walkthrough/flow_4_settings.png": {
+      "hash": "5bda4cac36881b0084ad82ff5a3f6e2d613b7682a78a480003eb8bdabc1f3df4",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\5b\\5bda4cac36881b0084ad82ff5a3f6e2d613b7682a78a480003eb8bdabc1f3df4"
+    },
+    "assets/images/walkthrough/step1-nba-home.png": {
+      "hash": "85b26df62b44609c94273a3321a1db0d1a8721cc89c2021962f16dc19ff0c0d2",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\85\\85b26df62b44609c94273a3321a1db0d1a8721cc89c2021962f16dc19ff0c0d2"
+    },
+    "assets/images/walkthrough/step2-nba-scrolled.png": {
+      "hash": "fa07ffdd871ccc4bd696d5eb24ffddbfb3a921ed9e72b00ea6c818cd18e349f1",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\fa\\fa07ffdd871ccc4bd696d5eb24ffddbfb3a921ed9e72b00ea6c818cd18e349f1"
+    },
+    "assets/images/walkthrough/step3-nfl-home.png": {
+      "hash": "c105d481630c5c2688cdd2f244fe614e022b2fd9518045bbe7f7be3730c85e0c",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\c1\\c105d481630c5c2688cdd2f244fe614e022b2fd9518045bbe7f7be3730c85e0c"
+    },
+    "assets/images/walkthrough/step4-live-player.png": {
+      "hash": "462a90efe7941fc8d32219cfcf615358cb2d9a9b8f9f2b214eded207ae56a468",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\46\\462a90efe7941fc8d32219cfcf615358cb2d9a9b8f9f2b214eded207ae56a468"
+    },
+    "assets/images/walkthrough/step4b-live-stats.png": {
+      "hash": "462a90efe7941fc8d32219cfcf615358cb2d9a9b8f9f2b214eded207ae56a468",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\46\\462a90efe7941fc8d32219cfcf615358cb2d9a9b8f9f2b214eded207ae56a468"
+    },
+    "assets/images/walkthrough/step5-settings-modal.png": {
+      "hash": "f08f41d84938346fe1411032206add38e086a1a1a0e1ef42305d60ebe863243c",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\f0\\f08f41d84938346fe1411032206add38e086a1a1a0e1ef42305d60ebe863243c"
+    },
+    "assets/images/walkthrough/step5b-settings-stream-options.png": {
+      "hash": "f08f41d84938346fe1411032206add38e086a1a1a0e1ef42305d60ebe863243c",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\f0\\f08f41d84938346fe1411032206add38e086a1a1a0e1ef42305d60ebe863243c"
+    }
+  },
+  "revisions": {
+    "578842a9-65e9-4319-bd35-6854f6c2c05a": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1794509542547,
+      "endedAt": 1794509542664,
+      "files": {
+        "assets/images/walkthrough/1-nba-home.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\3e\\3ea69bceecf7995177fb181fd67634695119666e678b5d764226b0dfa7fe89b3"
+        },
+        "assets/images/walkthrough/2-nba-scrolled.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\ab\\abaa6d0cd4ebd4c2dbacff7c468398a68c8dfcae7775a63f72568815f4af0563"
+        },
+        "assets/images/walkthrough/3-nfl-home.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\32\\320d1eb647e6c71f68c125661ddd30a076040d351f4cc915439f97c64e3e1502"
+        },
+        "assets/images/walkthrough/4-live-player.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\52\\5279bd54779f9b5f2b5a84a14188b8debc1e81bfe18cbe04cb755eadf9238d0b"
+        },
+        "assets/images/walkthrough/flow_1_nba_schedule.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\a1\\a19b2c2dee25a197c954eeda0d45809f3c95d04451713d03ed43f217ce8455cc"
+        },
+        "assets/images/walkthrough/flow_2_nfl_toggle.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\4d\\4d06448af001f728c021eb7b21d469d729e5a24b6409e9fff97aaed59d438b00"
+        },
+        "assets/images/walkthrough/flow_3_player_live.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\91\\91dd82a8fd9fbe30829ec6974a9198886786f715fd864b57c356ee32837270e1"
+        },
+        "assets/images/walkthrough/flow_4_settings.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\5b\\5bda4cac36881b0084ad82ff5a3f6e2d613b7682a78a480003eb8bdabc1f3df4"
+        },
+        "assets/images/walkthrough/step1-nba-home.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\85\\85b26df62b44609c94273a3321a1db0d1a8721cc89c2021962f16dc19ff0c0d2"
+        },
+        "assets/images/walkthrough/step2-nba-scrolled.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\fa\\fa07ffdd871ccc4bd696d5eb24ffddbfb3a921ed9e72b00ea6c818cd18e349f1"
+        },
+        "assets/images/walkthrough/step3-nfl-home.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\c1\\c105d481630c5c2688cdd2f244fe614e022b2fd9518045bbe7f7be3730c85e0c"
+        },
+        "assets/images/walkthrough/step4-live-player.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\46\\462a90efe7941fc8d32219cfcf615358cb2d9a9b8f9f2b214eded207ae56a468"
+        },
+        "assets/images/walkthrough/step4b-live-stats.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\46\\462a90efe7941fc8d32219cfcf615358cb2d9a9b8f9f2b214eded207ae56a468"
+        },
+        "assets/images/walkthrough/step5-settings-modal.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\f0\\f08f41d84938346fe1411032206add38e086a1a1a0e1ef42305d60ebe863243c"
+        },
+        "assets/images/walkthrough/step5b-settings-stream-options.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\f0\\f08f41d84938346fe1411032206add38e086a1a1a0e1ef42305d60ebe863243c"
+        },
+        "index.html": {
+          "before": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\c5\\c59418303ae8d39defe399ec7fba6a0c10c7f232a4f9e22a4fadadcef2646abe",
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\2d\\2d016b225927221d316393b08c0e4ed8bdd9fd209ac3f5af98a771a90433a5a6"
+        }
+      }
+    },
+    "c1630a57-f6f9-4ccc-b2c0-5d1ffdbf86d4": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1794509580478,
+      "endedAt": 1794509580480,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\2d\\2d016b225927221d316393b08c0e4ed8bdd9fd209ac3f5af98a771a90433a5a6",
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\ae\\aee85e766f036f65218de27350bcf35e837d337e4ce479811a0d7fa091cd451f"
+        }
+      }
+    },
+    "94aa700c-6b7d-419a-9650-2fe825437f75": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1794509595260,
+      "endedAt": 1794509595262,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\ae\\aee85e766f036f65218de27350bcf35e837d337e4ce479811a0d7fa091cd451f",
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\77970903-86bc-457c-bace-216f5c49abf5\\blobs\\d0\\d01d77b2d71373a310744aa9495555592f1043226bacfc23ee7cdb58f2653732"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": {
+      "revision": null,
+      "id": "a41532f5-4626-48dc-920d-6d702c0515ff"
+    },
+    "revisions": {
+      "578842a9-65e9-4319-bd35-6854f6c2c05a": [
+        {
+          "id": "080eddde-974d-4e52-9236-5f8e62147c80",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794509548087,
+          "contentHash": "fa3d2f1f1944afe7e9db667b36bf7ecfbd120f0b811cc756b237cbd6222c897b",
+          "revision": "578842a9-65e9-4319-bd35-6854f6c2c05a",
+          "inputFingerprint": "ab9433e4b9d3e956238564cd952a31224d29b56139377bd721cd82030302eb62",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "a08df7c3-3c65-4445-acce-64c149627cdf"
+        }
+      ],
+      "c1630a57-f6f9-4ccc-b2c0-5d1ffdbf86d4": [
+        {
+          "id": "6fd62da9-e38f-4669-8436-feb3bd1aa0de",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794509585064,
+          "contentHash": "d3ce0977ab6f29fc622d1ce1aa5a14c663e40279739f8bf35bdc9787bd2602cc",
+          "revision": "c1630a57-f6f9-4ccc-b2c0-5d1ffdbf86d4",
+          "inputFingerprint": "8670551b69a80cf387f89ba49d0df05923a0cd6011cd1c04344e0fccaf6f8b63",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "a08df7c3-3c65-4445-acce-64c149627cdf"
+        }
+      ]
+    },
+    "unversioned": [
+      {
+        "id": "a41532f5-4626-48dc-920d-6d702c0515ff",
+        "scope": "project",
+        "report": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output-10s\\composition\\.hyperframes\\artifacts\\checks\\a41532f5-4626-48dc-920d-6d702c0515ff.json",
+        "metadata": {
+          "ok": true,
+          "browserSkipped": false,
+          "options": {
+            "samples": 9,
+            "atTransitions": false,
+            "maxIssues": 80,
+            "collapseStatic": true,
+            "tolerance": 2,
+            "timeout": 45000,
+            "cache": true,
+            "contrast": true,
+            "craft": true,
+            "strict": false,
+            "snapshots": false,
+            "browserGpuMode": "auto",
+            "includeUnmounted": false
+          }
+        },
+        "createdAt": 1794509014029,
+        "contentHash": "9cd845fb63fc854208e2a70d52d857f68380f55eda6ace4132677f8f50d87ff7",
+        "revision": null,
+        "inputFingerprint": "217c09fb397f3a4cbabcfb82481d34ee352287f04e28b373884fe5198c285fa0",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "a08df7c3-3c65-4445-acce-64c149627cdf",
+      "completedAt": 1794509612647,
+      "output": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output-10s\\brag.mp4",
+      "status": "completed",
+      "revision": "94aa700c-6b7d-419a-9650-2fe825437f75"
+    },
+    "retainedRevisions": [
+      "94aa700c-6b7d-419a-9650-2fe825437f75"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { isSamsungSmartTv, isSmartTv, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
+import { isSamsungSmartTv, isSmartTv, isTeslaBrowser, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
 import Hls from 'hls.js';
 import LatticeLoader from './LatticeLoader.tsx';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle,
-  Settings, Check, Tv
+  Settings, Check, Tv, Car
 } from 'lucide-react';
 import type { Stream } from '../types/stream.ts';
 
@@ -13,6 +13,7 @@ interface CourtsidePlayerProps {
   stream: Stream;
   selectedQuality: string;
   onQualityChange: (quality: string) => void;
+  onToggleTeslaMode?: () => void;
 }
 
 // Dedicated 1080p NBA Highlights YouTube Player
@@ -83,7 +84,8 @@ const NbaYoutubePlayer: React.FC<{ videoId: string; title: string }> = ({ videoI
 export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   stream,
   selectedQuality,
-  onQualityChange
+  onQualityChange,
+  onToggleTeslaMode
 }) => {
   if (stream.youtubeVideoId) {
     const isNfl = stream.league === 'NFL' || stream.category === 'football' || stream.name.toLowerCase().includes('nfl');
@@ -165,6 +167,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
   const controlsTimeoutRef = useRef<any>(null);
   const isTv = useMemo(() => isSmartTv(), []);
   const isSamsung = useMemo(() => isSamsungSmartTv(), []);
+  const isTesla = useMemo(() => isTeslaBrowser(), []);
   const [tvAutoplayBlocked, setTvAutoplayBlocked] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(false); // Default OFF for everybody
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -292,13 +295,14 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     // Clear watchdog timer
     if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
 
-    // Watchdog: If playback does not start within 14 seconds, try quality fallback or alert
+    // Watchdog: If playback does not start within 18 seconds, try quality fallback or alert
     watchdogTimerRef.current = setTimeout(() => {
       if (video.paused && video.readyState === 0) {
         console.warn('Playback watchdog timeout fired for', stream.stream_key, selectedQuality);
-        if (selectedQuality === '1080p' && availableQualities.includes('720p')) {
-          console.log('Watchdog attempting quality fallback to 720p...');
-          onQualityChange('720p');
+        const alternate = availableQualities.find((q) => q !== selectedQuality);
+        if (alternate) {
+          console.log(`Watchdog attempting quality fallback to ${alternate}...`);
+          onQualityChange(alternate);
         } else {
           setIsLoading(false);
           setHasError(true);
@@ -307,7 +311,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       } else {
         setIsLoading(false);
       }
-    }, 14000);
+    }, 18000);
 
     // Destroy existing Hls instance
     if (hlsRef.current) {
@@ -336,10 +340,10 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         liveMaxLatencyDurationCount: tvConfig.liveMaxLatencyDurationCount,
         nudgeOffset: tvConfig.nudgeOffset,
         nudgeMaxRetry: tvConfig.nudgeMaxRetry,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        fragLoadingRetryDelay: 500,
-        manifestLoadingRetryDelay: 500,
+        maxBufferHole: 0.8,
+        highBufferWatchdogPeriod: 3,
+        fragLoadingRetryDelay: 800,
+        manifestLoadingRetryDelay: 800,
         fragLoadingMaxRetry: tvConfig.fragLoadingMaxRetry,
         manifestLoadingMaxRetry: tvConfig.manifestLoadingMaxRetry,
         levelLoadingMaxRetry: 6,
@@ -387,51 +391,65 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.warn('HLS.js event error:', data.type, data.details);
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('bss_check_status'));
+        if (!data.fatal) {
+          return;
         }
-        if (data.fatal) {
-          if (retryCountRef.current < (isTv ? 2 : 4)) {
-            retryCountRef.current += 1;
+
+        console.warn('HLS.js fatal event error:', data.type, data.details);
+        if (retryCountRef.current < (isTv ? 3 : 5)) {
+          retryCountRef.current += 1;
+          const delay = Math.min(retryCountRef.current * 1000, 3000);
+          setTimeout(() => {
+            if (!hlsRef.current) return;
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
               hls.startLoad();
             } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError();
             }
-          } else if (isTv && video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Samsung Tizen Hardware Fallback: switch to Native AVPlayer pipeline
-            console.log('[CourtsidePlayer] Smart TV hardware failover to native HLS...');
+          }, delay);
+        } else if (isTv && video.canPlayType('application/vnd.apple.mpegurl')) {
+          // Samsung Tizen Hardware Fallback: switch to Native AVPlayer pipeline
+          console.log('[CourtsidePlayer] Smart TV hardware failover to native HLS...');
+          hls.destroy();
+          hlsRef.current = null;
+          video.src = targetUrl;
+          video.load();
+          video.play().then(() => {
+            setIsPlaying(true);
+            setIsLoading(false);
+            setTvAutoplayBlocked(false);
+          }).catch(() => {
+            video.muted = true;
+            setIsMuted(true);
+            video.play().catch(() => {
+              setTvAutoplayBlocked(true);
+            });
+          });
+        } else {
+          if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+
+          const alternate = availableQualities.find((q) => q !== selectedQuality);
+          if (alternate) {
+            console.log(`Auto-failover to alternative ${alternate} stream variant...`);
             hls.destroy();
             hlsRef.current = null;
-            video.src = targetUrl;
-            video.load();
-            video.play().then(() => {
-              setIsPlaying(true);
-              setIsLoading(false);
-              setTvAutoplayBlocked(false);
-            }).catch(() => {
-              video.muted = true;
-              setIsMuted(true);
-              video.play().catch(() => {
-                setTvAutoplayBlocked(true);
-              });
-            });
-          } else {
-            if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
-            hls.destroy();
-
-            // Automatic Failover: If 1080p failed multiple times, switch to 720p
-            if (selectedQuality === '1080p' && availableQualities.includes('720p')) {
-              console.log('Auto-failover to 720p stream variant...');
-              onQualityChange('720p');
-              return;
-            }
-
-            setIsLoading(false);
-            setHasError(true);
-            setErrorMessage('Coverage is preparing or reconnecting. Retrying automatically...');
+            onQualityChange(alternate);
+            return;
           }
+
+          if (retryCountRef.current < 8) {
+            retryCountRef.current += 1;
+            console.log('[CourtsidePlayer] Reloading stream source...');
+            hls.loadSource(targetUrl);
+            hls.startLoad();
+            return;
+          }
+
+          hls.destroy();
+          hlsRef.current = null;
+          setIsLoading(false);
+          setHasError(true);
+          setErrorMessage('Coverage is preparing or reconnecting. Tap Retry Feed.');
         }
       });
     } 
@@ -719,6 +737,18 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     <div className="w-full flex flex-col space-y-2.5">
       {/* Top Header Status */}
       <div className="flex items-center justify-end space-x-1.5 px-0.5">
+        {onToggleTeslaMode && (
+          <button
+            onClick={onToggleTeslaMode}
+            className="flex items-center space-x-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/60 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-800/60 px-2.5 py-0.5 rounded-full cursor-pointer transition active:scale-95"
+            title="Launch Tesla In-Motion Mode"
+          >
+            <Car className="w-3 h-3 text-red-600 dark:text-red-400" />
+            <span className="text-[10px] font-black text-red-700 dark:text-red-300 uppercase tracking-wide">
+              {isTesla ? 'Tesla In-Motion' : 'Tesla Mode'}
+            </span>
+          </button>
+        )}
         {isSamsung && (
           <div className="flex items-center space-x-1 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
             <Tv className="w-3 h-3 text-amber-600" />
@@ -971,6 +1001,25 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
                               {captionsEnabled ? 'On ›' : 'Off ›'}
                             </span>
                           </button>
+
+                          {/* Tesla In-Motion Mode toggle */}
+                          {onToggleTeslaMode && (
+                            <button
+                              onClick={() => {
+                                setShowSettingsMenu(false);
+                                onToggleTeslaMode();
+                              }}
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.08] text-left cursor-pointer border-t border-gray-100 dark:border-white/[0.06] mt-1 pt-1.5"
+                            >
+                              <div className="flex items-center space-x-1.5 text-gray-700 dark:text-neutral-300">
+                                <Car className="w-3.5 h-3.5 text-red-500" />
+                                <span>Tesla Mode</span>
+                              </div>
+                              <span className="text-[10px] font-bold bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded">
+                                Open ›
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )}
 

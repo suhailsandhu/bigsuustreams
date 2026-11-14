@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Share2, Check, Trophy, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Share2, Check, Trophy, RefreshCw, Car } from 'lucide-react';
 import type { Stream } from '../types/stream';
 import type { ScoreboardGame, GameSummaryResponse } from '../types/scoreboard';
 import { CourtsidePlayer } from './CourtsidePlayer.tsx';
+import { TeslaInMotionPlayer } from './TeslaInMotionPlayer.tsx';
 import { formatTipoffTime, fetchGameSummary } from '../services/api';
-import { isSmartTv, TV_KEYS } from '../utils/tvDetector';
+import { isSmartTv, isTeslaModeActive, setTeslaModePreference, TV_KEYS } from '../utils/tvDetector';
 
 // Helper to highlight leader stats in green, highest turnovers in red, and +/- positive/negative
 function getStatHighlightClass(
@@ -102,6 +103,13 @@ const isGameActuallyLive = (g: ScoreboardGame): boolean => {
 export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [], onBack, onSelectGame }) => {
   const isTv = useMemo(() => isSmartTv(), []);
   const [, setTvSwitcherIndex] = useState(0);
+  const [isTeslaMode, setIsTeslaMode] = useState(() => isTeslaModeActive());
+
+  const toggleTeslaMode = (enabled?: boolean) => {
+    const next = enabled !== undefined ? enabled : !isTeslaMode;
+    setIsTeslaMode(next);
+    setTeslaModePreference(next);
+  };
 
   // Auto-scroll to top on mount so video is front-and-center without scrolling
   useEffect(() => {
@@ -169,7 +177,8 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
   // Default quality: reads user profile setting (1080p or 720p), fallback to 1080p
   const [selectedQuality, setSelectedQuality] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('bss_default_quality') || '1080p';
+      const pref = localStorage.getItem('bss_stream_quality_mode') || localStorage.getItem('bss_default_quality');
+      if (pref === '720p' || pref === '1080p') return pref;
     }
     return '1080p';
   });
@@ -312,6 +321,20 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         </button>
 
         <div className="flex items-center space-x-2">
+          {/* Tesla Mode Toggle */}
+          <button
+            onClick={() => toggleTeslaMode()}
+            className={`flex items-center space-x-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full shadow-2xs transition-all cursor-pointer active:scale-95 border ${
+              isTeslaMode
+                ? 'bg-red-600 text-white border-red-500 shadow-red-500/20'
+                : 'text-gray-700 dark:text-neutral-200 bg-white dark:bg-[#141416] hover:bg-gray-50 dark:hover:bg-white/[0.05] border-gray-200 dark:border-white/[0.08]'
+            }`}
+            title="Toggle Tesla In-Motion Mode"
+          >
+            <Car className={`w-3.5 h-3.5 ${isTeslaMode ? 'text-white' : 'text-red-500'}`} />
+            <span>{isTeslaMode ? 'Tesla Mode Active' : 'Tesla Mode'}</span>
+          </button>
+
           <button
             onClick={handleShare}
             className="flex items-center space-x-1.5 text-xs font-bold text-gray-700 dark:text-neutral-200 bg-white dark:bg-[#141416] hover:bg-gray-50 dark:hover:bg-white/[0.05] border border-gray-200 dark:border-white/[0.08] px-3.5 py-1.5 rounded-full shadow-2xs transition-colors cursor-pointer active:scale-95"
@@ -331,12 +354,27 @@ export const GameView: React.FC<GameViewProps> = ({ stream, game, allGames = [],
         </div>
       </div>
 
-      {/* Video Player Section: Clean Courtside Player */}
-      <CourtsidePlayer
-        stream={stream}
-        selectedQuality={selectedQuality}
-        onQualityChange={setSelectedQuality}
-      />
+      {/* Video Player Section: Tesla In-Motion Mode OR Courtside Player */}
+      {isTeslaMode ? (
+        <div className="w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-red-500/30 ring-1 ring-red-500/20 bg-black">
+          <TeslaInMotionPlayer
+            stream={stream}
+            game={game}
+            allGames={allGames}
+            selectedQuality={selectedQuality}
+            onQualityChange={setSelectedQuality}
+            onCloseTeslaMode={() => toggleTeslaMode(false)}
+            onSelectGame={onSelectGame}
+          />
+        </div>
+      ) : (
+        <CourtsidePlayer
+          stream={stream}
+          selectedQuality={selectedQuality}
+          onQualityChange={setSelectedQuality}
+          onToggleTeslaMode={() => toggleTeslaMode(true)}
+        />
+      )}
 
       {/* Live Games Quick-Switcher (Compact 2-3 Games Visible with Smooth Horizontal Scroll) */}
       {liveGamesNow.length > 0 && (

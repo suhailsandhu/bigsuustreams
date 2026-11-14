@@ -1,0 +1,347 @@
+{
+  "version": 1,
+  "historyId": "b3203f28-daf9-413b-8f1f-5abb660630e0",
+  "currentRevision": "6ddd4f90-bf72-4f00-b7aa-c016aa3df320",
+  "pendingChanges": false,
+  "files": {
+    "assets/images/logo.png": {
+      "hash": "b99b87c2b8ff4b9a22061561953684293ce2cb2d60b16bd3aae8fb2364777047",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\b9\\b99b87c2b8ff4b9a22061561953684293ce2cb2d60b16bd3aae8fb2364777047"
+    },
+    "assets/images/nba-court-wood.jpg": {
+      "hash": "c9d06e4819a90f91ae4742ab090f4440bc9c361272b456ab8aaa9e82c7497b7b",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\c9\\c9d06e4819a90f91ae4742ab090f4440bc9c361272b456ab8aaa9e82c7497b7b"
+    },
+    "assets/images/nba-logo.png": {
+      "hash": "04b2b9dd2a0bda5310227001f9b48af3bb30ad9919d891a39ac723283e1ffbda",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\04\\04b2b9dd2a0bda5310227001f9b48af3bb30ad9919d891a39ac723283e1ffbda"
+    },
+    "assets/sfx/hit.ogg": {
+      "hash": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\e0\\e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831"
+    },
+    "assets/sfx/switch1.ogg": {
+      "hash": "efdd1d1e2904fb2d81259cd96bb80101caceae94be02baa4b5310714a6708b19",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\ef\\efdd1d1e2904fb2d81259cd96bb80101caceae94be02baa4b5310714a6708b19"
+    },
+    "assets/sfx/switch2.ogg": {
+      "hash": "aa8ad6e4745e87c84c24a0335e0e0f8629ccbbc474ccfd544fe07d7f3a1b2280",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\aa\\aa8ad6e4745e87c84c24a0335e0e0f8629ccbbc474ccfd544fe07d7f3a1b2280"
+    },
+    "hyperframes.json": {
+      "hash": "53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\53\\53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50"
+    },
+    "index.html": {
+      "hash": "6aacee2971c3c60fa618672a81dc1c53282d9d7c144cffd2aa6effb9a8ac5ce5",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\6a\\6aacee2971c3c60fa618672a81dc1c53282d9d7c144cffd2aa6effb9a8ac5ce5"
+    },
+    "meta.json": {
+      "hash": "fe021f858ddfa90a976c496144814c91291e711277688ad9ec337cba270d590e",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\fe\\fe021f858ddfa90a976c496144814c91291e711277688ad9ec337cba270d590e"
+    },
+    "package.json": {
+      "hash": "8b74792cb8e8732d2f354cec634d0b9e8279e7ea2713457f80cf2bb591eee2e8",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\8b\\8b74792cb8e8732d2f354cec634d0b9e8279e7ea2713457f80cf2bb591eee2e8"
+    },
+    "assets/music/music.mp3": {
+      "hash": "aa56ab1cdcbef6b05566c6a7c114323078580ccf6a740a9e6c6b6c4b40b4389f",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\aa\\aa56ab1cdcbef6b05566c6a7c114323078580ccf6a740a9e6c6b6c4b40b4389f"
+    },
+    "assets/images/ui-nba.jpg": {
+      "hash": "bf4de4990cc925120b80fd45bbbb8baaf84dcad3067239094568307b0851c0e3",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\bf\\bf4de4990cc925120b80fd45bbbb8baaf84dcad3067239094568307b0851c0e3"
+    },
+    "assets/images/ui-nfl.png": {
+      "hash": "7654837cf722ea382c66db6c362864ba5999a11cb90078f424e8ac3fca5b68b1",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\76\\7654837cf722ea382c66db6c362864ba5999a11cb90078f424e8ac3fca5b68b1"
+    },
+    "assets/images/ui-player.jpg": {
+      "hash": "742dc4e6c1cec4b7bf3bc003461986e79ba817726d3f4669ea1cd921196bd6f7",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\74\\742dc4e6c1cec4b7bf3bc003461986e79ba817726d3f4669ea1cd921196bd6f7"
+    },
+    "assets/sfx/swipe.ogg": {
+      "hash": "006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690",
+      "content": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\00\\006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690"
+    }
+  },
+  "revisions": {
+    "b99c5954-3a9a-431f-9105-fa91db694a34": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1794470329382,
+      "endedAt": 1794470329384,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\89\\89bca00c3c76d8a594182fa50b8b9c8c73707a490104a4c22c1d0d7e5169daf3",
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\48\\48f283f3749e0f098257ee28e6c09c02387b0650e96eccd15323204fa2ac97a2"
+        }
+      }
+    },
+    "94207609-a78f-4319-814e-f7f1ec5313c5": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1794470729567,
+      "endedAt": 1794470729592,
+      "files": {
+        "assets/images/ui-nba.jpg": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\bf\\bf4de4990cc925120b80fd45bbbb8baaf84dcad3067239094568307b0851c0e3"
+        },
+        "assets/images/ui-nfl.png": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\76\\7654837cf722ea382c66db6c362864ba5999a11cb90078f424e8ac3fca5b68b1"
+        },
+        "assets/images/ui-player.jpg": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\74\\742dc4e6c1cec4b7bf3bc003461986e79ba817726d3f4669ea1cd921196bd6f7"
+        },
+        "assets/sfx/swipe.ogg": {
+          "before": null,
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\00\\006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690"
+        },
+        "index.html": {
+          "before": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\48\\48f283f3749e0f098257ee28e6c09c02387b0650e96eccd15323204fa2ac97a2",
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\27\\27c0da114cf92fffc3a9ff0c2039ca499a2daf8ffae17ec2035f297a02623758"
+        }
+      }
+    },
+    "6ddd4f90-bf72-4f00-b7aa-c016aa3df320": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1794470771938,
+      "endedAt": 1794470771940,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\27\\27c0da114cf92fffc3a9ff0c2039ca499a2daf8ffae17ec2035f297a02623758",
+          "after": "C:\\Users\\newva\\.cache\\hyperframes\\history\\b3203f28-daf9-413b-8f1f-5abb660630e0\\blobs\\6a\\6aacee2971c3c60fa618672a81dc1c53282d9d7c144cffd2aa6effb9a8ac5ce5"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": {
+      "revision": "6ddd4f90-bf72-4f00-b7aa-c016aa3df320",
+      "id": "6ad1f885-cd90-41b1-9337-05f0bb74f95e"
+    },
+    "revisions": {
+      "b99c5954-3a9a-431f-9105-fa91db694a34": [
+        {
+          "id": "0585908f-a08b-48fa-b084-8987a43abf0b",
+          "scope": "project",
+          "report": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\0585908f-a08b-48fa-b084-8987a43abf0b.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794470336568,
+          "contentHash": "dbe7a051ce3a4cc72dcdc27e0ec253e067e6a7e57e549a3a6f388d669b43f4fa",
+          "revision": "b99c5954-3a9a-431f-9105-fa91db694a34",
+          "inputFingerprint": "54c57aff109697aca5f626633fbfacc0ececf9fddc7ed1a4350ebbe66797d5ba",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ],
+      "94207609-a78f-4319-814e-f7f1ec5313c5": [
+        {
+          "id": "045ee858-48a8-48be-a542-3282666b1ad9",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794470737599,
+          "contentHash": "4f34f4606bceac4e955223a12ad1a639db0a695466290aa5162d808fcd51d5ac",
+          "revision": "94207609-a78f-4319-814e-f7f1ec5313c5",
+          "inputFingerprint": "9144f93b697e1756993e7d35ce3d60b0a7f231308dcda09a5fb576a1b241ee2c",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "a39a3bbf-eaee-49ec-870c-1964e31f249f"
+        }
+      ],
+      "6ddd4f90-bf72-4f00-b7aa-c016aa3df320": [
+        {
+          "id": "0d17d4ce-b042-4937-849d-1af1b2cc6025",
+          "scope": "project",
+          "report": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\0d17d4ce-b042-4937-849d-1af1b2cc6025.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794470777741,
+          "contentHash": "f5cdd0da620ee3b9d3f328ccfacba1c47d9ce71e3e4b985be00bc29f716ed8cb",
+          "revision": "6ddd4f90-bf72-4f00-b7aa-c016aa3df320",
+          "inputFingerprint": "bd698d877955d54ad010ec750a76347e146642b73cec5d3013e524bbe7a8d640",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        },
+        {
+          "id": "97b40b2c-f947-4cf7-85cb-3e1deae10af8",
+          "scope": "project",
+          "report": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\97b40b2c-f947-4cf7-85cb-3e1deae10af8.json",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794508908456,
+          "contentHash": "2f88858b02a23f19912be279d4356ef30bc95d24feb43bee93c05d830308abd9",
+          "revision": "6ddd4f90-bf72-4f00-b7aa-c016aa3df320",
+          "inputFingerprint": "bd698d877955d54ad010ec750a76347e146642b73cec5d3013e524bbe7a8d640",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        },
+        {
+          "id": "6ad1f885-cd90-41b1-9337-05f0bb74f95e",
+          "scope": "project",
+          "report": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\6ad1f885-cd90-41b1-9337-05f0bb74f95e.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 45000,
+              "cache": true,
+              "contrast": true,
+              "craft": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto",
+              "includeUnmounted": false
+            }
+          },
+          "createdAt": 1794508966019,
+          "contentHash": "f5cdd0da620ee3b9d3f328ccfacba1c47d9ce71e3e4b985be00bc29f716ed8cb",
+          "revision": "6ddd4f90-bf72-4f00-b7aa-c016aa3df320",
+          "inputFingerprint": "bd698d877955d54ad010ec750a76347e146642b73cec5d3013e524bbe7a8d640",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ]
+    },
+    "unversioned": [
+      {
+        "id": "7b99c668-66c4-4dcf-9160-86f1c7ed4956",
+        "scope": "project",
+        "report": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\7b99c668-66c4-4dcf-9160-86f1c7ed4956.json",
+        "metadata": {
+          "ok": false,
+          "browserSkipped": true,
+          "options": {
+            "samples": 9,
+            "atTransitions": false,
+            "maxIssues": 80,
+            "collapseStatic": true,
+            "tolerance": 2,
+            "timeout": 45000,
+            "cache": true,
+            "contrast": true,
+            "craft": true,
+            "strict": false,
+            "snapshots": false,
+            "browserGpuMode": "auto",
+            "includeUnmounted": false
+          }
+        },
+        "createdAt": 1794470300404,
+        "contentHash": "e3e6c87c1530dcc708b7532f551821f0d1d82337ce61ddc155b0b7d205c608ea",
+        "revision": null,
+        "inputFingerprint": "ddee20425f0517bfeac003b6902cc8ef5be203e62a6c667088853e68014e3acd",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "a39a3bbf-eaee-49ec-870c-1964e31f249f",
+      "completedAt": 1794470810593,
+      "output": "C:\\Users\\newva\\OneDrive\\Desktop\\NBA Streaming APP\\brag-output\\brag.mp4",
+      "status": "completed",
+      "revision": "6ddd4f90-bf72-4f00-b7aa-c016aa3df320"
+    },
+    "retainedRevisions": [
+      "6ddd4f90-bf72-4f00-b7aa-c016aa3df320",
+      "b99c5954-3a9a-431f-9105-fa91db694a34"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}

@@ -1,0 +1,23 @@
+# Courtside Stream — 10s Launch Video Copy
+
+## X / Twitter
+Tired of 5 popunder ads just to watch the 4th quarter? 🏀🏈
+
+We built Courtside Stream:
+- 100% sports, 0 ads
+- Direct 1080p HD HLS streams
+- Swipe between NBA & NFL schedules in 1 touch
+- Installable PWA on iOS & Android
+
+Run locally with `npm run dev` or deploy to Vercel in 1 click!
+
+#NBA #NFL #WebDev #SportsStreaming #BuildInPublic
+
+---
+
+## LinkedIn / Reddit
+Most free sports streams force you to navigate through a minefield of redirects and fake download buttons before you can even see the scoreboard.
+
+We built Courtside Stream — a mobile-first PWA that connects directly to low-latency HLS streams with zero popups, real-time box scores, and instant dual-league switching between NBA and NFL.
+
+Check out the 10-second preview below!

@@ -390,7 +390,7 @@ async function handleResolve(req, res) {
 
 async function handleHls(req, res) {
   const key = req.params.key;
-  const quality = req.params.quality || req.query.quality || '720p';
+  const quality = req.params.quality || req.query.quality || '1080p';
   const isFootball = (req.baseUrl || req.path || req.originalUrl || '').includes('football');
   const category = isFootball ? 'football' : 'basketball';
   try {
@@ -416,10 +416,15 @@ async function handleHls(req, res) {
       }).join('\n');
     }
 
-    // Pre-buffer first chunk into server RAM immediately for 0ms initial play response
-    const firstChunkLine = hls.m3u8Text.split('\n').find(l => l.trim().startsWith('/api/stream/chunk/'));
-    if (firstChunkLine) {
-      const parts = firstChunkLine.trim().split('/');
+    // Pre-buffer active live-edge chunks into server RAM immediately for 0ms initial play response
+    const chunkLines = hls.m3u8Text.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.startsWith('/api/stream/chunk/'));
+    
+    // Live players play near the live edge (last 2-3 chunks in the playlist)
+    const targetChunks = chunkLines.slice(-3);
+    for (const chunkLine of targetChunks) {
+      const parts = chunkLine.split('/');
       const chunkHash = parts[4];
       const chunkSeg = parts[5];
       if (chunkHash && chunkSeg) {
@@ -515,10 +520,21 @@ function createTsCleanStream() {
 
 // In-Memory High-Speed LRU Segment Cache & In-Flight Request Coalescing
 // Eliminates stream lag & buffering by serving segments in < 2ms directly from server RAM
-const CHUNK_CACHE_LIMIT_BYTES = 120 * 1024 * 1024; // 120 MB RAM buffer cache
+const CHUNK_CACHE_LIMIT_BYTES = 256 * 1024 * 1024; // 256 MB RAM buffer cache
 let currentCacheBytes = 0;
 const chunkCache = new Map(); // key -> { buffer: Buffer, expires: number, size: number }
 const inflightChunks = new Map(); // key -> Promise<Buffer | null>
+
+function getNextSegmentName(seg) {
+  if (!seg) return null;
+  const m = seg.match(/^(.*?)(\d+)(\.[a-zA-Z0-9]+)$/);
+  if (!m) return null;
+  const prefix = m[1];
+  const numStr = m[2];
+  const ext = m[3];
+  const nextNum = String(parseInt(numStr, 10) + 1).padStart(numStr.length, '0');
+  return `${prefix}${nextNum}${ext}`;
+}
 
 function getCachedChunk(key) {
   const item = chunkCache.get(key);
@@ -531,7 +547,7 @@ function getCachedChunk(key) {
   return item.buffer;
 }
 
-function putCachedChunk(key, buffer, ttlMs = 45000) {
+function putCachedChunk(key, buffer, ttlMs = 60000) {
   if (!buffer || buffer.length === 0) return;
   while (currentCacheBytes + buffer.length > CHUNK_CACHE_LIMIT_BYTES && chunkCache.size > 0) {
     const oldestKey = chunkCache.keys().next().value;
@@ -574,8 +590,8 @@ async function fetchChunkBuffer(hash, segment) {
         targetUrl = `${record.baseUrl}${cleanSegment}${record.qStr && !cleanSegment.includes('?') ? record.qStr : ''}`;
       }
 
-      // Upstream CDN protocol fix: cdn*.strmfree.* nodes are HTTP-only
-      if (targetUrl && targetUrl.includes('strmfree') && targetUrl.startsWith('https://cdn')) {
+      // Upstream CDN protocol fix: cdn*.strmfree.* / cdn*.streamfree.* nodes are HTTP-only
+      if (targetUrl && (targetUrl.includes('strmfree') || targetUrl.includes('streamfree')) && targetUrl.startsWith('https://cdn')) {
         targetUrl = targetUrl.replace('https://', 'http://');
       }
 
@@ -661,7 +677,7 @@ async function fetchChunkBuffer(hash, segment) {
         for (const cand of candidateUrls) {
           try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
             const r = await fetch(cand.url, {
               signal: controller.signal,
               headers: {
@@ -736,6 +752,18 @@ async function handleChunkProxy(req, res) {
     if (!chunkResult || !chunkResult.buffer) {
       return res.status(502).send('Chunk fetch failed across all failover mirrors');
     }
+
+    // Predictive Next-Segment Pre-fetching: Eliminates buffer starvation
+    const nextSeg = getNextSegmentName(segment);
+    if (nextSeg) {
+      const nextKey = `${hash}:${nextSeg}`;
+      if (!chunkCache.has(nextKey) && !inflightChunks.has(nextKey)) {
+        setImmediate(() => {
+          fetchChunkBuffer(hash, nextSeg).catch(() => {});
+        });
+      }
+    }
+
     return sendChunkData(res, req, chunkResult.buffer, chunkResult.status);
   } catch (err) {
     return res.status(502).send('Proxy error');

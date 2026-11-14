@@ -1,0 +1,19 @@
+# Courtside Stream — Launch Copy
+
+## Post Variant 1 (X / Twitter):
+No popunders. No shady redirect traps. Just smooth, instant sports streaming.
+
+We built Courtside Stream:
+🏀 Full NBA schedules & 1080p game highlights
+🏈 Full NFL game day streaming & matchup hub
+👆 1:1 swipe gestures across dates & sports
+📱 Mobile-first PWA for iOS & Android
+
+Pure sports. Zero ads.
+
+## Post Variant 2 (Punchy / Mobile Focused):
+One swipe to switch from NBA to NFL. One tap to stream in crisp 1080p HD with live box scores. 
+Courtside Stream turns your phone into an ad-free courtside seat.
+
+## Post Variant 3 (Technical / Builder):
+Built an ad-free live sports aggregator with direct CDN HLS playback, smooth 1:1 touch swipe navigation for 29-day schedule calendars, instant sport switching (NBA ⟷ NFL), and real-time live box score telemetry.

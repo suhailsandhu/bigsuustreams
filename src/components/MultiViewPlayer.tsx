@@ -91,8 +91,8 @@ const MultiViewTile: React.FC<{
     const tokenParam = token ? `?t=${encodeURIComponent(token)}` : '';
     const isNfl = stream.category === 'football' || stream.league === 'NFL' || stream.name.toLowerCase().includes('nfl');
     const sportPrefix = isNfl ? 'football' : 'basketball';
-    // Use 720p for fast lightweight loading in 2x2 grid, 1080p when big screen
-    const targetQuality = isBigScreen ? '1080p' : (quality || '720p');
+    // Use 1080p default so feeds never 404 on missing 720p variants
+    const targetQuality = isBigScreen ? '1080p' : (quality || '1080p');
     const targetUrl = `/api/${sportPrefix}/hls/${stream.stream_key}/${targetQuality}.m3u8${tokenParam}`;
 
     // Desktop Chrome, Firefox, Edge, Android, Smart TVs (MSE Support)
@@ -100,17 +100,17 @@ const MultiViewTile: React.FC<{
       const mvConfig = getMultiViewHlsConfig(isTv);
       const hls = new Hls({
         enableWorker: mvConfig.enableWorker,
-        lowLatencyMode: true,
+        lowLatencyMode: false,
         backBufferLength: mvConfig.backBufferLength,
-        maxBufferLength: isBigScreen ? 12 : mvConfig.maxBufferLength,
-        maxMaxBufferLength: isBigScreen ? 20 : mvConfig.maxMaxBufferLength,
-        maxBufferSize: isBigScreen ? 15 * 1024 * 1024 : mvConfig.maxBufferSize,
-        liveSyncDurationCount: isBigScreen ? 2 : mvConfig.liveSyncDurationCount,
+        maxBufferLength: isBigScreen ? 15 : mvConfig.maxBufferLength,
+        maxMaxBufferLength: isBigScreen ? 25 : mvConfig.maxMaxBufferLength,
+        maxBufferSize: isBigScreen ? 20 * 1024 * 1024 : mvConfig.maxBufferSize,
+        liveSyncDurationCount: isBigScreen ? 3 : mvConfig.liveSyncDurationCount,
         liveMaxLatencyDurationCount: mvConfig.liveMaxLatencyDurationCount,
         initialLiveManifestSize: 1, // Start on 1st manifest immediately
-        startLevel: isBigScreen ? -1 : 0, // Instant start on low bitrate, then step up smoothly
+        startLevel: -1, // Auto-step smoothly
         capLevelToPlayerSize: !isBigScreen, // Free TV hardware decoders from over-rendering
-        maxBufferHole: 0.5,
+        maxBufferHole: 0.8,
         nudgeOffset: mvConfig.nudgeOffset,
         nudgeMaxRetry: mvConfig.nudgeMaxRetry,
         fragLoadingTimeOut: mvConfig.fragLoadingTimeOut,
@@ -144,12 +144,19 @@ const MultiViewTile: React.FC<{
         setIsLoading(false);
       });
 
+      let mvRetryCount = 0;
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            hls.startLoad();
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            hls.recoverMediaError();
+          if (mvRetryCount < 4) {
+            mvRetryCount += 1;
+            setTimeout(() => {
+              if (!hlsRef.current) return;
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                hls.startLoad();
+              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                hls.recoverMediaError();
+              }
+            }, 1000 * mvRetryCount);
           } else {
             setIsLoading(false);
             setHasError(true);

@@ -274,14 +274,14 @@ class AutonomousWatchdog {
       // When game is 35 minutes or closer to start, or already live/tipoff passed:
       const shouldPrepare = diffMinutes <= 35;
 
-      // Don't re-test if already verified within the last 4 minutes
+      // Don't re-test if already verified within the last 15 minutes (preserves upstream bandwidth)
       const timeSinceLastCheck = now - watchItem.lastCheckedAt;
-      if (shouldPrepare && (watchItem.status !== 'ready' || timeSinceLastCheck > 240000)) {
+      if (shouldPrepare && (watchItem.status !== 'ready' || timeSinceLastCheck > 900000)) {
         watchItem.lastCheckedAt = now;
         const sportCategory = g.sport === 'nfl' ? 'football' : 'basketball';
 
         try {
-          // Deep Playback Verification: Validates manifest, downloads segment, verifies MPEG-TS 0x47 sync pattern
+          // Deep Playback Verification: Validates manifest, checks MPEG-TS 0x47 sync pattern via lightweight range probe
           let verification = await this.verifyStreamDeeply(g.streamKey, '1080p', sportCategory);
 
           // If 1080p fails deep verification, attempt auto-recovery with 720p
@@ -427,17 +427,18 @@ class AutonomousWatchdog {
       }
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
       const fetchUrl = upstreamUrl.split('#')[0];
       const res = await fetch(fetchUrl, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Range': 'bytes=0-2047' // Lightweight range probe: checks sync bytes in ~20ms using 2KB instead of downloading 5MB
         }
       });
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
+      if (!res.ok && res.status !== 206) {
         return {
           verified: false,
           mpegTs: false,
