@@ -1007,42 +1007,19 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
           const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-          const curlOutputs = [];
-          const { execSync } = await import('child_process');
           try {
-            const scriptPath = path.join(__dirname, 'test-tor.cjs');
-            const scriptCode = `
-              const { execSync } = require('child_process');
-              try {
-                const html = execSync('curl -s -x socks5h://127.0.0.1:9050 "https://strmfree.st/embed/basketball/${key}1080p"', { encoding: 'utf8', timeout: 15000 });
-                const idx = html.indexOf('const _0x = ');
-                if (idx === -1) {
-                  console.log(JSON.stringify({ error: 'No tokens in Tor embed HTML', length: html.length, preview: html.substring(0, 200) }));
-                  process.exit(0);
-                }
-                const jsonStart = html.indexOf('{', idx);
-                const jsonEnd = html.indexOf('};', jsonStart) + 1;
-                const jsonStr = html.substring(jsonStart, jsonEnd);
-                const tokens = JSON.parse(jsonStr);
-                const p = tokens['1080p'];
-                const u = "https://strmfree.st/live-externalcdn/${key}1080p/index.m3u8?_t=" + p._t + "&_e=" + p._e + "&_n=" + p._n;
-                const m3u8 = execSync('curl -s -i -x socks5h://127.0.0.1:9050 "' + u + '"', { encoding: 'utf8', timeout: 15000 });
-                console.log(JSON.stringify({
-                  status: m3u8.split('\\\\r\\\\n')[0] || m3u8.split('\\\\n')[0],
-                  hasExt: m3u8.includes('#EXTM3U'),
-                  preview: m3u8.substring(0, 300)
-                }));
-              } catch (err) {
-                console.log(JSON.stringify({ error: err.message, stdout: err.stdout }));
-              }
-            `;
-            fs.writeFileSync(scriptPath, scriptCode);
-            const torOut = execSync(`node "${scriptPath}"`, { encoding: 'utf8', timeout: 35000 });
-            curlOutputs.push({ rawTorOut: torOut.trim() });
+            const hlsResult = await resolveHlsStream(key, '1080p', 'basketball');
+            trace.push({
+              step: 'resolveHlsStream',
+              success: true,
+              selectedQuality: hlsResult.selectedQuality,
+              availableQualities: hlsResult.availableQualities,
+              m3u8Length: hlsResult.m3u8Text?.length,
+              sample: hlsResult.m3u8Text?.substring(0, 300)
+            });
           } catch (e) {
-            curlOutputs.push({ torError: e.message, stdout: e.stdout?.trim() });
+            trace.push({ step: 'resolveHlsStreamFailed', error: e.message });
           }
-          trace.push({ step: 'curlOutputs', data: curlOutputs });
         }
       }
     }

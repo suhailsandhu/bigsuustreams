@@ -3,6 +3,7 @@
 
 import type { Stream, StreamsResponse } from '../types/stream.js';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 
 interface MirrorState {
   url: string;
@@ -365,6 +366,106 @@ if (typeof setInterval !== 'undefined') {
   }, 300000);
 }
 
+export interface TorResolutionResult {
+  rawM3u8Text: string;
+  tokens: Record<string, any>;
+  workingHost: string;
+  serverName: string;
+  pathPrefix: string;
+  activeVariantSuffix: string;
+}
+
+export function fetchManifestViaTor(m3u8Url: string, timeoutSec: number = 5): string | null {
+  if (process.platform !== 'linux') return null;
+  try {
+    const cmd = `curl -s -i -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: */*" "${m3u8Url}"`;
+    const out = execSync(cmd, { encoding: 'utf8', timeout: (timeoutSec + 2) * 1000 });
+    const idx = out.indexOf('#EXTM3U');
+    if (idx !== -1) {
+      return out.substring(idx).trim();
+    }
+  } catch (err: any) {
+    // Tor fallback silent on failure
+  }
+  return null;
+}
+
+export function resolveViaTor(
+  streamKey: string,
+  sportCategory: string = 'basketball',
+  preferredQuality: string = '1080p',
+  timeoutSec: number = 10
+): TorResolutionResult | null {
+  if (process.platform !== 'linux') return null;
+  try {
+    const sportCandidates = sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
+    const qualityCandidates = Array.from(new Set([preferredQuality, '1080p', '720p', '2160p'])).filter(Boolean);
+
+    for (const cat of sportCandidates) {
+      for (const suf of qualityCandidates) {
+        const embedUrl = `https://strmfree.st/embed/${cat}/${streamKey}${suf}`;
+        let html = '';
+        try {
+          const embedCmd = `curl -s -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" "${embedUrl}"`;
+          html = execSync(embedCmd, { encoding: 'utf8', timeout: (timeoutSec + 2) * 1000 });
+        } catch {
+          continue;
+        }
+
+        const idx = html.indexOf('const _0x = ');
+        if (idx === -1) continue;
+
+        const jsonStart = html.indexOf('{', idx);
+        const jsonEnd = html.indexOf('};', jsonStart) + 1;
+        if (jsonStart === -1 || jsonEnd <= jsonStart) continue;
+
+        let tokens: Record<string, any> = {};
+        try {
+          tokens = JSON.parse(html.substring(jsonStart, jsonEnd));
+        } catch {
+          continue;
+        }
+
+        let sName = 'externalcdn';
+        try {
+          const keyCmd = `curl -s -m 4 -x socks5h://127.0.0.1:9050 "https://strmfree.st/get-stream-key/${streamKey}"`;
+          const keyData = JSON.parse(execSync(keyCmd, { encoding: 'utf8', timeout: 5000 }));
+          if (keyData?.server_name) sName = keyData.server_name;
+        } catch {}
+
+        const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+        const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
+
+        for (const testPrefix of candidatePrefixes) {
+          for (const testSuf of qualityCandidates) {
+            const qKey = testSuf.replace(/\d+$/, '');
+            const p = tokens[qKey] || tokens[testSuf] || Object.values(tokens)[0];
+            if (!p) continue;
+
+            const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
+            const m3u8Url = `https://strmfree.st${testPrefix}${streamKey}${testSuf}/index.m3u8${qStr}`;
+
+            const txt = fetchManifestViaTor(m3u8Url, 6);
+            if (txt && txt.includes('#EXTM3U')) {
+              return {
+                rawM3u8Text: txt,
+                tokens,
+                workingHost: 'https://strmfree.st',
+                serverName: sName,
+                pathPrefix: testPrefix,
+                activeVariantSuffix: testSuf
+              };
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Tor] Error in resolveViaTor for ${streamKey}:`, err?.message);
+  }
+  return null;
+}
+
 export async function resolveHlsStream(
   streamKey: string,
   requestedQuality = '1080p',
@@ -423,25 +524,31 @@ export async function resolveHlsStream(
         const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
         const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
-          const res = await fetch(fastUrl, {
-            signal: controller.signal,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-              'Accept': '*/*'
+          let txt: string | null = null;
+          if (process.platform === 'linux') {
+            txt = fetchManifestViaTor(fastUrl, 4);
+          }
+          if (!txt) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
+            const res = await fetch(fastUrl, {
+              signal: controller.signal,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': '*/*'
+              }
+            });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+              const fetchTxt = await res.text();
+              if (fetchTxt.includes('#EXTM3U')) txt = fetchTxt;
             }
-          });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            const txt = await res.text();
-            if (txt.includes('#EXTM3U')) {
-              rawM3u8Text = txt;
-              cachedTarget.lastM3u8Text = txt;
-              cachedTarget.lastM3u8Time = Date.now();
-            } else {
-              tokenCacheMap.delete(cacheKey);
-            }
+          }
+
+          if (txt && txt.includes('#EXTM3U')) {
+            rawM3u8Text = txt;
+            cachedTarget.lastM3u8Text = txt;
+            cachedTarget.lastM3u8Time = Date.now();
           } else {
             // Expired tokens or changed server prefix -> invalidate cache to trigger fresh resolution
             tokenCacheMap.delete(cacheKey);
@@ -545,6 +652,19 @@ export async function resolveHlsStream(
       } catch (err: any) {
         console.warn(`[StreamService] Direct discovery notice for ${streamKey}:`, err?.message);
       }
+
+      // Direct Discovery Tor Fallback (Bypasses upstream Datacenter ASN 403 blocks)
+      if (!rawM3u8Text && !isExternal && process.platform === 'linux') {
+        const torRes = resolveViaTor(streamKey, sportCategory, quality);
+        if (torRes) {
+          tokens = torRes.tokens;
+          workingHost = torRes.workingHost;
+          serverName = torRes.serverName;
+          pathPrefix = torRes.pathPrefix;
+          activeVariantSuffix = torRes.activeVariantSuffix;
+          rawM3u8Text = torRes.rawM3u8Text;
+        }
+      }
     }
 
     // 4. Fallback multi-feed failover scan (if direct discovery did not find a working playlist)
@@ -646,7 +766,21 @@ export async function resolveHlsStream(
         if (foundWorkingFeed) break;
       }
 
-      if (!foundWorkingFeed && !isExternal) {
+      if (!foundWorkingFeed && !rawM3u8Text && !isExternal && process.platform === 'linux') {
+        const altCategory = sportCategory === 'football' ? 'basketball' : 'football';
+        const torRes = resolveViaTor(streamKey, altCategory, quality);
+        if (torRes) {
+          tokens = torRes.tokens;
+          workingHost = torRes.workingHost;
+          serverName = torRes.serverName;
+          pathPrefix = torRes.pathPrefix;
+          activeVariantSuffix = torRes.activeVariantSuffix;
+          rawM3u8Text = torRes.rawM3u8Text;
+          foundWorkingFeed = true;
+        }
+      }
+
+      if (!foundWorkingFeed && !rawM3u8Text && !isExternal) {
         tokenCacheMap.delete(cacheKey);
         throw new Error(`Could not locate active live broadcast or security tokens for ${streamKey}`);
       }
