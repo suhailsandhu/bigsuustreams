@@ -1008,19 +1008,25 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
           const curlOutputs = [];
-          const testM3u8Url = `https://strmfree.st${detectedPrefix}${key}${testSuf}/index.m3u8${qStr}`;
-          const { execSync } = await import('child_process');
-          try {
-            const torM3u8 = execSync(`curl -s -i -x socks5h://127.0.0.1:9050 "${testM3u8Url}"`, { encoding: 'utf8', timeout: 15000 });
-            curlOutputs.push({
-              proxy: 'tor-socks5',
-              url: testM3u8Url,
-              hasExtM3u: torM3u8.includes('#EXTM3U'),
-              length: torM3u8.length,
-              preview: torM3u8.substring(0, 300)
-            });
-          } catch (e) {
-            curlOutputs.push({ proxy: 'tor-socks5', error: e.message, stdout: e.stdout?.substring(0, 300) });
+          for (const [qual, p] of Object.entries(parsedTokens)) {
+            const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
+            const urlMatching = `${sourceOrigin}${detectedPrefix}${key}${qual}/index.m3u8${qStr}`;
+            try {
+              const r = await fetch(urlMatching, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                signal: AbortSignal.timeout(4000)
+              });
+              const txt = await r.text();
+              curlOutputs.push({
+                qual,
+                status: r.status,
+                hasExt: txt.includes('#EXTM3U'),
+                url: urlMatching,
+                preview: txt.substring(0, 120)
+              });
+            } catch (e) {
+              curlOutputs.push({ qual, error: e.message });
+            }
           }
           trace.push({ step: 'curlOutputs', data: curlOutputs });
         }
