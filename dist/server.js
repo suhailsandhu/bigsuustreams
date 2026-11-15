@@ -4117,13 +4117,19 @@ app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
           const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : "";
           const curlOutputs = [];
+          const testM3u8Url = `https://strmfree.st${detectedPrefix}${key}${testSuf}/index.m3u8${qStr}`;
           const { execSync } = await import("child_process");
           try {
-            const ip4 = execSync("ip -4 -br addr", { encoding: "utf8" });
-            const ip6 = execSync("ip -6 -br addr", { encoding: "utf8" });
-            curlOutputs.push({ ip4, ip6 });
+            const torM3u8 = execSync(`curl -s -i -x socks5h://127.0.0.1:9050 "${testM3u8Url}"`, { encoding: "utf8", timeout: 15e3 });
+            curlOutputs.push({
+              proxy: "tor-socks5",
+              url: testM3u8Url,
+              hasExtM3u: torM3u8.includes("#EXTM3U"),
+              length: torM3u8.length,
+              preview: torM3u8.substring(0, 300)
+            });
           } catch (e) {
-            curlOutputs.push({ ipError: e.message });
+            curlOutputs.push({ proxy: "tor-socks5", error: e.message, stdout: e.stdout?.substring(0, 300) });
           }
           trace.push({ step: "curlOutputs", data: curlOutputs });
         }
