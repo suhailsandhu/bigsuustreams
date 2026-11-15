@@ -1007,34 +1007,19 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
           const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-          const ipTests = [
-            { name: 'direct', headers: { 'User-Agent': 'Mozilla/5.0' } },
-            { name: 'forwarded-residential', headers: { 'User-Agent': 'Mozilla/5.0', 'X-Forwarded-For': '73.189.45.12' } },
-            { name: 'cf-connecting-ip', headers: { 'User-Agent': 'Mozilla/5.0', 'CF-Connecting-IP': '73.189.45.12' } },
-            { name: 'true-client-ip', headers: { 'User-Agent': 'Mozilla/5.0', 'True-Client-IP': '73.189.45.12' } },
-            { name: 'x-real-ip', headers: { 'User-Agent': 'Mozilla/5.0', 'X-Real-IP': '73.189.45.12' } }
-          ];
+          const curlOutputs = [];
+          const testM3u8Url = `https://strmfree.st${detectedPrefix}${key}${testSuf}/index.m3u8${qStr}`;
+          try {
+            const { execSync } = await import('child_process');
+            const cRes1 = execSync(`curl -s -i "${testM3u8Url}"`, { encoding: 'utf8', timeout: 5000 });
+            curlOutputs.push({ cmd: 'curl plain', output: cRes1.substring(0, 400) });
 
-          for (const it of ipTests) {
-            const testM3u8Url = `https://strmfree.st${detectedPrefix}${key}${testSuf}/index.m3u8${qStr}`;
-            try {
-              const mRes = await fetch(testM3u8Url, {
-                signal: AbortSignal.timeout(4000),
-                headers: it.headers
-              });
-              const txt = await mRes.text();
-              m3u8Attempts.push({
-                test: it.name,
-                status: mRes.status,
-                hasExtM3u: txt.includes('#EXTM3U'),
-                preview: txt.substring(0, 150)
-              });
-              if (txt.includes('#EXTM3U')) break;
-            } catch (e) {
-              m3u8Attempts.push({ test: it.name, error: e.message });
-            }
+            const cRes2 = execSync(`curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -H "Referer: ${liveSource.url}" "${testM3u8Url}"`, { encoding: 'utf8', timeout: 5000 });
+            curlOutputs.push({ cmd: 'curl with UA and Referer', output: cRes2.substring(0, 400) });
+          } catch (e) {
+            curlOutputs.push({ cmd: 'curl error', error: e.message, stdout: e.stdout?.substring(0, 300) });
           }
-          trace.push({ step: 'm3u8Attempts', attempts: m3u8Attempts });
+          trace.push({ step: 'curlOutputs', data: curlOutputs });
         }
       }
     }
