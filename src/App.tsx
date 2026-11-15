@@ -202,6 +202,9 @@ export const App: React.FC = () => {
   // Safe, non-invasive Maintenance Check (only activates if server explicitly returns updating: true)
   useEffect(() => {
     const checkSystemStatus = async () => {
+      // NEVER interrupt an active video stream with a maintenance screen!
+      if (selectedStream) return;
+
       try {
         const res = await fetch('/api/system-status', {
           cache: 'no-store'
@@ -224,7 +227,7 @@ export const App: React.FC = () => {
     // Low-frequency check (every 30s) so it never interferes with active video streaming
     const interval = setInterval(checkSystemStatus, 30000);
     return () => clearInterval(interval);
-  }, [isSiteUpdating]);
+  }, [isSiteUpdating, selectedStream]);
 
   // Anti-reverse-engineering & client-side security guards
   useEffect(() => {

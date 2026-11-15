@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { isSamsungSmartTv, isSmartTv, getTvHlsConfig, TV_KEYS } from '../utils/tvDetector.ts';
 import Hls from 'hls.js';
-import LatticeLoader from './LatticeLoader.tsx';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize2, Minimize2, 
   RefreshCw, AlertCircle,
@@ -156,11 +155,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const isPlayingRef = useRef(false);
+  const hasStartedPlayingRef = useRef(false);
   // Autoplay with sound on automatically for everyone
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showControls, setShowControls] = useState(false);
@@ -287,6 +288,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     if (!video) return;
 
     setIsLoading(true);
+    setIsBuffering(false);
+    hasStartedPlayingRef.current = false;
     setHasError(false);
     setErrorMessage('');
     setShowControls(false);
@@ -324,6 +327,14 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     const sportPrefix = (stream.category === 'football' || stream.league === 'NFL') ? 'football' : 'basketball';
     const targetUrl = `/api/${sportPrefix}/hls/${stream.stream_key}/${selectedQuality}.m3u8${tokenParam}`;
 
+    // Helper to clear all loading / buffering overlays once media starts
+    const markStarted = () => {
+      setIsLoading(false);
+      setIsBuffering(false);
+      hasStartedPlayingRef.current = true;
+      if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+    };
+
     // 1. Check if Hls.js is supported
     if (Hls.isSupported()) {
       const tvConfig = getTvHlsConfig(isTv);
@@ -331,18 +342,20 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       const hls = new Hls({
         enableWorker: tvConfig.enableWorker,
         lowLatencyMode: ultraLow,
+        startFragPrefetch: true, // Download initial video chunk immediately for instant playback
         backBufferLength: tvConfig.backBufferLength,
         maxBufferLength: tvConfig.maxBufferLength,
         maxMaxBufferLength: tvConfig.maxMaxBufferLength,
         maxBufferSize: tvConfig.maxBufferSize,
         liveSyncDurationCount: tvConfig.liveSyncDurationCount,
         liveMaxLatencyDurationCount: tvConfig.liveMaxLatencyDurationCount,
+        liveDurationInfinity: true,
         nudgeOffset: tvConfig.nudgeOffset,
         nudgeMaxRetry: tvConfig.nudgeMaxRetry,
         maxBufferHole: 0.8,
-        highBufferWatchdogPeriod: 3,
-        fragLoadingRetryDelay: 800,
-        manifestLoadingRetryDelay: 800,
+        highBufferWatchdogPeriod: 2,
+        fragLoadingRetryDelay: 600,
+        manifestLoadingRetryDelay: 600,
         fragLoadingMaxRetry: tvConfig.fragLoadingMaxRetry,
         manifestLoadingMaxRetry: tvConfig.manifestLoadingMaxRetry,
         levelLoadingMaxRetry: 6,
@@ -360,8 +373,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsLoading(false);
-        if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+        markStarted();
 
         video.play().then(() => {
           setIsPlaying(true);
@@ -376,7 +388,6 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
             retryCountRef.current = 0;
           }).catch(() => {
             setIsPlaying(false);
-            setIsLoading(false);
             if (isTv) {
               setTvAutoplayBlocked(true);
             }
@@ -385,8 +396,7 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
       });
 
       hls.on(Hls.Events.FRAG_LOADED, () => {
-        setIsLoading(false);
-        if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
+        markStarted();
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -458,6 +468,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       const markReady = () => {
         setIsLoading(false);
+        setIsBuffering(false);
+        hasStartedPlayingRef.current = true;
         if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
       };
 
@@ -472,11 +484,13 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
 
       video.play().then(() => {
         setIsPlaying(true);
+        markReady();
       }).catch(() => {
         video.muted = true;
         setIsMuted(true);
         video.play().then(() => {
           setIsPlaying(true);
+          markReady();
         }).catch(() => {
           markReady();
           setIsPlaying(false);
@@ -492,12 +506,14 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
         setHasError(true);
         setErrorMessage('Coverage is preparing or reconnecting. Retrying automatically...');
         setIsLoading(false);
+        setIsBuffering(false);
       });
     } else {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current);
       setHasError(true);
       setErrorMessage('Your browser does not support HLS video playback.');
       setIsLoading(false);
+      setIsBuffering(false);
     }
   }, [onQualityChange, selectedQuality, stream.stream_key]);
 
@@ -528,16 +544,29 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+      setIsBuffering(false);
+      hasStartedPlayingRef.current = true;
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      setIsBuffering(false);
+    };
     let stallCounter = 0;
     let lastStallTime = 0;
     const onWaiting = () => {
-      setIsLoading(true);
+      // If stream has already started playing, show subtle buffer indicator without covering video
+      if (hasStartedPlayingRef.current) {
+        setIsBuffering(true);
+      } else {
+        setIsLoading(true);
+      }
       const now = Date.now();
       if (now - lastStallTime < 15000) {
         stallCounter++;
-        if (stallCounter >= 3 && selectedQuality === '1080p' && availableQualities.includes('720p')) {
+        if (stallCounter >= 4 && selectedQuality === '1080p' && availableQualities.includes('720p')) {
           console.log('[CourtsidePlayer] Repeated buffer stall detected, auto-adapting to 720p for smooth stream');
           onQualityChange('720p');
           stallCounter = 0;
@@ -549,6 +578,8 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
     };
     const onPlaying = () => {
       setIsLoading(false);
+      setIsBuffering(false);
+      hasStartedPlayingRef.current = true;
     };
 
     const onWebkitBegin = () => setIsFullscreen(true);
@@ -816,25 +847,23 @@ export const CourtsidePlayer: React.FC<CourtsidePlayerProps> = ({
           </div>
         )}
 
-        {/* Loading Indicator (Clean Background with React Bits LatticeLoader) */}
+        {/* Fast Initial Connecting Indicator: Sleek, lightweight, non-blocking */}
         {isLoading && !hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-[#0c0c0e]/95 z-20 pointer-events-none p-4">
-            <LatticeLoader
-              label="Connecting stream..."
-              status="working"
-              pattern="orbit"
-              grid={3}
-              cellSize={7}
-              gap={3}
-              color="#ea580c"
-              glow
-              glowColor="#ea580c"
-              showTimer
-              className="text-gray-900 dark:text-neutral-100 font-bold"
-            />
-            <p className="text-[11px] text-gray-500 dark:text-neutral-400 mt-2 font-medium">
-              {selectedQuality} HD
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs z-20 pointer-events-none p-4 transition-opacity duration-300">
+            <div className="relative flex items-center justify-center">
+              <div className="w-11 h-11 rounded-full border-3 border-white/20 border-t-orange-500 animate-spin" />
+              <div className="absolute w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+            </div>
+            <p className="text-xs font-bold text-white mt-3 tracking-wide drop-shadow-sm">
+              Connecting {selectedQuality} HD...
             </p>
+          </div>
+        )}
+
+        {/* Mid-stream Buffer Indicator: Keeps video frame visible underneath with zero blackout */}
+        {isBuffering && !isLoading && !hasError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <div className="w-11 h-11 rounded-full border-3 border-white/30 border-t-white animate-spin drop-shadow-lg" />
           </div>
         )}
 

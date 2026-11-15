@@ -383,7 +383,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
     const now = Date.now();
     const cacheKey = `${streamKey}:${quality}`;
     const cachedTarget = tokenCacheMap.get(cacheKey);
-    if (cachedTarget && cachedTarget.expires > now && cachedTarget.lastM3u8Text && now - (cachedTarget.lastM3u8Time || 0) < 2e3) {
+    if (cachedTarget && cachedTarget.expires > now && cachedTarget.lastM3u8Text && now - (cachedTarget.lastM3u8Time || 0) < 1e4) {
       rawM3u8Text = cachedTarget.lastM3u8Text;
       tokens = cachedTarget.tokens;
       workingHost = cachedTarget.workingHost;
@@ -392,6 +392,45 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
       isExternal = Boolean(cachedTarget.isExternal);
       externalUrl = cachedTarget.externalUrl || "";
       activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
+      if (!isExternal && !cachedTarget.isRefreshing && now - (cachedTarget.lastM3u8Time || 0) >= 2e3) {
+        cachedTarget.isRefreshing = true;
+        const qKey2 = activeVariantSuffix.replace(/\d+$/, "");
+        const p2 = tokens[qKey2] || tokens[quality] || tokens["1080p"] || Object.values(tokens)[0];
+        const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
+        const v = `${streamKey}${activeVariantSuffix}`;
+        const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr2}`;
+        (async () => {
+          try {
+            let txt = null;
+            if (process.platform === "linux") {
+              txt = await fetchManifestViaTor(fastUrl, 4);
+            }
+            if (!txt) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3500);
+              const res = await fetch(fastUrl, {
+                signal: controller.signal,
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "Accept": "*/*"
+                }
+              });
+              clearTimeout(timeoutId);
+              if (res.ok) {
+                const fetchTxt = await res.text();
+                if (fetchTxt.includes("#EXTM3U")) txt = fetchTxt;
+              }
+            }
+            if (txt && txt.includes("#EXTM3U")) {
+              cachedTarget.lastM3u8Text = txt;
+              cachedTarget.lastM3u8Time = Date.now();
+            }
+          } catch {
+          } finally {
+            cachedTarget.isRefreshing = false;
+          }
+        })();
+      }
     } else if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
       tokens = cachedTarget.tokens;
       workingHost = cachedTarget.workingHost;
@@ -436,7 +475,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
             tokenCacheMap.delete(cacheKey);
           }
         } catch {
-          if (cachedTarget.lastM3u8Text && now - (cachedTarget.lastM3u8Time || 0) < 15e3) {
+          if (cachedTarget.lastM3u8Text && now - (cachedTarget.lastM3u8Time || 0) < 2e4) {
             rawM3u8Text = cachedTarget.lastM3u8Text;
           } else {
             tokenCacheMap.delete(cacheKey);

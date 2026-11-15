@@ -348,6 +348,7 @@ interface StreamTokenCache {
   expires: number;
   lastM3u8Text?: string;
   lastM3u8Time?: number;
+  isRefreshing?: boolean;
 }
 
 const tokenCacheMap = new Map<string, StreamTokenCache>();
@@ -520,8 +521,9 @@ export async function resolveHlsStream(
     const cacheKey = `${streamKey}:${quality}`;
     const cachedTarget = tokenCacheMap.get(cacheKey);
 
-    // 1. FAST PATH: Return cached playlist if fetched less than 2s ago
-    if (cachedTarget && cachedTarget.expires > now && cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 2000)) {
+    // 1. ULTRA-FAST PATH: Return cached playlist immediately if fresh (<10s old)
+    // Decoupled Stale-While-Revalidate: The video player receives the playlist in <1ms without waiting for Tor!
+    if (cachedTarget && cachedTarget.expires > now && cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 10000)) {
       rawM3u8Text = cachedTarget.lastM3u8Text;
       tokens = cachedTarget.tokens;
       workingHost = cachedTarget.workingHost;
@@ -530,8 +532,51 @@ export async function resolveHlsStream(
       isExternal = Boolean(cachedTarget.isExternal);
       externalUrl = cachedTarget.externalUrl || '';
       activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
+
+      // Asynchronous Background Refresh: if manifest is >= 2s old and not already refreshing,
+      // refresh it in the background so the next player request has new segments ready in RAM!
+      if (!isExternal && !cachedTarget.isRefreshing && (now - (cachedTarget.lastM3u8Time || 0) >= 2000)) {
+        cachedTarget.isRefreshing = true;
+        const qKey = activeVariantSuffix.replace(/\d+$/, '');
+        const p = tokens[qKey] || tokens[quality] || tokens['1080p'] || Object.values(tokens)[0];
+        const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+        const v = `${streamKey}${activeVariantSuffix}`;
+        const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
+
+        (async () => {
+          try {
+            let txt: string | null = null;
+            if (process.platform === 'linux') {
+              txt = await fetchManifestViaTor(fastUrl, 4);
+            }
+            if (!txt) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3500);
+              const res = await fetch(fastUrl, {
+                signal: controller.signal,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Accept': '*/*'
+                }
+              });
+              clearTimeout(timeoutId);
+              if (res.ok) {
+                const fetchTxt = await res.text();
+                if (fetchTxt.includes('#EXTM3U')) txt = fetchTxt;
+              }
+            }
+
+            if (txt && txt.includes('#EXTM3U')) {
+              cachedTarget.lastM3u8Text = txt;
+              cachedTarget.lastM3u8Time = Date.now();
+            }
+          } catch {} finally {
+            cachedTarget.isRefreshing = false;
+          }
+        })();
+      }
     }
-    // 2. If cached route exists, fast-fetch the live playlist
+    // 2. If cached route exists but manifest is stale (>10s), fetch fresh playlist synchronously
     else if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
       tokens = cachedTarget.tokens;
       workingHost = cachedTarget.workingHost;
@@ -580,7 +625,7 @@ export async function resolveHlsStream(
           }
         } catch {
           // If upstream hiccuped, reuse recent valid playlist to prevent disconnect
-          if (cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 15000)) {
+          if (cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 20000)) {
             rawM3u8Text = cachedTarget.lastM3u8Text;
           } else {
             tokenCacheMap.delete(cacheKey);
