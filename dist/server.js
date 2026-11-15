@@ -4067,33 +4067,40 @@ app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
   }
   const key = req.params.key;
   const results = [];
-  const testUrls = [
-    `https://strmfree.st/get-stream-key/${key}`,
-    `https://streamfree.top/get-stream-key/${key}`,
-    `https://strmfree.st/embed/basketball/${key}1080p`,
-    `https://streamfree.top/embed/basketball/${key}1080p`,
-    `https://strmfree.st/api/v1/sources/${key}`
+  const testHeaders = [
+    { label: "no-headers", headers: {} },
+    { label: "simple-ua", headers: { "User-Agent": "Mozilla/5.0" } },
+    { label: "browser-headers", headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Sec-Fetch-Dest": "iframe",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "cross-site"
+    } },
+    { label: "iphone-ua", headers: {
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    } },
+    { label: "empty-referer", headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    } }
   ];
-  for (const url of testUrls) {
+  for (const th of testHeaders) {
     try {
-      const r = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          "Referer": "https://strmfree.st/"
-        },
+      const r = await fetch(`https://strmfree.st/embed/basketball/${key}1080p`, {
+        headers: th.headers,
         signal: AbortSignal.timeout(5e3)
       });
       const txt = await r.text();
       results.push({
-        url,
+        test: th.label,
         status: r.status,
-        headers: Object.fromEntries(r.headers.entries()),
-        preview: txt.substring(0, 300),
-        hasExtM3u: txt.includes("#EXTM3U"),
+        preview: txt.substring(0, 150),
         hasTokens: txt.includes("const _0x")
       });
     } catch (e) {
-      results.push({ url, error: e?.message });
+      results.push({ test: th.label, error: e?.message });
     }
   }
   res.json({ key, results });
