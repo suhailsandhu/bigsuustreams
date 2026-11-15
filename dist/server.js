@@ -4124,12 +4124,14 @@ app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
               const { execSync } = require('child_process');
               try {
                 const html = execSync('curl -s -x socks5h://127.0.0.1:9050 "https://strmfree.st/embed/basketball/${key}1080p"', { encoding: 'utf8', timeout: 15000 });
-                const m = html.match(/const\\\\s+_0x\\\\s*=\\\\s*({[^;]+});/);
-                if (!m) {
+                const idx = html.indexOf('const _0x = ');
+                if (idx === -1) {
                   console.log(JSON.stringify({ error: 'No tokens in Tor embed HTML', length: html.length, preview: html.substring(0, 200) }));
                   process.exit(0);
                 }
-                const tokens = JSON.parse(m[1]);
+                const semi = html.indexOf(';', idx);
+                const jsonStr = html.substring(idx + 13, semi).trim();
+                const tokens = JSON.parse(jsonStr);
                 const p = tokens['1080p'];
                 const u = "https://strmfree.st/live-externalcdn/${key}1080p/index.m3u8?_t=" + p._t + "&_e=" + p._e + "&_n=" + p._n;
                 const m3u8 = execSync('curl -s -i -x socks5h://127.0.0.1:9050 "' + u + '"', { encoding: 'utf8', timeout: 15000 });
