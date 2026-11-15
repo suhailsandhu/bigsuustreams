@@ -1037,7 +1037,7 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
             `;
             fs.writeFileSync(scriptPath, scriptCode);
             const torOut = execSync(`node "${scriptPath}"`, { encoding: 'utf8', timeout: 35000 });
-            curlOutputs.push({ torResult: JSON.parse(torOut.trim()) });
+            curlOutputs.push({ rawTorOut: torOut.trim() });
           } catch (e) {
             curlOutputs.push({ torError: e.message, stdout: e.stdout?.trim() });
           }
