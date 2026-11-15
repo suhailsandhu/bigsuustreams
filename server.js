@@ -945,46 +945,100 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized. PIN required.' });
   }
   const key = req.params.key;
-  const results = [];
-  const testHeaders = [
-    { label: 'no-headers', headers: {} },
-    { label: 'simple-ua', headers: { 'User-Agent': 'Mozilla/5.0' } },
-    { label: 'browser-headers', headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Sec-Fetch-Dest': 'iframe',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'cross-site'
-    }},
-    { label: 'iphone-ua', headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-    }},
-    { label: 'empty-referer', headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-    }}
-  ];
+  const trace = [];
 
-  for (const th of testHeaders) {
-    try {
-      const r = await fetch(`https://strmfree.st/embed/basketball/${key}1080p`, {
-        headers: th.headers,
+  try {
+    // Step 1: Sources lookup
+    const sourcesData = await getSourcesByKey(key).catch(e => ({ error: e.message }));
+    trace.push({ step: 'getSourcesByKey', data: sourcesData });
+
+    const liveSource = sourcesData?.sources?.find(s => s.live === true || s.is_live === true) || sourcesData?.sources?.[0];
+    trace.push({ step: 'liveSource', source: liveSource });
+
+    if (liveSource?.url) {
+      const parsed = new URL(liveSource.url);
+      const sourceOrigin = parsed.origin;
+      const pathParts = parsed.pathname.split('/');
+      const fullSlug = pathParts.pop() || '';
+      const directSuffix = fullSlug.replace(key, '') || '1080p';
+
+      // Step 2: Embed fetch
+      const embedRes = await fetch(liveSource.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        },
         signal: AbortSignal.timeout(5000)
-      });
-      const txt = await r.text();
-      results.push({
-        test: th.label,
-        status: r.status,
-        preview: txt.substring(0, 150),
-        hasTokens: txt.includes('const _0x')
-      });
-    } catch (e) {
-      results.push({ test: th.label, error: e?.message });
+      }).catch(e => ({ error: e.message }));
+
+      if (embedRes.error) {
+        trace.push({ step: 'embedFetchFailed', error: embedRes.error });
+      } else {
+        const embedHtml = await embedRes.text();
+        const match = embedHtml.match(/const\s+_0x\s*=\s*({[^;]+});/);
+        trace.push({
+          step: 'embedRes',
+          status: embedRes.status,
+          headers: Object.fromEntries(embedRes.headers.entries()),
+          hasTokens: !!match,
+          tokenKeys: match ? Object.keys(JSON.parse(match[1])) : []
+        });
+
+        // Step 3: Stream key lookup
+        const keyRes = await fetch(`${sourceOrigin}/get-stream-key/${key}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*'
+          },
+          signal: AbortSignal.timeout(3000)
+        }).then(r => r.json()).catch(e => ({ error: e.message }));
+        trace.push({ step: 'keyData', data: keyRes });
+
+        if (match) {
+          const parsedTokens = JSON.parse(match[1]);
+          const sName = keyRes?.server_name || 'origin';
+          const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+          const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
+          const qualitiesToTry = Array.from(new Set([directSuffix, '1080p', '720p'])).filter(Boolean);
+
+          const m3u8Attempts = [];
+          for (const testPrefix of candidatePrefixes) {
+            for (const testSuf of qualitiesToTry) {
+              const qKey = testSuf.replace(/\d+$/, '');
+              const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
+              if (!p) continue;
+              const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
+              const testM3u8Url = `${sourceOrigin}${testPrefix}${key}${testSuf}/index.m3u8${qStr}`;
+              try {
+                const mRes = await fetch(testM3u8Url, {
+                  signal: AbortSignal.timeout(4000),
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Accept': '*/*'
+                  }
+                });
+                const txt = await mRes.text();
+                m3u8Attempts.push({
+                  url: testM3u8Url,
+                  status: mRes.status,
+                  hasExtM3u: txt.includes('#EXTM3U'),
+                  preview: txt.substring(0, 150)
+                });
+                if (txt.includes('#EXTM3U')) break;
+              } catch (e) {
+                m3u8Attempts.push({ url: testM3u8Url, error: e.message });
+              }
+            }
+          }
+          trace.push({ step: 'm3u8Attempts', attempts: m3u8Attempts });
+        }
+      }
     }
+  } catch (err) {
+    trace.push({ step: 'fatal', error: err.message, stack: err.stack });
   }
 
-  res.json({ key, results });
+  res.json({ key, trace });
 });
 
 app.get('/api/admin/test-stream/:key', async (req, res) => {
