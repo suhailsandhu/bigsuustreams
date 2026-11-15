@@ -4117,15 +4117,21 @@ app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
           const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : "";
           const curlOutputs = [];
-          const testM3u8Url = `https://strmfree.st${detectedPrefix}${key}${testSuf}/index.m3u8${qStr}`;
-          try {
-            const { execSync } = await import("child_process");
-            const cRes1 = execSync(`curl -s -i "${testM3u8Url}"`, { encoding: "utf8", timeout: 5e3 });
-            curlOutputs.push({ cmd: "curl plain", output: cRes1.substring(0, 400) });
-            const cRes2 = execSync(`curl -s -i -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -H "Referer: ${liveSource.url}" "${testM3u8Url}"`, { encoding: "utf8", timeout: 5e3 });
-            curlOutputs.push({ cmd: "curl with UA and Referer", output: cRes2.substring(0, 400) });
-          } catch (e) {
-            curlOutputs.push({ cmd: "curl error", error: e.message, stdout: e.stdout?.substring(0, 300) });
+          const prefixes = ["/live/", "/live-cdn/", "/live-externalcdn/"];
+          const hosts = ["https://strmfree.st", "https://streamfree.top"];
+          const { execSync } = await import("child_process");
+          for (const h of hosts) {
+            for (const pre of prefixes) {
+              const u = `${h}${pre}${key}${testSuf}/index.m3u8${qStr}`;
+              try {
+                const out = execSync(`curl -s -i "${u}"`, { encoding: "utf8", timeout: 4e3 });
+                const firstLine = out.split("\r\n")[0] || out.split("\n")[0];
+                const hasExt = out.includes("#EXTM3U");
+                curlOutputs.push({ url: `${h}${pre}...`, status: firstLine, hasExt, preview: out.substring(0, 100) });
+              } catch (e) {
+                curlOutputs.push({ url: `${h}${pre}...`, error: e.message });
+              }
+            }
           }
           trace.push({ step: "curlOutputs", data: curlOutputs });
         }
