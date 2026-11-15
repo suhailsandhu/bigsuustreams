@@ -429,8 +429,7 @@ export async function resolveHlsStream(
             signal: controller.signal,
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-              'Referer': fastEmbedUrl,
-              'Origin': workingHost
+              'Accept': '*/*'
             }
           });
           clearTimeout(timeoutId);
@@ -472,20 +471,20 @@ export async function resolveHlsStream(
             const directSuffix = fullSlug.replace(streamKey, '') || '1080p';
 
             // Parallel fetch embed page AND stream key info to detect exact CDN server prefix
+            // CRITICAL: strmfree.st blocks requests with custom Referer header with HTTP 403 Violation.
+            // Using clean browser headers bypasses the anti-bot block cleanly.
             const [embedRes, keyRes] = await Promise.all([
               fetch(liveSource.url, {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                  'Referer': `${sourceOrigin}/`,
-                  'Origin': sourceOrigin
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
                 },
                 signal: AbortSignal.timeout(4000)
               }).catch(() => null),
               fetch(`${sourceOrigin}/get-stream-key/${streamKey}`, {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                  'Referer': liveSource.url,
-                  'Origin': sourceOrigin
+                  'Accept': 'application/json, text/plain, */*'
                 },
                 signal: AbortSignal.timeout(3000)
               }).then(r => r.ok ? r.json() : null).catch(() => null)
@@ -520,8 +519,7 @@ export async function resolveHlsStream(
                         signal: AbortSignal.timeout(3500),
                         headers: {
                           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                          'Referer': liveSource.url,
-                          'Origin': sourceOrigin
+                          'Accept': '*/*'
                         }
                       });
                       if (mRes.ok) {
@@ -567,7 +565,7 @@ export async function resolveHlsStream(
           const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-              'Origin': mirror
+              'Accept': 'application/json, text/plain, */*'
             },
             signal: AbortSignal.timeout(2500)
           });
@@ -582,7 +580,8 @@ export async function resolveHlsStream(
         }
 
         const sName = keyData.server_name || 'origin';
-        const prefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+        const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+        const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
 
         for (const cat of sportCandidates) {
           for (const suf of candidateSuffixes) {
@@ -593,7 +592,8 @@ export async function resolveHlsStream(
               const res = await fetch(embedUrl, {
                 signal: controller.signal,
                 headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
                 }
               });
               clearTimeout(timeoutId);
@@ -612,29 +612,31 @@ export async function resolveHlsStream(
               const p = parsedTokens[qKey] || parsedTokens[quality] || Object.values(parsedTokens)[0];
               const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-              const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr}`;
-              const m3u8Res = await fetch(m3u8Url, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                  'Referer': embedUrl,
-                  'Origin': mirror
-                },
-                signal: AbortSignal.timeout(3000)
-              });
-              if (!m3u8Res.ok) continue;
-              const m3u8Txt = await m3u8Res.text();
+              for (const testPrefix of candidatePrefixes) {
+                const m3u8Url = `${mirror}${testPrefix}${streamKey}${suf}/index.m3u8${qStr}`;
+                const m3u8Res = await fetch(m3u8Url, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    'Accept': '*/*'
+                  },
+                  signal: AbortSignal.timeout(3000)
+                });
+                if (!m3u8Res.ok) continue;
+                const m3u8Txt = await m3u8Res.text();
 
-              if (m3u8Txt.includes('#EXTM3U')) {
-                tokens = parsedTokens;
-                workingHost = mirror;
-                serverName = sName;
-                pathPrefix = prefix;
-                activeVariantSuffix = suf;
-                rawM3u8Text = m3u8Txt;
-                foundWorkingFeed = true;
-                recordMirrorSuccess(mirror, 80);
-                break;
+                if (m3u8Txt.includes('#EXTM3U')) {
+                  tokens = parsedTokens;
+                  workingHost = mirror;
+                  serverName = sName;
+                  pathPrefix = testPrefix;
+                  activeVariantSuffix = suf;
+                  rawM3u8Text = m3u8Txt;
+                  foundWorkingFeed = true;
+                  recordMirrorSuccess(mirror, 80);
+                  break;
+                }
               }
+              if (foundWorkingFeed) break;
             } catch {
               recordMirrorFailure(mirror);
             }
