@@ -987,6 +987,32 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
   res.json({ key, results });
 });
 
+app.get('/api/admin/test-stream/:key', async (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: 'Unauthorized. PIN required.' });
+  }
+  const key = req.params.key;
+  try {
+    const t0 = Date.now();
+    const hls = await resolveHlsStream(key, '1080p', 'basketball');
+    res.json({
+      success: true,
+      timeMs: Date.now() - t0,
+      quality: hls.selectedQuality,
+      available: hls.availableQualities,
+      m3u8Length: hls.m3u8Text?.length,
+      sample: hls.m3u8Text?.substring(0, 300)
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      error: err.message,
+      stack: err.stack
+    });
+  }
+});
+
 app.get('/api/admin/health', (req, res) => {
   const pin = req.headers['x-admin-pin'] || req.query.pin;
   if (!analytics.verifyPin(String(pin))) {
@@ -1087,17 +1113,19 @@ app.post('/api/admin/deploy', async (req, res) => {
   setTimeout(() => {
     import('child_process').then(({ exec }) => {
       const deployScript = `
-        export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/root/.nvm/versions/node/$(ls /root/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
-        cd /var/www/bigsuustreams
-        git fetch origin main
-        git reset --hard origin/main
+        export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+        cd /var/www/bigsuustreams || cd /var/www/* || pwd
+        echo "[DEPLOY START] $(date)" > /var/www/bigsuustreams/deploy.log 2>&1
+        git fetch origin main >> /var/www/bigsuustreams/deploy.log 2>&1
+        git reset --hard origin/main >> /var/www/bigsuustreams/deploy.log 2>&1
         rm -f .bss_updating dist/.bss_updating
-        pm2 restart all || pm2 restart server || npx pm2 restart all || /usr/local/bin/pm2 restart all || true
+        echo "[DEPLOY FINISHED GIT RESET] HEAD is now: $(git rev-parse --short HEAD)" >> /var/www/bigsuustreams/deploy.log 2>&1
+        (pm2 restart all || pm2 restart bigsuustreams || pm2 restart server || true) >> /var/www/bigsuustreams/deploy.log 2>&1
       `;
       exec(deployScript, { shell: '/bin/bash' }, (error, stdout, stderr) => {
         const logContent = `[${new Date().toISOString()}] Exit: ${error?.code || 0}\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}\n`;
         try {
-          fs.writeFileSync('/var/www/bigsuustreams/deploy.log', logContent);
+          fs.appendFileSync('/var/www/bigsuustreams/deploy.log', logContent);
         } catch {}
         if (error) {
           console.error('[Auto-Deploy] Deployment failed:', error, stderr);
@@ -1129,7 +1157,7 @@ app.post('/api/admin/restart', (req, res) => {
 });
 
 // Deployment & Worker Diagnostic Log
-app.get('/api/admin/deploy-status', (req, res) => {
+app.get('/api/admin/deploy-status', async (req, res) => {
   const pin = req.headers['x-admin-pin'] || req.query?.pin;
   if (!analytics.verifyPin(pin)) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1140,10 +1168,18 @@ app.get('/api/admin/deploy-status', (req, res) => {
       deployLog = fs.readFileSync('/var/www/bigsuustreams/deploy.log', 'utf8');
     }
   } catch {}
+  let currentCommit = '';
+  try {
+    const { execSync } = await import('child_process');
+    currentCommit = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  } catch (e) {
+    currentCommit = 'unknown: ' + e?.message;
+  }
   res.json({
     uptimeSeconds: Math.floor(process.uptime()),
     pid: process.pid,
     nodeVersion: process.version,
+    currentCommit,
     deployLog
   });
 });
