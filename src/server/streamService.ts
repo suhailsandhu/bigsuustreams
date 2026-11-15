@@ -397,35 +397,55 @@ export async function resolveViaTor(
   streamKey: string,
   sportCategory: string = 'basketball',
   preferredQuality: string = '1080p',
+  directSuffix: string = '',
+  hintEmbedUrl: string = '',
   timeoutSec: number = 6
 ): Promise<TorResolutionResult | null> {
   if (process.platform !== 'linux') return null;
   try {
     const catCandidates = sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
-    const sufCandidates = Array.from(new Set([preferredQuality, '1080p', '720p', ''])).filter(s => s !== undefined);
+    const sufCandidates = Array.from(new Set([directSuffix, preferredQuality, '1080p', '1080p2', '720p', '720p2', ''])).filter(s => s !== undefined);
 
     let tokens: Record<string, any> | null = null;
     let foundCat = sportCategory;
 
-    embedLoop:
-    for (const cat of catCandidates) {
-      for (const suf of sufCandidates) {
-        try {
-          const embedUrl = `https://strmfree.st/embed/${cat}/${streamKey}${suf}`;
-          const embedCmd = `curl -s -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: text/html,*/*" "${embedUrl}"`;
-          const { stdout: html } = await execAsync(embedCmd, { timeout: (timeoutSec + 2) * 1000, maxBuffer: 1024 * 1024 * 2 });
-
-          const idx = html.indexOf('const _0x = ');
-          if (idx !== -1) {
-            const jsonStart = html.indexOf('{', idx);
-            const jsonEnd = html.indexOf('};', jsonStart) + 1;
-            if (jsonStart !== -1 && jsonEnd > jsonStart) {
-              tokens = JSON.parse(html.substring(jsonStart, jsonEnd));
-              foundCat = cat;
-              break embedLoop;
-            }
+    // Try hint embed URL first if provided
+    if (hintEmbedUrl) {
+      try {
+        const embedCmd = `curl -s -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: text/html,*/*" "${hintEmbedUrl}"`;
+        const { stdout: html } = await execAsync(embedCmd, { timeout: (timeoutSec + 2) * 1000, maxBuffer: 1024 * 1024 * 2 });
+        const idx = html.indexOf('const _0x = ');
+        if (idx !== -1) {
+          const jsonStart = html.indexOf('{', idx);
+          const jsonEnd = html.indexOf('};', jsonStart) + 1;
+          if (jsonStart !== -1 && jsonEnd > jsonStart) {
+            tokens = JSON.parse(html.substring(jsonStart, jsonEnd));
           }
-        } catch {}
+        }
+      } catch {}
+    }
+
+    if (!tokens) {
+      embedLoop:
+      for (const cat of catCandidates) {
+        for (const suf of sufCandidates) {
+          try {
+            const embedUrl = `https://strmfree.st/embed/${cat}/${streamKey}${suf}`;
+            const embedCmd = `curl -s -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: text/html,*/*" "${embedUrl}"`;
+            const { stdout: html } = await execAsync(embedCmd, { timeout: (timeoutSec + 2) * 1000, maxBuffer: 1024 * 1024 * 2 });
+
+            const idx = html.indexOf('const _0x = ');
+            if (idx !== -1) {
+              const jsonStart = html.indexOf('{', idx);
+              const jsonEnd = html.indexOf('};', jsonStart) + 1;
+              if (jsonStart !== -1 && jsonEnd > jsonStart) {
+                tokens = JSON.parse(html.substring(jsonStart, jsonEnd));
+                foundCat = cat;
+                break embedLoop;
+              }
+            }
+          } catch {}
+        }
       }
     }
 
@@ -441,7 +461,7 @@ export async function resolveViaTor(
 
     const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
     const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
-    const candidateQualities = Array.from(new Set([preferredQuality, '1080p', '720p', '2160p'])).filter(Boolean);
+    const candidateQualities = Array.from(new Set([directSuffix, preferredQuality, '1080p', '1080p2', '720p', '720p2', '2160p'])).filter(Boolean);
 
     for (const testPrefix of candidatePrefixes) {
       for (const testSuf of candidateQualities) {
@@ -571,16 +591,21 @@ export async function resolveHlsStream(
 
     // 3. Direct Discovery via /api/v1/sources/:streamKey (Ultra-Fast <1s direct resolution with dynamic CDN prefix)
     if (!rawM3u8Text && !isExternal) {
+      let discoveredSuffix = '';
+      let discoveredEmbedUrl = '';
+
       try {
         const sourcesData = await getSourcesByKey(streamKey).catch(() => null);
         if (sourcesData && Array.isArray(sourcesData.sources) && sourcesData.sources.length > 0) {
           const liveSource = sourcesData.sources.find((s: any) => s.live === true || s.is_live === true) || sourcesData.sources[0];
           if (liveSource && liveSource.url) {
+            discoveredEmbedUrl = liveSource.url;
             const parsedSourceUrl = new URL(liveSource.url);
             const sourceOrigin = parsedSourceUrl.origin;
             const pathParts = parsedSourceUrl.pathname.split('/');
             const fullSlug = pathParts.pop() || '';
             const directSuffix = fullSlug.replace(streamKey, '') || '1080p';
+            discoveredSuffix = directSuffix;
 
             // Parallel fetch embed page AND stream key info to detect exact CDN server prefix
             // CRITICAL: strmfree.st blocks requests with custom Referer header with HTTP 403 Violation.
@@ -660,7 +685,7 @@ export async function resolveHlsStream(
 
       // Direct Discovery Tor Fallback (Bypasses upstream Datacenter ASN 403 blocks)
       if (!rawM3u8Text && !isExternal && process.platform === 'linux') {
-        const torRes = await resolveViaTor(streamKey, sportCategory, quality);
+        const torRes = await resolveViaTor(streamKey, sportCategory, quality, discoveredSuffix, discoveredEmbedUrl);
         if (torRes) {
           tokens = torRes.tokens;
           workingHost = torRes.workingHost;
@@ -773,7 +798,7 @@ export async function resolveHlsStream(
 
       if (!foundWorkingFeed && !rawM3u8Text && !isExternal && process.platform === 'linux') {
         const altCategory = sportCategory === 'football' ? 'basketball' : 'football';
-        const torRes = await resolveViaTor(streamKey, altCategory, quality);
+        const torRes = await resolveViaTor(streamKey, altCategory, quality, discoveredSuffix, discoveredEmbedUrl);
         if (torRes) {
           tokens = torRes.tokens;
           workingHost = torRes.workingHost;
