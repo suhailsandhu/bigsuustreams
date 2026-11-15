@@ -4117,21 +4117,13 @@ app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
           const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : "";
           const curlOutputs = [];
-          const prefixes = ["/live/", "/live-cdn/", "/live-externalcdn/"];
-          const hosts = ["https://strmfree.st", "https://streamfree.top"];
           const { execSync } = await import("child_process");
-          for (const h of hosts) {
-            for (const pre of prefixes) {
-              const u = `${h}${pre}${key}${testSuf}/index.m3u8${qStr}`;
-              try {
-                const out = execSync(`curl -s -i "${u}"`, { encoding: "utf8", timeout: 4e3 });
-                const firstLine = out.split("\r\n")[0] || out.split("\n")[0];
-                const hasExt = out.includes("#EXTM3U");
-                curlOutputs.push({ url: `${h}${pre}...`, status: firstLine, hasExt, preview: out.substring(0, 100) });
-              } catch (e) {
-                curlOutputs.push({ url: `${h}${pre}...`, error: e.message });
-              }
-            }
+          try {
+            const ip4 = execSync("ip -4 -br addr", { encoding: "utf8" });
+            const ip6 = execSync("ip -6 -br addr", { encoding: "utf8" });
+            curlOutputs.push({ ip4, ip6 });
+          } catch (e) {
+            curlOutputs.push({ ipError: e.message });
           }
           trace.push({ step: "curlOutputs", data: curlOutputs });
         }
