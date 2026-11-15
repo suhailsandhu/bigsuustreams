@@ -4060,6 +4060,44 @@ app.post("/api/analytics/config", (req, res) => {
     res.status(500).json({ error: String(err) });
   }
 });
+app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: "Unauthorized. PIN required." });
+  }
+  const key = req.params.key;
+  const results = [];
+  const testUrls = [
+    `https://strmfree.st/get-stream-key/${key}`,
+    `https://streamfree.top/get-stream-key/${key}`,
+    `https://strmfree.st/embed/basketball/${key}1080p`,
+    `https://streamfree.top/embed/basketball/${key}1080p`,
+    `https://strmfree.st/api/v1/sources/${key}`
+  ];
+  for (const url of testUrls) {
+    try {
+      const r = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Referer": "https://strmfree.st/"
+        },
+        signal: AbortSignal.timeout(5e3)
+      });
+      const txt = await r.text();
+      results.push({
+        url,
+        status: r.status,
+        headers: Object.fromEntries(r.headers.entries()),
+        preview: txt.substring(0, 300),
+        hasExtM3u: txt.includes("#EXTM3U"),
+        hasTokens: txt.includes("const _0x")
+      });
+    } catch (e) {
+      results.push({ url, error: e?.message });
+    }
+  }
+  res.json({ key, results });
+});
 app.get("/api/admin/health", (req, res) => {
   const pin = req.headers["x-admin-pin"] || req.query.pin;
   if (!analytics.verifyPin(String(pin))) {
