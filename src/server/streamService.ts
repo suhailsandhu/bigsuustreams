@@ -3,7 +3,10 @@
 
 import type { Stream, StreamsResponse } from '../types/stream.js';
 import crypto from 'crypto';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 interface MirrorState {
   url: string;
@@ -375,14 +378,14 @@ export interface TorResolutionResult {
   activeVariantSuffix: string;
 }
 
-export function fetchManifestViaTor(m3u8Url: string, timeoutSec: number = 5): string | null {
+export async function fetchManifestViaTor(m3u8Url: string, timeoutSec: number = 4): Promise<string | null> {
   if (process.platform !== 'linux') return null;
   try {
     const cmd = `curl -s -i -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: */*" "${m3u8Url}"`;
-    const out = execSync(cmd, { encoding: 'utf8', timeout: (timeoutSec + 2) * 1000 });
-    const idx = out.indexOf('#EXTM3U');
+    const { stdout } = await execAsync(cmd, { timeout: (timeoutSec + 2) * 1000, maxBuffer: 1024 * 1024 * 4 });
+    const idx = stdout.indexOf('#EXTM3U');
     if (idx !== -1) {
-      return out.substring(idx).trim();
+      return stdout.substring(idx).trim();
     }
   } catch (err: any) {
     // Tor fallback silent on failure
@@ -390,73 +393,75 @@ export function fetchManifestViaTor(m3u8Url: string, timeoutSec: number = 5): st
   return null;
 }
 
-export function resolveViaTor(
+export async function resolveViaTor(
   streamKey: string,
   sportCategory: string = 'basketball',
   preferredQuality: string = '1080p',
-  timeoutSec: number = 10
-): TorResolutionResult | null {
+  timeoutSec: number = 6
+): Promise<TorResolutionResult | null> {
   if (process.platform !== 'linux') return null;
   try {
-    const sportCandidates = sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
-    const qualityCandidates = Array.from(new Set([preferredQuality, '1080p', '720p', '2160p'])).filter(Boolean);
+    const catCandidates = sportCategory === 'football' ? ['football', 'basketball'] : ['basketball', 'football'];
+    const sufCandidates = Array.from(new Set([preferredQuality, '1080p', '720p', ''])).filter(s => s !== undefined);
 
-    for (const cat of sportCandidates) {
-      for (const suf of qualityCandidates) {
-        const embedUrl = `https://strmfree.st/embed/${cat}/${streamKey}${suf}`;
-        let html = '';
+    let tokens: Record<string, any> | null = null;
+    let foundCat = sportCategory;
+
+    embedLoop:
+    for (const cat of catCandidates) {
+      for (const suf of sufCandidates) {
         try {
-          const embedCmd = `curl -s -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" "${embedUrl}"`;
-          html = execSync(embedCmd, { encoding: 'utf8', timeout: (timeoutSec + 2) * 1000 });
-        } catch {
-          continue;
-        }
+          const embedUrl = `https://strmfree.st/embed/${cat}/${streamKey}${suf}`;
+          const embedCmd = `curl -s -m ${timeoutSec} -x socks5h://127.0.0.1:9050 -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" -H "Accept: text/html,*/*" "${embedUrl}"`;
+          const { stdout: html } = await execAsync(embedCmd, { timeout: (timeoutSec + 2) * 1000, maxBuffer: 1024 * 1024 * 2 });
 
-        const idx = html.indexOf('const _0x = ');
-        if (idx === -1) continue;
-
-        const jsonStart = html.indexOf('{', idx);
-        const jsonEnd = html.indexOf('};', jsonStart) + 1;
-        if (jsonStart === -1 || jsonEnd <= jsonStart) continue;
-
-        let tokens: Record<string, any> = {};
-        try {
-          tokens = JSON.parse(html.substring(jsonStart, jsonEnd));
-        } catch {
-          continue;
-        }
-
-        let sName = 'externalcdn';
-        try {
-          const keyCmd = `curl -s -m 4 -x socks5h://127.0.0.1:9050 "https://strmfree.st/get-stream-key/${streamKey}"`;
-          const keyData = JSON.parse(execSync(keyCmd, { encoding: 'utf8', timeout: 5000 }));
-          if (keyData?.server_name) sName = keyData.server_name;
-        } catch {}
-
-        const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
-        const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
-
-        for (const testPrefix of candidatePrefixes) {
-          for (const testSuf of qualityCandidates) {
-            const qKey = testSuf.replace(/\d+$/, '');
-            const p = tokens[qKey] || tokens[testSuf] || Object.values(tokens)[0];
-            if (!p) continue;
-
-            const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
-            const m3u8Url = `https://strmfree.st${testPrefix}${streamKey}${testSuf}/index.m3u8${qStr}`;
-
-            const txt = fetchManifestViaTor(m3u8Url, 6);
-            if (txt && txt.includes('#EXTM3U')) {
-              return {
-                rawM3u8Text: txt,
-                tokens,
-                workingHost: 'https://strmfree.st',
-                serverName: sName,
-                pathPrefix: testPrefix,
-                activeVariantSuffix: testSuf
-              };
+          const idx = html.indexOf('const _0x = ');
+          if (idx !== -1) {
+            const jsonStart = html.indexOf('{', idx);
+            const jsonEnd = html.indexOf('};', jsonStart) + 1;
+            if (jsonStart !== -1 && jsonEnd > jsonStart) {
+              tokens = JSON.parse(html.substring(jsonStart, jsonEnd));
+              foundCat = cat;
+              break embedLoop;
             }
           }
+        } catch {}
+      }
+    }
+
+    if (!tokens) return null;
+
+    let sName = 'externalcdn';
+    try {
+      const keyCmd = `curl -s -m 3 -x socks5h://127.0.0.1:9050 "https://strmfree.st/get-stream-key/${streamKey}"`;
+      const { stdout: keyOut } = await execAsync(keyCmd, { timeout: 4000 });
+      const keyData = JSON.parse(keyOut);
+      if (keyData?.server_name) sName = keyData.server_name;
+    } catch {}
+
+    const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+    const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
+    const candidateQualities = Array.from(new Set([preferredQuality, '1080p', '720p', '2160p'])).filter(Boolean);
+
+    for (const testPrefix of candidatePrefixes) {
+      for (const testSuf of candidateQualities) {
+        const qKey = testSuf.replace(/\d+$/, '');
+        const p = tokens[qKey] || tokens[testSuf] || Object.values(tokens)[0];
+        if (!p) continue;
+
+        const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
+        const m3u8Url = `https://strmfree.st${testPrefix}${streamKey}${testSuf}/index.m3u8${qStr}`;
+
+        const txt = await fetchManifestViaTor(m3u8Url, 4);
+        if (txt && txt.includes('#EXTM3U')) {
+          return {
+            rawM3u8Text: txt,
+            tokens,
+            workingHost: 'https://strmfree.st',
+            serverName: sName,
+            pathPrefix: testPrefix,
+            activeVariantSuffix: testSuf
+          };
         }
       }
     }
@@ -526,7 +531,7 @@ export async function resolveHlsStream(
         try {
           let txt: string | null = null;
           if (process.platform === 'linux') {
-            txt = fetchManifestViaTor(fastUrl, 4);
+            txt = await fetchManifestViaTor(fastUrl, 4);
           }
           if (!txt) {
             const controller = new AbortController();
@@ -655,7 +660,7 @@ export async function resolveHlsStream(
 
       // Direct Discovery Tor Fallback (Bypasses upstream Datacenter ASN 403 blocks)
       if (!rawM3u8Text && !isExternal && process.platform === 'linux') {
-        const torRes = resolveViaTor(streamKey, sportCategory, quality);
+        const torRes = await resolveViaTor(streamKey, sportCategory, quality);
         if (torRes) {
           tokens = torRes.tokens;
           workingHost = torRes.workingHost;
@@ -768,7 +773,7 @@ export async function resolveHlsStream(
 
       if (!foundWorkingFeed && !rawM3u8Text && !isExternal && process.platform === 'linux') {
         const altCategory = sportCategory === 'football' ? 'basketball' : 'football';
-        const torRes = resolveViaTor(streamKey, altCategory, quality);
+        const torRes = await resolveViaTor(streamKey, altCategory, quality);
         if (torRes) {
           tokens = torRes.tokens;
           workingHost = torRes.workingHost;

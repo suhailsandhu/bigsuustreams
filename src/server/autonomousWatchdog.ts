@@ -118,10 +118,10 @@ class AutonomousWatchdog {
       this.runFullCycle().catch(() => {});
     }, 3000);
 
-    // Continuous 30-second cycle
+    // Continuous 60-second cycle
     this.intervalTimer = setInterval(() => {
       this.runFullCycle().catch(() => {});
-    }, 30000);
+    }, 60000);
   }
 
   public stop() {
@@ -274,9 +274,12 @@ class AutonomousWatchdog {
       // When game is 35 minutes or closer to start, or already live/tipoff passed:
       const shouldPrepare = diffMinutes <= 35;
 
-      // Don't re-test if already verified within the last 15 minutes (preserves upstream bandwidth)
+      // Intelligent backoff cooldown:
+      // If ready: re-verify every 15 minutes (900,000 ms)
+      // If pending/error: wait at least 5 minutes (300,000 ms) before retrying to prevent CPU saturation
       const timeSinceLastCheck = now - watchItem.lastCheckedAt;
-      if (shouldPrepare && (watchItem.status !== 'ready' || timeSinceLastCheck > 900000)) {
+      const minInterval = watchItem.status === 'ready' ? 900000 : 300000;
+      if (shouldPrepare && timeSinceLastCheck > minInterval) {
         watchItem.lastCheckedAt = now;
         const sportCategory = g.sport === 'nfl' ? 'football' : 'basketball';
 
