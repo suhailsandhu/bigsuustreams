@@ -1020,8 +1020,9 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
                   console.log(JSON.stringify({ error: 'No tokens in Tor embed HTML', length: html.length, preview: html.substring(0, 200) }));
                   process.exit(0);
                 }
-                const semi = html.indexOf(';', idx);
-                const jsonStr = html.substring(idx + 13, semi).trim();
+                const jsonStart = html.indexOf('{', idx);
+                const jsonEnd = html.indexOf('};', jsonStart) + 1;
+                const jsonStr = html.substring(jsonStart, jsonEnd);
                 const tokens = JSON.parse(jsonStr);
                 const p = tokens['1080p'];
                 const u = "https://strmfree.st/live-externalcdn/${key}1080p/index.m3u8?_t=" + p._t + "&_e=" + p._e + "&_n=" + p._n;
