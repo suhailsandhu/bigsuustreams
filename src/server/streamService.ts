@@ -348,6 +348,7 @@ interface StreamTokenCache {
   expires: number;
   lastM3u8Text?: string;
   lastM3u8Time?: number;
+  resolvedHls?: ResolvedHls;
   isRefreshing?: boolean;
 }
 
@@ -521,116 +522,56 @@ export async function resolveHlsStream(
     const cacheKey = `${streamKey}:${quality}`;
     const cachedTarget = tokenCacheMap.get(cacheKey);
 
-    // 1. ULTRA-FAST PATH: Return cached playlist immediately if fresh (<10s old)
-    // Decoupled Stale-While-Revalidate: The video player receives the playlist in <1ms without waiting for Tor!
-    if (cachedTarget && cachedTarget.expires > now && cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 10000)) {
-      rawM3u8Text = cachedTarget.lastM3u8Text;
-      tokens = cachedTarget.tokens;
-      workingHost = cachedTarget.workingHost;
-      serverName = cachedTarget.serverName;
-      pathPrefix = cachedTarget.pathPrefix;
-      isExternal = Boolean(cachedTarget.isExternal);
-      externalUrl = cachedTarget.externalUrl || '';
-      activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
-
-      // Asynchronous Background Refresh: if manifest is >= 2s old and not already refreshing,
-      // refresh it in the background so the next player request has new segments ready in RAM!
-      if (!isExternal && !cachedTarget.isRefreshing && (now - (cachedTarget.lastM3u8Time || 0) >= 2000)) {
-        cachedTarget.isRefreshing = true;
-        const qKey = activeVariantSuffix.replace(/\d+$/, '');
-        const p = tokens[qKey] || tokens[quality] || tokens['1080p'] || Object.values(tokens)[0];
-        const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
-        const v = `${streamKey}${activeVariantSuffix}`;
-        const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
-
-        (async () => {
-          try {
-            let txt: string | null = null;
-            if (process.platform === 'linux') {
-              txt = await fetchManifestViaTor(fastUrl, 4);
-            }
-            if (!txt) {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 3500);
-              const res = await fetch(fastUrl, {
-                signal: controller.signal,
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                  'Accept': '*/*'
-                }
-              });
-              clearTimeout(timeoutId);
-              if (res.ok) {
-                const fetchTxt = await res.text();
-                if (fetchTxt.includes('#EXTM3U')) txt = fetchTxt;
-              }
-            }
-
-            if (txt && txt.includes('#EXTM3U')) {
-              cachedTarget.lastM3u8Text = txt;
-              cachedTarget.lastM3u8Time = Date.now();
-            }
-          } catch {} finally {
-            cachedTarget.isRefreshing = false;
-          }
-        })();
-      }
+    // 1. FAST CACHE HIT (< 2500ms): Return active parsed manifest immediately (<1ms)
+    if (cachedTarget && cachedTarget.resolvedHls && (now - (cachedTarget.lastM3u8Time || 0) < 2500)) {
+      return cachedTarget.resolvedHls;
     }
-    // 2. If cached route exists but manifest is stale (>10s), fetch fresh playlist synchronously
-    else if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0) {
+
+    // 2. FAST REFRESH VIA CACHED TOKENS: Try fetching fresh manifest using cached tokens
+    if (cachedTarget && cachedTarget.expires > now && Object.keys(cachedTarget.tokens).length > 0 && !cachedTarget.isExternal) {
       tokens = cachedTarget.tokens;
       workingHost = cachedTarget.workingHost;
       serverName = cachedTarget.serverName;
       pathPrefix = cachedTarget.pathPrefix;
-      isExternal = Boolean(cachedTarget.isExternal);
-      externalUrl = cachedTarget.externalUrl || '';
       activeVariantSuffix = cachedTarget.activeVariantSuffix || quality;
+      isExternal = false;
 
-      if (!isExternal) {
-        const qKey = activeVariantSuffix.replace(/\d+$/, '');
-        const p = tokens[qKey] || tokens[quality] || tokens['1080p'] || Object.values(tokens)[0];
-        const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
-        const v = `${streamKey}${activeVariantSuffix}`;
-        const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
-        const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
-        try {
-          let txt: string | null = null;
-          if (process.platform === 'linux') {
-            txt = await fetchManifestViaTor(fastUrl, 4);
-          }
-          if (!txt) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3500);
-            const res = await fetch(fastUrl, {
-              signal: controller.signal,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'Accept': '*/*'
-              }
-            });
-            clearTimeout(timeoutId);
-            if (res.ok) {
-              const fetchTxt = await res.text();
-              if (fetchTxt.includes('#EXTM3U')) txt = fetchTxt;
+      const qKey = activeVariantSuffix.replace(/\d+$/, '');
+      const p = tokens[qKey] || tokens[quality] || tokens['1080p'] || Object.values(tokens)[0];
+      const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+      const v = `${streamKey}${activeVariantSuffix}`;
+      const fastUrl = `${workingHost}${pathPrefix}${v}/index.m3u8${qStr}`;
+
+      try {
+        let txt: string | null = null;
+        if (process.platform === 'linux') {
+          txt = await fetchManifestViaTor(fastUrl, 3);
+        }
+        if (!txt) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
+          const res = await fetch(fastUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Accept': '*/*'
             }
-          }
-
-          if (txt && txt.includes('#EXTM3U')) {
-            rawM3u8Text = txt;
-            cachedTarget.lastM3u8Text = txt;
-            cachedTarget.lastM3u8Time = Date.now();
-          } else {
-            // Expired tokens or changed server prefix -> invalidate cache to trigger fresh resolution
-            tokenCacheMap.delete(cacheKey);
-          }
-        } catch {
-          // If upstream hiccuped, reuse recent valid playlist to prevent disconnect
-          if (cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 20000)) {
-            rawM3u8Text = cachedTarget.lastM3u8Text;
-          } else {
-            tokenCacheMap.delete(cacheKey);
+          });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const fetchTxt = await res.text();
+            if (fetchTxt.includes('#EXTM3U')) txt = fetchTxt;
           }
         }
+
+        if (txt && txt.includes('#EXTM3U')) {
+          rawM3u8Text = txt;
+        } else {
+          // Tokens expired or upstream stream restarted -> invalidate cache to trigger Step 3 fresh discovery
+          tokenCacheMap.delete(cacheKey);
+        }
+      } catch {
+        tokenCacheMap.delete(cacheKey);
       }
     }
 
@@ -878,19 +819,6 @@ export async function resolveHlsStream(
       selectedQuality = tokens['1080p'] ? '1080p' : (tokens['720p'] ? '720p' : (tokens['2160p'] ? '2160p' : availableQualities[0]));
     }
 
-    tokenCacheMap.set(cacheKey, {
-      tokens,
-      workingHost,
-      serverName,
-      pathPrefix,
-      activeVariantSuffix,
-      isExternal,
-      externalUrl,
-      expires: now + 300000, // 5 min cache
-      lastM3u8Text: rawM3u8Text,
-      lastM3u8Time: now
-    });
-
     const variant = `${streamKey}${activeVariantSuffix}`;
     const qKey = activeVariantSuffix.replace(/\d+$/, '');
     const p = tokens[qKey] || tokens[selectedQuality] || Object.values(tokens)[0];
@@ -961,13 +889,29 @@ export async function resolveHlsStream(
       segmentMap
     });
 
-    return {
+    const result: ResolvedHls = {
       isExternal: false,
       selectedQuality,
       availableQualities,
       m3u8Text,
       upstreamUrl: `/api/${sportCategory}/hls/${streamKey}/${selectedQuality}.m3u8`
     };
+
+    tokenCacheMap.set(cacheKey, {
+      tokens,
+      workingHost,
+      serverName,
+      pathPrefix,
+      activeVariantSuffix,
+      isExternal,
+      externalUrl,
+      expires: Date.now() + 300000, // 5 min token validity
+      lastM3u8Text: rawM3u8Text,
+      lastM3u8Time: Date.now(),
+      resolvedHls: result
+    });
+
+    return result;
   })();
 
   inflightResolutions.set(inflightKey, resolvePromise);
