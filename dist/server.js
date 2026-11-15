@@ -311,7 +311,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
         const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4e3);
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
           const res = await fetch(fastUrl, {
             signal: controller.signal,
             headers: {
@@ -327,11 +327,17 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
               rawM3u8Text = txt;
               cachedTarget.lastM3u8Text = txt;
               cachedTarget.lastM3u8Time = Date.now();
+            } else {
+              tokenCacheMap.delete(cacheKey);
             }
+          } else {
+            tokenCacheMap.delete(cacheKey);
           }
         } catch {
-          if (cachedTarget.lastM3u8Text && now - (cachedTarget.lastM3u8Time || 0) < 3e4) {
+          if (cachedTarget.lastM3u8Text && now - (cachedTarget.lastM3u8Time || 0) < 15e3) {
             rawM3u8Text = cachedTarget.lastM3u8Text;
+          } else {
+            tokenCacheMap.delete(cacheKey);
           }
         }
       }
@@ -347,63 +353,77 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
             const pathParts = parsedSourceUrl.pathname.split("/");
             const fullSlug = pathParts.pop() || "";
             const directSuffix = fullSlug.replace(streamKey, "") || "1080p";
-            const embedController = new AbortController();
-            const embedTimeoutId = setTimeout(() => embedController.abort(), 4500);
-            const embedRes = await fetch(liveSource.url, {
-              signal: embedController.signal,
-              headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                "Referer": `${sourceOrigin}/`,
-                "Origin": sourceOrigin
-              }
-            });
-            clearTimeout(embedTimeoutId);
-            if (embedRes.ok) {
+            const [embedRes, keyRes] = await Promise.all([
+              fetch(liveSource.url, {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "Referer": `${sourceOrigin}/`,
+                  "Origin": sourceOrigin
+                },
+                signal: AbortSignal.timeout(4e3)
+              }).catch(() => null),
+              fetch(`${sourceOrigin}/get-stream-key/${streamKey}`, {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                  "Referer": liveSource.url,
+                  "Origin": sourceOrigin
+                },
+                signal: AbortSignal.timeout(3e3)
+              }).then((r) => r.ok ? r.json() : null).catch(() => null)
+            ]);
+            const keyData = keyRes;
+            if (keyData?.is_external && keyData.external_url) {
+              isExternal = true;
+              externalUrl = keyData.external_url;
+            } else if (embedRes && embedRes.ok) {
               const html = await embedRes.text();
               const match = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
               if (match) {
                 const parsedTokens = JSON.parse(match[1]);
+                const sName = keyData?.server_name || "origin";
+                const detectedPrefix = sName === "externalcdn" ? "/live-externalcdn/" : sName !== "origin" ? "/live-cdn/" : "/live/";
+                const candidatePrefixes = Array.from(/* @__PURE__ */ new Set([detectedPrefix, "/live-externalcdn/", "/live-cdn/", "/live/"]));
                 const qualitiesToTry = Array.from(/* @__PURE__ */ new Set([directSuffix, quality, "1080p", "720p"])).filter(Boolean);
-                for (const testSuf of qualitiesToTry) {
-                  const qKey2 = testSuf.replace(/\d+$/, "");
-                  const p2 = parsedTokens[qKey2] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
-                  if (!p2) continue;
-                  const qStr2 = `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}`;
-                  const testM3u8Url = `${sourceOrigin}/live/${streamKey}${testSuf}/index.m3u8${qStr2}`;
-                  try {
-                    const mController = new AbortController();
-                    const mTimeoutId = setTimeout(() => mController.abort(), 4e3);
-                    const mRes = await fetch(testM3u8Url, {
-                      signal: mController.signal,
-                      headers: {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                        "Referer": liveSource.url,
-                        "Origin": sourceOrigin
-                      }
-                    });
-                    clearTimeout(mTimeoutId);
-                    if (mRes.ok) {
-                      const txt = await mRes.text();
-                      if (txt.includes("#EXTM3U")) {
-                        tokens = parsedTokens;
-                        workingHost = sourceOrigin;
-                        serverName = "origin";
-                        pathPrefix = "/live/";
-                        activeVariantSuffix = testSuf;
-                        rawM3u8Text = txt;
-                        recordMirrorSuccess(sourceOrigin, 50);
-                        break;
+                outerLoop:
+                  for (const testPrefix of candidatePrefixes) {
+                    for (const testSuf of qualitiesToTry) {
+                      const qKey2 = testSuf.replace(/\d+$/, "");
+                      const p2 = parsedTokens[qKey2] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
+                      if (!p2) continue;
+                      const qStr2 = `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}`;
+                      const testM3u8Url = `${sourceOrigin}${testPrefix}${streamKey}${testSuf}/index.m3u8${qStr2}`;
+                      try {
+                        const mRes = await fetch(testM3u8Url, {
+                          signal: AbortSignal.timeout(3500),
+                          headers: {
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                            "Referer": liveSource.url,
+                            "Origin": sourceOrigin
+                          }
+                        });
+                        if (mRes.ok) {
+                          const txt = await mRes.text();
+                          if (txt.includes("#EXTM3U")) {
+                            tokens = parsedTokens;
+                            workingHost = sourceOrigin;
+                            serverName = sName;
+                            pathPrefix = testPrefix;
+                            activeVariantSuffix = testSuf;
+                            rawM3u8Text = txt;
+                            recordMirrorSuccess(sourceOrigin, 50);
+                            break outerLoop;
+                          }
+                        }
+                      } catch {
                       }
                     }
-                  } catch {
                   }
-                }
               }
             }
           }
         }
       } catch (err) {
-        console.warn(`[StreamService] Direct discovery fast-path notice for ${streamKey}:`, err?.message);
+        console.warn(`[StreamService] Direct discovery notice for ${streamKey}:`, err?.message);
       }
     }
     if (!rawM3u8Text && !isExternal) {
@@ -414,12 +434,32 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
       const sportCandidates = sportCategory === "football" ? ["football", "basketball"] : ["basketball", "football"];
       let foundWorkingFeed = false;
       for (const mirror of mirrors) {
+        let keyData = {};
+        try {
+          const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+              "Origin": mirror
+            },
+            signal: AbortSignal.timeout(2500)
+          });
+          if (kRes.ok) keyData = await kRes.json();
+        } catch {
+        }
+        if (keyData.is_external && keyData.external_url) {
+          isExternal = true;
+          externalUrl = keyData.external_url;
+          foundWorkingFeed = true;
+          break;
+        }
+        const sName = keyData.server_name || "origin";
+        const prefix = sName === "externalcdn" ? "/live-externalcdn/" : sName !== "origin" ? "/live-cdn/" : "/live/";
         for (const cat of sportCandidates) {
           for (const suf of candidateSuffixes) {
             try {
               const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 4e3);
+              const timeoutId = setTimeout(() => controller.abort(), 3e3);
               const res = await fetch(embedUrl, {
                 signal: controller.signal,
                 headers: {
@@ -439,27 +479,6 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
               const qKey2 = suf.replace(/\d+$/, "");
               const p2 = parsedTokens[qKey2] || parsedTokens[quality] || Object.values(parsedTokens)[0];
               const qStr2 = p2 ? `?_t=${p2._t}&_e=${p2._e}&_n=${p2._n}` : "";
-              let keyData = {};
-              try {
-                const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
-                  headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                    "Referer": embedUrl,
-                    "Origin": mirror
-                  },
-                  signal: AbortSignal.timeout(3e3)
-                });
-                if (kRes.ok) keyData = await kRes.json();
-              } catch {
-              }
-              if (keyData.is_external && keyData.external_url) {
-                isExternal = true;
-                externalUrl = keyData.external_url;
-                foundWorkingFeed = true;
-                break;
-              }
-              const sName = keyData.server_name || "origin";
-              const prefix = sName === "externalcdn" ? "/live-externalcdn/" : sName !== "origin" ? "/live-cdn/" : "/live/";
               const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr2}`;
               const m3u8Res = await fetch(m3u8Url, {
                 headers: {
@@ -467,7 +486,7 @@ async function resolveHlsStream(streamKey, requestedQuality = "1080p", sportCate
                   "Referer": embedUrl,
                   "Origin": mirror
                 },
-                signal: AbortSignal.timeout(4e3)
+                signal: AbortSignal.timeout(3e3)
               });
               if (!m3u8Res.ok) continue;
               const m3u8Txt = await m3u8Res.text();
@@ -4122,17 +4141,68 @@ app.post("/api/admin/deploy", async (req, res) => {
   });
   setTimeout(() => {
     import("child_process").then(({ exec }) => {
-      exec("cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && rm -f .bss_updating dist/.bss_updating && pm2 restart all && pm2 save", (error, stdout, stderr) => {
+      const deployScript = `
+        export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/root/.nvm/versions/node/$(ls /root/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+        cd /var/www/bigsuustreams
+        git fetch origin main
+        git reset --hard origin/main
+        rm -f .bss_updating dist/.bss_updating
+        pm2 restart all || pm2 restart server || npx pm2 restart all || /usr/local/bin/pm2 restart all || true
+      `;
+      exec(deployScript, { shell: "/bin/bash" }, (error, stdout, stderr) => {
+        const logContent = `[${(/* @__PURE__ */ new Date()).toISOString()}] Exit: ${error?.code || 0}
+STDOUT:
+${stdout}
+STDERR:
+${stderr}
+`;
+        try {
+          fs3.writeFileSync("/var/www/bigsuustreams/deploy.log", logContent);
+        } catch {
+        }
         if (error) {
           console.error("[Auto-Deploy] Deployment failed:", error, stderr);
         } else {
           console.log("[Auto-Deploy] Deployed successfully:", stdout);
         }
+        setTimeout(() => {
+          process.exit(0);
+        }, 1200);
       });
     }).catch((err) => {
       console.error("[Auto-Deploy] Failed to load child_process:", err);
+      process.exit(0);
     });
   }, 2500);
+});
+app.post("/api/admin/restart", (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.body?.pin || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: "Unauthorized: Invalid Admin PIN" });
+  }
+  res.json({ success: true, message: "Server process restart initiated." });
+  setTimeout(() => {
+    process.exit(0);
+  }, 500);
+});
+app.get("/api/admin/deploy-status", (req, res) => {
+  const pin = req.headers["x-admin-pin"] || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  let deployLog = "No deploy log found.";
+  try {
+    if (fs3.existsSync("/var/www/bigsuustreams/deploy.log")) {
+      deployLog = fs3.readFileSync("/var/www/bigsuustreams/deploy.log", "utf8");
+    }
+  } catch {
+  }
+  res.json({
+    uptimeSeconds: Math.floor(process.uptime()),
+    pid: process.pid,
+    nodeVersion: process.version,
+    deployLog
+  });
 });
 function formatXmlTvDate(d) {
   const pad = (n) => String(n).padStart(2, "0");

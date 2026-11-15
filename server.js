@@ -1035,20 +1035,69 @@ app.post('/api/admin/deploy', async (req, res) => {
     message: 'Deployment initiated. Website is updating screen activated.'
   });
 
-  // 2. Wait 2.5 seconds so all clients receive update event and display the update screen before PM2 restarts
+  // 2. Wait 2.5 seconds so all clients receive update event and display the update screen before restart
   setTimeout(() => {
     import('child_process').then(({ exec }) => {
-      exec('cd /var/www/bigsuustreams && git fetch origin && git reset --hard origin/main && rm -f .bss_updating dist/.bss_updating && pm2 restart all && pm2 save', (error, stdout, stderr) => {
+      const deployScript = `
+        export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/root/.nvm/versions/node/$(ls /root/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+        cd /var/www/bigsuustreams
+        git fetch origin main
+        git reset --hard origin/main
+        rm -f .bss_updating dist/.bss_updating
+        pm2 restart all || pm2 restart server || npx pm2 restart all || /usr/local/bin/pm2 restart all || true
+      `;
+      exec(deployScript, { shell: '/bin/bash' }, (error, stdout, stderr) => {
+        const logContent = `[${new Date().toISOString()}] Exit: ${error?.code || 0}\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}\n`;
+        try {
+          fs.writeFileSync('/var/www/bigsuustreams/deploy.log', logContent);
+        } catch {}
         if (error) {
           console.error('[Auto-Deploy] Deployment failed:', error, stderr);
         } else {
           console.log('[Auto-Deploy] Deployed successfully:', stdout);
         }
+        // Graceful exit fallback so PM2 supervisor immediately respawns worker with new code
+        setTimeout(() => {
+          process.exit(0);
+        }, 1200);
       });
     }).catch(err => {
       console.error('[Auto-Deploy] Failed to load child_process:', err);
+      process.exit(0);
     });
   }, 2500);
+});
+
+// Immediate Safe Worker Restart (PM2 supervisor immediately respawns fresh worker)
+app.post('/api/admin/restart', (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.body?.pin || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid Admin PIN' });
+  }
+  res.json({ success: true, message: 'Server process restart initiated.' });
+  setTimeout(() => {
+    process.exit(0);
+  }, 500);
+});
+
+// Deployment & Worker Diagnostic Log
+app.get('/api/admin/deploy-status', (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.query?.pin;
+  if (!analytics.verifyPin(pin)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  let deployLog = 'No deploy log found.';
+  try {
+    if (fs.existsSync('/var/www/bigsuustreams/deploy.log')) {
+      deployLog = fs.readFileSync('/var/www/bigsuustreams/deploy.log', 'utf8');
+    }
+  } catch {}
+  res.json({
+    uptimeSeconds: Math.floor(process.uptime()),
+    pid: process.pid,
+    nodeVersion: process.version,
+    deployLog
+  });
 });
 
 // ============================================================================

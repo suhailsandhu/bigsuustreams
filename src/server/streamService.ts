@@ -424,7 +424,7 @@ export async function resolveHlsStream(
         const fastEmbedUrl = `${workingHost}/embed/${sportCategory}/${v}`;
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
           const res = await fetch(fastUrl, {
             signal: controller.signal,
             headers: {
@@ -440,18 +440,25 @@ export async function resolveHlsStream(
               rawM3u8Text = txt;
               cachedTarget.lastM3u8Text = txt;
               cachedTarget.lastM3u8Time = Date.now();
+            } else {
+              tokenCacheMap.delete(cacheKey);
             }
+          } else {
+            // Expired tokens or changed server prefix -> invalidate cache to trigger fresh resolution
+            tokenCacheMap.delete(cacheKey);
           }
         } catch {
           // If upstream hiccuped, reuse recent valid playlist to prevent disconnect
-          if (cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 30000)) {
+          if (cachedTarget.lastM3u8Text && (now - (cachedTarget.lastM3u8Time || 0) < 15000)) {
             rawM3u8Text = cachedTarget.lastM3u8Text;
+          } else {
+            tokenCacheMap.delete(cacheKey);
           }
         }
       }
     }
 
-    // 3. Direct Discovery via /api/v1/sources/:streamKey (Ultra-Fast <1s direct resolution)
+    // 3. Direct Discovery via /api/v1/sources/:streamKey (Ultra-Fast <1s direct resolution with dynamic CDN prefix)
     if (!rawM3u8Text && !isExternal) {
       try {
         const sourcesData = await getSourcesByKey(streamKey).catch(() => null);
@@ -464,66 +471,81 @@ export async function resolveHlsStream(
             const fullSlug = pathParts.pop() || '';
             const directSuffix = fullSlug.replace(streamKey, '') || '1080p';
 
-            const embedController = new AbortController();
-            const embedTimeoutId = setTimeout(() => embedController.abort(), 4500);
-            const embedRes = await fetch(liveSource.url, {
-              signal: embedController.signal,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                'Referer': `${sourceOrigin}/`,
-                'Origin': sourceOrigin
-              }
-            });
-            clearTimeout(embedTimeoutId);
+            // Parallel fetch embed page AND stream key info to detect exact CDN server prefix
+            const [embedRes, keyRes] = await Promise.all([
+              fetch(liveSource.url, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Referer': `${sourceOrigin}/`,
+                  'Origin': sourceOrigin
+                },
+                signal: AbortSignal.timeout(4000)
+              }).catch(() => null),
+              fetch(`${sourceOrigin}/get-stream-key/${streamKey}`, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Referer': liveSource.url,
+                  'Origin': sourceOrigin
+                },
+                signal: AbortSignal.timeout(3000)
+              }).then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
 
-            if (embedRes.ok) {
+            const keyData = keyRes as any;
+            if (keyData?.is_external && keyData.external_url) {
+              isExternal = true;
+              externalUrl = keyData.external_url;
+            } else if (embedRes && embedRes.ok) {
               const html = await embedRes.text();
               const match = html.match(/const\s+_0x\s*=\s*({[^;]+});/);
               if (match) {
                 const parsedTokens = JSON.parse(match[1]);
+                const sName = keyData?.server_name || 'origin';
+                const detectedPrefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+                const candidatePrefixes = Array.from(new Set([detectedPrefix, '/live-externalcdn/', '/live-cdn/', '/live/']));
                 
-                // Determine test qualities: requested quality first, then directSuffix, then 1080p
                 const qualitiesToTry = Array.from(new Set([directSuffix, quality, '1080p', '720p'])).filter(Boolean);
-                for (const testSuf of qualitiesToTry) {
-                  const qKey = testSuf.replace(/\d+$/, '');
-                  const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
-                  if (!p) continue;
-                  const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
-                  const testM3u8Url = `${sourceOrigin}/live/${streamKey}${testSuf}/index.m3u8${qStr}`;
+                
+                outerLoop:
+                for (const testPrefix of candidatePrefixes) {
+                  for (const testSuf of qualitiesToTry) {
+                    const qKey = testSuf.replace(/\d+$/, '');
+                    const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
+                    if (!p) continue;
+                    const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
+                    const testM3u8Url = `${sourceOrigin}${testPrefix}${streamKey}${testSuf}/index.m3u8${qStr}`;
 
-                  try {
-                    const mController = new AbortController();
-                    const mTimeoutId = setTimeout(() => mController.abort(), 4000);
-                    const mRes = await fetch(testM3u8Url, {
-                      signal: mController.signal,
-                      headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                        'Referer': liveSource.url,
-                        'Origin': sourceOrigin
+                    try {
+                      const mRes = await fetch(testM3u8Url, {
+                        signal: AbortSignal.timeout(3500),
+                        headers: {
+                          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                          'Referer': liveSource.url,
+                          'Origin': sourceOrigin
+                        }
+                      });
+                      if (mRes.ok) {
+                        const txt = await mRes.text();
+                        if (txt.includes('#EXTM3U')) {
+                          tokens = parsedTokens;
+                          workingHost = sourceOrigin;
+                          serverName = sName;
+                          pathPrefix = testPrefix;
+                          activeVariantSuffix = testSuf;
+                          rawM3u8Text = txt;
+                          recordMirrorSuccess(sourceOrigin, 50);
+                          break outerLoop;
+                        }
                       }
-                    });
-                    clearTimeout(mTimeoutId);
-                    if (mRes.ok) {
-                      const txt = await mRes.text();
-                      if (txt.includes('#EXTM3U')) {
-                        tokens = parsedTokens;
-                        workingHost = sourceOrigin;
-                        serverName = 'origin';
-                        pathPrefix = '/live/';
-                        activeVariantSuffix = testSuf;
-                        rawM3u8Text = txt;
-                        recordMirrorSuccess(sourceOrigin, 50);
-                        break;
-                      }
-                    }
-                  } catch {}
+                    } catch {}
+                  }
                 }
               }
             }
           }
         }
       } catch (err: any) {
-        console.warn(`[StreamService] Direct discovery fast-path notice for ${streamKey}:`, err?.message);
+        console.warn(`[StreamService] Direct discovery notice for ${streamKey}:`, err?.message);
       }
     }
 
@@ -540,12 +562,34 @@ export async function resolveHlsStream(
       let foundWorkingFeed = false;
 
       for (const mirror of mirrors) {
+        let keyData: any = {};
+        try {
+          const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Origin': mirror
+            },
+            signal: AbortSignal.timeout(2500)
+          });
+          if (kRes.ok) keyData = await kRes.json();
+        } catch {}
+
+        if (keyData.is_external && keyData.external_url) {
+          isExternal = true;
+          externalUrl = keyData.external_url;
+          foundWorkingFeed = true;
+          break;
+        }
+
+        const sName = keyData.server_name || 'origin';
+        const prefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
+
         for (const cat of sportCandidates) {
           for (const suf of candidateSuffixes) {
             try {
               const embedUrl = `${mirror}/embed/${cat}/${streamKey}${suf}`;
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 4000);
+              const timeoutId = setTimeout(() => controller.abort(), 3000);
               const res = await fetch(embedUrl, {
                 signal: controller.signal,
                 headers: {
@@ -568,29 +612,6 @@ export async function resolveHlsStream(
               const p = parsedTokens[qKey] || parsedTokens[quality] || Object.values(parsedTokens)[0];
               const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
-              let keyData: any = {};
-              try {
-                const kRes = await fetch(`${mirror}/get-stream-key/${streamKey}`, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                    'Referer': embedUrl,
-                    'Origin': mirror
-                  },
-                  signal: AbortSignal.timeout(3000)
-                });
-                if (kRes.ok) keyData = await kRes.json();
-              } catch {}
-
-              if (keyData.is_external && keyData.external_url) {
-                isExternal = true;
-                externalUrl = keyData.external_url;
-                foundWorkingFeed = true;
-                break;
-              }
-
-              const sName = keyData.server_name || 'origin';
-              const prefix = sName === 'externalcdn' ? '/live-externalcdn/' : (sName !== 'origin' ? '/live-cdn/' : '/live/');
-
               const m3u8Url = `${mirror}${prefix}${streamKey}${suf}/index.m3u8${qStr}`;
               const m3u8Res = await fetch(m3u8Url, {
                 headers: {
@@ -598,7 +619,7 @@ export async function resolveHlsStream(
                   'Referer': embedUrl,
                   'Origin': mirror
                 },
-                signal: AbortSignal.timeout(4000)
+                signal: AbortSignal.timeout(3000)
               });
               if (!m3u8Res.ok) continue;
               const m3u8Txt = await m3u8Res.text();
