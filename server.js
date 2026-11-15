@@ -1008,25 +1008,25 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
           const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
 
           const curlOutputs = [];
-          for (const [qual, p] of Object.entries(parsedTokens)) {
-            const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
-            const urlMatching = `${sourceOrigin}${detectedPrefix}${key}${qual}/index.m3u8${qStr}`;
-            try {
-              const r = await fetch(urlMatching, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-                signal: AbortSignal.timeout(4000)
-              });
-              const txt = await r.text();
-              curlOutputs.push({
-                qual,
-                status: r.status,
-                hasExt: txt.includes('#EXTM3U'),
-                url: urlMatching,
-                preview: txt.substring(0, 120)
-              });
-            } catch (e) {
-              curlOutputs.push({ qual, error: e.message });
-            }
+          const { execSync } = await import('child_process');
+          try {
+            const oneShotTest = execSync(`node -e "
+              (async () => {
+                const r = await fetch('https://strmfree.st/embed/basketball/${key}1080p', {
+                  headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+                const html = await r.text();
+                const m = html.match(/const\\\\s+_0x\\\\s*=\\\\s*({[^;]+});/);
+                const tokens = JSON.parse(m[1]);
+                const p = tokens['1080p'];
+                const u = 'https://strmfree.st/live-externalcdn/${key}1080p/index.m3u8?_t=' + p._t + '&_e=' + p._e + '&_n=' + p._n;
+                const mRes = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                console.log('One-shot status:', mRes.status, 'hasExt:', (await mRes.text()).includes('#EXTM3U'));
+              })();
+            "`, { encoding: 'utf8', timeout: 10000 });
+            curlOutputs.push({ oneShot: oneShotTest.trim() });
+          } catch (e) {
+            curlOutputs.push({ oneShotError: e.message, stdout: e.stdout?.trim() });
           }
           trace.push({ step: 'curlOutputs', data: curlOutputs });
         }
