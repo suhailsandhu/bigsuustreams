@@ -1027,6 +1027,27 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
   res.json({ key, trace });
 });
 
+app.post('/api/admin/setup-proxy', async (req, res) => {
+  const pin = req.headers['x-admin-pin'] || req.query.pin;
+  if (!analytics.verifyPin(String(pin))) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { execSync } = await import('child_process');
+  const results = {};
+  try {
+    results.torInstalled = execSync('which tor || true', { encoding: 'utf8' }).trim();
+    if (!results.torInstalled) {
+      results.installOutput = execSync('DEBIAN_FRONTEND=noninteractive apt-get update -y && apt-get install -y tor && systemctl enable --now tor', { encoding: 'utf8', timeout: 60000 });
+      results.torInstalled = execSync('which tor || true', { encoding: 'utf8' }).trim();
+    }
+    results.torStatus = execSync('systemctl is-active tor || true', { encoding: 'utf8' }).trim();
+    results.testExitIp = execSync('curl -s -x socks5h://127.0.0.1:9050 https://api.ipify.org || true', { encoding: 'utf8', timeout: 15000 }).trim();
+  } catch (e) {
+    results.error = e.message;
+  }
+  res.json(results);
+});
+
 app.get('/api/admin/test-stream/:key', async (req, res) => {
   const pin = req.headers['x-admin-pin'] || req.query.pin;
   if (!analytics.verifyPin(String(pin))) {
