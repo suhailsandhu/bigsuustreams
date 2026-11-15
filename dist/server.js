@@ -4119,23 +4119,29 @@ app.get("/api/admin/diagnose-stream/:key", async (req, res) => {
           const curlOutputs = [];
           const { execSync } = await import("child_process");
           try {
-            const oneShotTest = execSync(`node -e "
+            const torOneShot = execSync(`node -e "
               (async () => {
-                const r = await fetch('https://strmfree.st/embed/basketball/${key}1080p', {
-                  headers: { 'User-Agent': 'Mozilla/5.0' }
-                });
-                const html = await r.text();
+                const { execSync } = require('child_process');
+                // Fetch embed page through Tor
+                const html = execSync('curl -s -x socks5h://127.0.0.1:9050 "https://strmfree.st/embed/basketball/${key}1080p"', { encoding: 'utf8', timeout: 15000 });
                 const m = html.match(/const\\\\s+_0x\\\\s*=\\\\s*({[^;]+});/);
+                if (!m) {
+                  console.log('No token in Tor embed HTML, length:', html.length);
+                  return;
+                }
                 const tokens = JSON.parse(m[1]);
                 const p = tokens['1080p'];
                 const u = 'https://strmfree.st/live-externalcdn/${key}1080p/index.m3u8?_t=' + p._t + '&_e=' + p._e + '&_n=' + p._n;
-                const mRes = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-                console.log('One-shot status:', mRes.status, 'hasExt:', (await mRes.text()).includes('#EXTM3U'));
+                // Fetch M3U8 through the EXACT same Tor proxy
+                const m3u8 = execSync('curl -s -i -x socks5h://127.0.0.1:9050 "' + u + '"', { encoding: 'utf8', timeout: 15000 });
+                console.log('Tor one-shot M3U8 status:', m3u8.split('\\\\r\\\\n')[0] || m3u8.split('\\\\n')[0]);
+                console.log('Has EXTM3U:', m3u8.includes('#EXTM3U'));
+                console.log('First 200 chars:', m3u8.substring(0, 200));
               })();
-            "`, { encoding: "utf8", timeout: 1e4 });
-            curlOutputs.push({ oneShot: oneShotTest.trim() });
+            "`, { encoding: "utf8", timeout: 35e3 });
+            curlOutputs.push({ torOneShot: torOneShot.trim() });
           } catch (e) {
-            curlOutputs.push({ oneShotError: e.message, stdout: e.stdout?.trim() });
+            curlOutputs.push({ torOneShotError: e.message, stdout: e.stdout?.trim() });
           }
           trace.push({ step: "curlOutputs", data: curlOutputs });
         }
