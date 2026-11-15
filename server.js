@@ -1002,32 +1002,46 @@ app.get('/api/admin/diagnose-stream/:key', async (req, res) => {
           const qualitiesToTry = Array.from(new Set([directSuffix, '1080p', '720p'])).filter(Boolean);
 
           const m3u8Attempts = [];
-          for (const testPrefix of candidatePrefixes) {
-            for (const testSuf of qualitiesToTry) {
-              const qKey = testSuf.replace(/\d+$/, '');
-              const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
-              if (!p) continue;
-              const qStr = `?_t=${p._t}&_e=${p._e}&_n=${p._n}`;
-              const testM3u8Url = `${sourceOrigin}${testPrefix}${key}${testSuf}/index.m3u8${qStr}`;
-              try {
-                const mRes = await fetch(testM3u8Url, {
-                  signal: AbortSignal.timeout(4000),
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                    'Accept': '*/*'
-                  }
-                });
-                const txt = await mRes.text();
-                m3u8Attempts.push({
-                  url: testM3u8Url,
-                  status: mRes.status,
-                  hasExtM3u: txt.includes('#EXTM3U'),
-                  preview: txt.substring(0, 150)
-                });
-                if (txt.includes('#EXTM3U')) break;
-              } catch (e) {
-                m3u8Attempts.push({ url: testM3u8Url, error: e.message });
-              }
+          const testSuf = qualitiesToTry[0] || '1080p';
+          const qKey = testSuf.replace(/\d+$/, '');
+          const p = parsedTokens[qKey] || parsedTokens[testSuf] || Object.values(parsedTokens)[0];
+          const qStr = p ? `?_t=${p._t}&_e=${p._e}&_n=${p._n}` : '';
+          const testM3u8Url = `${sourceOrigin}${detectedPrefix}${key}${testSuf}/index.m3u8${qStr}`;
+
+          const headerPermutations = [
+            { name: 'no-referer', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } },
+            { name: 'referer-embed', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': liveSource.url } },
+            { name: 'referer-origin', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': `${sourceOrigin}/` } },
+            { name: 'referer-embed-and-origin', headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Referer': liveSource.url,
+              'Origin': sourceOrigin,
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin'
+            }},
+            { name: 'streamfree-mirror', headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': `https://streamfree.top/embed/basketball/${key}1080p`
+            }}
+          ];
+
+          for (const perm of headerPermutations) {
+            try {
+              const mRes = await fetch(testM3u8Url, {
+                signal: AbortSignal.timeout(4000),
+                headers: perm.headers
+              });
+              const txt = await mRes.text();
+              m3u8Attempts.push({
+                test: perm.name,
+                url: testM3u8Url,
+                status: mRes.status,
+                hasExtM3u: txt.includes('#EXTM3U'),
+                preview: txt.substring(0, 150)
+              });
+            } catch (e) {
+              m3u8Attempts.push({ test: perm.name, error: e.message });
             }
           }
           trace.push({ step: 'm3u8Attempts', attempts: m3u8Attempts });
